@@ -1,0 +1,112 @@
+export type Period = "week" | "15d" | "month" | "6mo" | "year";
+
+export const PERIODS: { value: Period; label: string }[] = [
+  { value: "week", label: "Week" },
+  { value: "15d", label: "15 Days" },
+  { value: "month", label: "Month" },
+  { value: "6mo", label: "6 Months" },
+  { value: "year", label: "Year" },
+];
+
+const PERIOD_DAYS: Record<Period, number> = {
+  week: 7,
+  "15d": 15,
+  month: 30,
+  "6mo": 183,
+  year: 365,
+};
+
+/** Bucket granularity used for the trend chart of each period. */
+export const PERIOD_BUCKET: Record<Period, "day" | "week" | "month"> = {
+  week: "day",
+  "15d": "day",
+  month: "day",
+  "6mo": "week",
+  year: "month",
+};
+
+export function isValidDateStr(s: unknown): s is string {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+/** Format a Date as local YYYY-MM-DD. */
+export function toDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function parseDateStr(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function addDays(s: string, n: number): string {
+  const d = parseDateStr(s);
+  d.setDate(d.getDate() + n);
+  return toDateStr(d);
+}
+
+/** Inclusive date range ending on `today` for the given period. */
+export function periodRange(
+  period: Period,
+  today: string
+): { start: string; end: string; days: number } {
+  const days = PERIOD_DAYS[period];
+  return { start: addDays(today, -(days - 1)), end: today, days };
+}
+
+/** Label for a bucket key shown on the trend chart's x-axis. */
+export function bucketOf(date: string, granularity: "day" | "week" | "month"): string {
+  if (granularity === "day") return date;
+  if (granularity === "month") return date.slice(0, 7); // YYYY-MM
+  // week: Monday of that week
+  const d = parseDateStr(date);
+  const dow = (d.getDay() + 6) % 7; // Mon=0 .. Sun=6
+  d.setDate(d.getDate() - dow);
+  return toDateStr(d);
+}
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+export function bucketLabel(key: string, granularity: "day" | "week" | "month"): string {
+  if (granularity === "month") {
+    const [, m] = key.split("-").map(Number);
+    return MONTHS[m - 1];
+  }
+  const d = parseDateStr(key);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+/** All bucket keys covering the range, in order (so empty buckets still appear). */
+export function bucketsForRange(
+  start: string,
+  end: string,
+  granularity: "day" | "week" | "month"
+): string[] {
+  const keys: string[] = [];
+  let cur = bucketOf(start, granularity);
+  const last = bucketOf(end, granularity);
+  while (cur <= last) {
+    keys.push(cur);
+    if (granularity === "day") cur = addDays(cur, 1);
+    else if (granularity === "week") cur = addDays(cur, 7);
+    else {
+      const [y, m] = cur.split("-").map(Number);
+      cur = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+    }
+  }
+  return keys;
+}
+
+export function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}

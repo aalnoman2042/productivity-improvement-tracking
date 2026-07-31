@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PIT — Productivity Improvement Tracker
 
-## Getting Started
+Track everything that makes a day good — sleep, study, work, workouts, food,
+habits, weight — and watch the trends. Each account is private; friends sign up
+with an invite code and see only their own data.
 
-First, run the development server:
+## Run locally
 
-```bash
+```powershell
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Settings live in `.env.local` (copy `.env.example`
+if it's missing). Data is stored in MongoDB — a local server in dev, MongoDB
+Atlas in production.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Everything you track is a **tracker**, and its *type* decides both how you enter
+it and how it's charted:
 
-## Learn More
+| Type | Good for | You enter | Chart |
+|---|---|---|---|
+| `duration` | Study, work, workout, reading | Hours/minutes, or a stopwatch | Stacked bars + share donut |
+| `sleep` | Sleep | Bedtime & wake time (+ quality 1–5) | Hours per night vs target |
+| `count` | Water, meals, junk food | A number, with +/− buttons | Bars per day |
+| `scale` | Mood, diet quality, focus | 1–5 rating | Trend line |
+| `check` | Vitamins, meditation | Done / not done | Completion + streak |
+| `measure` | Weight, calories | A decimal + unit | Trend line |
 
-To learn more about Next.js, take a look at the following resources:
+Any tracker can carry a **goal** ("at least 3h study per day", "at most 2 junk
+meals per week"). The dashboard scores every day or week against it.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The stopwatch adds its minutes to the day's total, so several sessions add up.
+It survives a refresh — the running timer is kept in `localStorage`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Pages
 
-## Deploy on Vercel
+- **Dashboard** (`/`) — period selector (week / 15 days / month / 6 months /
+  year), stat tiles, time donut + trend, sleep chart, one card per habit.
+- **Today** (`/today`) — log a day; every tracker gets the input its type needs.
+- **Trackers** (`/trackers`) — create, edit, set goals, archive; one-click
+  starter pack for a new account.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Data model (MongoDB)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Three collections, all with `$jsonSchema` validators so the BSON types stay
+honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
+
+- `users` — email (unique), name, scrypt `passwordHash`, `createdAt`
+- `trackers` — `userId`, name, type, unit, color, category, goal, archived, order
+- `entries` — `userId`, `trackerId`, `date` (`YYYY-MM-DD`), `value`, optional
+  `meta` (sleep times & quality), `note`, timestamps.
+  Unique on `(userId, trackerId, date)`.
+
+## Demo data
+
+To fill an account with a believable month of history:
+
+```powershell
+npm run seed:demo -- your@email.com
+```
+
+This **replaces** that account's trackers and entries. Nothing else is touched.
+
+## Stack
+
+Next.js (App Router) · TypeScript · Tailwind v4 · Recharts · MongoDB ·
+sessions as signed JWT cookies (`jose`) with passwords hashed using Node's
+`scrypt`; every route is guarded in `proxy.ts` and every query is scoped by
+`userId`.
+
+## Deploy online
+
+See [DEPLOY.md](./DEPLOY.md) for the Vercel + MongoDB Atlas walkthrough.

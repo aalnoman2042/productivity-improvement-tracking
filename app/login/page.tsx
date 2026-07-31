@@ -1,0 +1,92 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        router.replace("/");
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Could not sign in");
+      }
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="flex flex-1 items-center justify-center p-6">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm rounded-lg border border-edge bg-surface p-8 shadow-md"
+      >
+        <h1 className="text-center text-2xl font-bold tracking-tight text-accent">
+          PIT
+        </h1>
+        <p className="mt-1 mb-6 text-center text-sm text-secondary">
+          Sign in to your tracker
+        </p>
+
+        <label className="mb-1 block text-sm font-medium">Email</label>
+        <input
+          type="email"
+          autoComplete="email"
+          autoFocus
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mb-4 w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent"
+        />
+
+        <label className="mb-1 block text-sm font-medium">Password</label>
+        <input
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent"
+        />
+
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="mt-5 w-full rounded-md bg-accent py-2.5 font-medium text-white hover:bg-accent-hover disabled:opacity-40"
+        >
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+
+        <p className="mt-5 text-center text-sm text-secondary">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-medium text-accent underline">
+            Sign up
+          </Link>
+        </p>
+      </form>
+    </main>
+  );
+}
