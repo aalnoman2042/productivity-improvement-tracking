@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
+/* =====================================================================
+   Light theme (default)
+   ===================================================================== */
 :root {
   color-scheme: light;
+
   --background: #f4f6fa;
   --foreground: #111827;
   --surface: #ffffff;
+  --surface-2: #f7f9fc;
   --ink-secondary: #4b5563;
   --ink-muted: #6b7280;
   --chart-grid: #eaecf0;
@@ -15,11 +20,16 @@
   --accent-hover: #184f95;
   --accent-soft: #eef4fd;
 
-  /* Gradients */
   --grad-brand: linear-gradient(135deg, #2a78d6 0%, #1c5cab 55%, #4a3aa7 100%);
-  --grad-page: linear-gradient(180deg, #f7f9fc 0%, #eef1f7 100%);
   --grad-card: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
 
+  /* Soft colour wash behind everything — three fixed radial tints. */
+  --wash-1: rgba(42, 120, 214, 0.13);
+  --wash-2: rgba(74, 58, 167, 0.11);
+  --wash-3: rgba(27, 175, 122, 0.09);
+  --wash-base: #f4f6fa;
+
+  /* Categorical series — validated light steps */
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
@@ -30,10 +40,88 @@
   --series-8: #e34948;
 }
 
+/* =====================================================================
+   Dark theme — its own steps chosen for a dark surface, not an
+   automatic inversion of the light ones.
+   ===================================================================== */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0d0d0d;
+  --foreground: #ffffff;
+  --surface: #1a1a19;
+  --surface-2: #201f1e;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --edge: #2f2f2d;
+
+  --accent: #3987e5;
+  --accent-hover: #5598e7;
+  --accent-soft: #16273d;
+
+  --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
+  --grad-card: linear-gradient(180deg, #1c1c1b 0%, #171716 100%);
+
+  --wash-1: rgba(57, 135, 229, 0.16);
+  --wash-2: rgba(144, 133, 233, 0.13);
+  --wash-3: rgba(25, 158, 112, 0.1);
+  --wash-base: #0d0d0d;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+}
+
+/* Follow the device when the user hasn't picked a theme explicitly. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+
+    --background: #0d0d0d;
+    --foreground: #ffffff;
+    --surface: #1a1a19;
+    --surface-2: #201f1e;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --edge: #2f2f2d;
+
+    --accent: #3987e5;
+    --accent-hover: #5598e7;
+    --accent-soft: #16273d;
+
+    --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
+    --grad-card: linear-gradient(180deg, #1c1c1b 0%, #171716 100%);
+
+    --wash-1: rgba(57, 135, 229, 0.16);
+    --wash-2: rgba(144, 133, 233, 0.13);
+    --wash-3: rgba(25, 158, 112, 0.1);
+    --wash-base: #0d0d0d;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-secondary: var(--ink-secondary);
   --color-muted: var(--ink-muted);
   --color-edge: var(--edge);
@@ -41,21 +129,57 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+}
+
+/* =====================================================================
+   Page
+   ===================================================================== */
+html {
+  background: var(--wash-base);
 }
 
 body {
-  background: var(--grad-page);
-  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
-  /* Momentum scrolling and no rubber-band flash on phones */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+
+  /* Static gradients only — cheap to paint, no blur filters or animation,
+     so scrolling stays smooth on a phone. */
+  background-color: var(--wash-base);
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, var(--wash-1), transparent 60%),
+    radial-gradient(50rem 36rem at 92% 4%, var(--wash-2), transparent 62%),
+    radial-gradient(46rem 34rem at 50% 108%, var(--wash-3), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
-/* ---------------------------------------------------------------- utils */
+/* Phones: `fixed` attachment forces a repaint on every scroll frame. */
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+}
 
+/* Respect the notch / home indicator */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Clears the fixed bottom nav (and the iPhone home indicator) on phones. */
+.app-main {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .app-main {
+    padding-bottom: 2.5rem;
+  }
+}
+
+/* =====================================================================
+   Utilities
+   ===================================================================== */
 .bg-brand-gradient {
   background: var(--grad-brand);
 }
@@ -71,7 +195,6 @@ body {
   background: var(--grad-card);
 }
 
-/* Buttons and taps feel instant rather than sticky */
 button,
 a,
 select,
@@ -88,64 +211,70 @@ button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-/* ----------------------------------------------------------- animations */
+/* Comfortable tap targets on touch devices */
+@media (pointer: coarse) {
+  button,
+  select,
+  input[type="date"],
+  input[type="time"] {
+    min-height: 40px;
+  }
+}
 
+/* =====================================================================
+   Animations
+   ===================================================================== */
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes spin-slow {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
-.animate-fade-in {
-  animation: fade-in 220ms ease-out both;
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
-.animate-rise-in {
-  animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.animate-fade-in { animation: fade-in 220ms ease-out both; }
+.animate-rise-in { animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-spin-slow { animation: spin-slow 1.4s linear infinite; }
+.animate-pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
+
+/* Placeholder shown while a chart's code loads — same height as the chart,
+   so nothing jumps when it arrives. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 0.5rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--foreground) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
 }
 
-.animate-spin-slow {
-  animation: spin-slow 1.4s linear infinite;
-}
-
-.animate-pulse-ring {
-  animation: pulse-ring 1.6s ease-out infinite;
-}
-
-/* Stagger a list without a JS animation library: each child starts a beat
-   later than the one above it. Capped so long lists don't crawl. */
 .stagger > * {
   animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -157,7 +286,6 @@ button:active:not(:disabled) {
 .stagger > *:nth-child(6) { animation-delay: 175ms; }
 .stagger > *:nth-child(n + 7) { animation-delay: 210ms; }
 
-/* Anyone who asks for less motion gets none of it. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

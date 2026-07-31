@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:demo": "node scripts/seed-demo.mjs"
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "set-password": "node scripts/set-password.mjs",
+    "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
     "jose": "^6.2.4",

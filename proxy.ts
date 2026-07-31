@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession, COOKIE_NAME } from "@/lib/auth";
 
-const PUBLIC_PAGES = new Set(["/login", "/signup"]);
+const PUBLIC_PAGES = new Set(["/login", "/signup", "/forgot", "/reset"]);
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -10,7 +10,11 @@ export default async function proxy(req: NextRequest) {
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();
 
   if (PUBLIC_PAGES.has(pathname)) {
-    if (signedIn) return NextResponse.redirect(new URL("/", req.url));
+    // A signed-in visitor following a reset link should still be able to use
+    // it — everything else bounces to the dashboard.
+    if (signedIn && pathname !== "/reset") {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
     return NextResponse.next();
   }
 

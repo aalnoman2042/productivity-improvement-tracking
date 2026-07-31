@@ -10,9 +10,9 @@ import {
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
-import DonutChart, { type Slice } from "@/components/charts/DonutChart";
-import TrendChart from "@/components/charts/TrendChart";
-import SeriesChart, { type Point } from "@/components/charts/SeriesChart";
+import { DonutChart, TrendChart, SeriesChart } from "@/components/charts";
+import type { Slice } from "@/components/charts/DonutChart";
+import type { Point } from "@/components/charts/SeriesChart";
 
 type Bucket = {
   key: string;
@@ -75,7 +75,7 @@ function GoalBar({ met, total }: { met: number; total: number }) {
           {met}/{total} · {pct}%
         </span>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-background">
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div
           className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
           style={{ width: `${pct}%` }}
@@ -176,7 +176,7 @@ export default function DashboardPage() {
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                 period === p.value
                   ? "bg-brand-gradient text-white shadow-sm"
-                  : "text-secondary hover:bg-background"
+                  : "text-secondary hover:bg-surface-2"
               }`}
             >
               {p.label}

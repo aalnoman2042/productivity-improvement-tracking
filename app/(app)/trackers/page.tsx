@@ -270,7 +270,7 @@ export default function TrackersPage() {
                   className={`rounded-md border p-2.5 text-left disabled:opacity-50 ${
                     form.type === t.value
                       ? "border-accent bg-accent/5"
-                      : "border-edge hover:bg-background"
+                      : "border-edge hover:bg-surface-2"
                   }`}
                 >
                   <div className="text-sm font-medium">{t.label}</div>
@@ -415,7 +415,7 @@ export default function TrackersPage() {
                 setShowForm(false);
                 setEditingId(null);
               }}
-              className="rounded-md px-4 py-2 text-sm text-secondary hover:bg-background"
+              className="rounded-md px-4 py-2 text-sm text-secondary hover:bg-surface-2"
             >
               Cancel
             </button>
@@ -452,7 +452,7 @@ export default function TrackersPage() {
                 {group.items.map((t) => (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center gap-3 rounded-lg border border-edge card p-4 shadow-sm"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm sm:p-4"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"
@@ -465,25 +465,27 @@ export default function TrackersPage() {
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}
                       </div>
                     </div>
-                    <button
-                      onClick={() => openEdit(t)}
-                      className="rounded-md px-2 py-1 text-sm text-secondary hover:bg-background"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => patch(t.id, { archived: true })}
-                      className="rounded-md px-2 py-1 text-sm text-secondary hover:bg-background"
-                      title="Hide from the log, keep history"
-                    >
-                      Archive
-                    </button>
-                    <button
-                      onClick={() => remove(t.id)}
-                      className="rounded-md px-2 py-1 text-sm text-red-600 hover:bg-background"
-                    >
-                      Delete
-                    </button>
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => openEdit(t)}
+                        className="rounded-md border border-edge px-2.5 py-1 text-sm text-secondary hover:bg-surface-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => patch(t.id, { archived: true })}
+                        className="rounded-md border border-edge px-2.5 py-1 text-sm text-secondary hover:bg-surface-2"
+                        title="Hide from the log, keep history"
+                      >
+                        Archive
+                      </button>
+                      <button
+                        onClick={() => remove(t.id)}
+                        className="rounded-md border border-edge px-2.5 py-1 text-sm text-red-600 hover:bg-surface-2"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -506,7 +508,7 @@ export default function TrackersPage() {
                     <span className="flex-1 truncate font-medium">{t.name}</span>
                     <button
                       onClick={() => patch(t.id, { archived: false })}
-                      className="rounded-md px-2 py-1 text-sm text-secondary hover:bg-background"
+                      className="rounded-md px-2 py-1 text-sm text-secondary hover:bg-surface-2"
                     >
                       Restore
                     </button>

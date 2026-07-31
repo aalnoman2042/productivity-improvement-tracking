@@ -29,6 +29,9 @@ const VALIDATORS: Record<string, object> = {
       name: { bsonType: "string" },
       passwordHash: { bsonType: "string" },
       createdAt: { bsonType: "date" },
+      // Password reset: only the hash of the token is kept, never the token.
+      resetTokenHash: { bsonType: ["string", "null"] },
+      resetExpires: { bsonType: ["date", "null"] },
     },
   },
   trackers: {

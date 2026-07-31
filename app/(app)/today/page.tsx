@@ -235,7 +235,7 @@ export default function TodayPage() {
             />
           </label>
           {mins > 0 && (
-            <span className="rounded-md bg-background px-2 py-1 text-sm font-medium tabular-nums">
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-sm font-medium tabular-nums">
               {formatValue(mins, "sleep", "min")}
             </span>
           )}
@@ -248,7 +248,7 @@ export default function TodayPage() {
                 className={`h-7 w-7 rounded-md border text-sm ${
                   (dr.quality ?? 0) >= n
                     ? "border-accent bg-accent text-white"
-                    : "border-edge text-muted hover:bg-background"
+                    : "border-edge text-muted hover:bg-surface-2"
                 }`}
                 title={`Sleep quality ${n}/5`}
               >
@@ -267,7 +267,7 @@ export default function TodayPage() {
           <button
             type="button"
             onClick={() => set(t.id, { num: String(Math.max(0, n - 1)) })}
-            className="h-8 w-8 rounded-md border border-edge text-lg leading-none hover:bg-background"
+            className="h-8 w-8 rounded-md border border-edge text-lg leading-none hover:bg-surface-2"
             aria-label={`Decrease ${t.name}`}
           >
             −
@@ -283,7 +283,7 @@ export default function TodayPage() {
           <button
             type="button"
             onClick={() => set(t.id, { num: String(n + 1) })}
-            className="h-8 w-8 rounded-md border border-edge text-lg leading-none hover:bg-background"
+            className="h-8 w-8 rounded-md border border-edge text-lg leading-none hover:bg-surface-2"
             aria-label={`Increase ${t.name}`}
           >
             +
@@ -305,7 +305,7 @@ export default function TodayPage() {
               className={`h-8 w-8 rounded-md border text-sm ${
                 current === n
                   ? "border-accent bg-accent text-white"
-                  : "border-edge text-secondary hover:bg-background"
+                  : "border-edge text-secondary hover:bg-surface-2"
               }`}
             >
               {n}
@@ -323,7 +323,7 @@ export default function TodayPage() {
           className={`rounded-md border px-4 py-1.5 text-sm font-medium ${
             dr.checked
               ? "border-green-700 bg-green-700 text-white"
-              : "border-edge text-secondary hover:bg-background"
+              : "border-edge text-secondary hover:bg-surface-2"
           }`}
         >
           {dr.checked ? "✓ Done" : "Mark done"}
@@ -361,7 +361,7 @@ export default function TodayPage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setDate((d) => addDays(d, -1))}
-          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-background"
+          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2"
           aria-label="Previous day"
         >
           ←
@@ -381,7 +381,7 @@ export default function TodayPage() {
         <button
           onClick={() => setDate((d) => addDays(d, 1))}
           disabled={date >= today}
-          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-background disabled:opacity-30"
+          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2 disabled:opacity-30"
           aria-label="Next day"
         >
           →
@@ -418,14 +418,18 @@ export default function TodayPage() {
                     <span className="min-w-0 flex-1 truncate font-medium">
                       {t.name}
                     </span>
-                    {renderInput(t)}
+                    {/* Inputs sit beside the name on a wide screen and drop to
+                        their own full-width row on a phone. */}
+                    <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
+                      {renderInput(t)}
+                    </div>
                   </li>
                 ))}
               </ul>
             </section>
           ))}
 
-          <div className="sticky bottom-16 z-10 flex items-center gap-3 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
+          <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
             <span className="text-sm text-secondary">
               Time logged:{" "}
               <strong className="tabular-nums">
