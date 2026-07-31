@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -20,14 +19,6 @@ const ACCOUNT = { href: "/settings", label: "Account" };
 export default function Nav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((u) => u?.name && setName(u.name))
-      .catch(() => {});
-  }, []);
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -74,9 +65,7 @@ export default function Nav() {
               title="Account, password and sign out"
             >
               <span aria-hidden="true">👤</span>
-              <span className="max-w-28 truncate">
-                {name?.split(" ")[0] || ACCOUNT.label}
-              </span>
+              <span>{ACCOUNT.label}</span>
             </Link>
             <button
               onClick={signOut}

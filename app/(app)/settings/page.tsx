@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { APP_VERSION } from "@/lib/version";
 
 type Me = { id: string; name: string; email: string };
 
@@ -109,7 +110,7 @@ export default function SettingsPage() {
           >
             <h2 className="font-semibold">Profile</h2>
             <div>
-              <label className="mb-1 block text-sm font-medium">Name</label>
+              <label className="mb-1 block text-sm font-medium">Your name</label>
               <input
                 required
                 maxLength={60}
@@ -215,6 +216,26 @@ export default function SettingsPage() {
             >
               {signingOut ? "Signing out…" : "Sign out of PIT"}
             </button>
+          </section>
+
+          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+            <h2 className="font-semibold">About</h2>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-secondary">App</dt>
+                <dd className="font-medium">
+                  PIT — Productivity Improvement Tracker
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-secondary">Version</dt>
+                <dd className="font-medium tabular-nums">{APP_VERSION}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-secondary">Built by</dt>
+                <dd className="font-medium">Rohan</dd>
+              </div>
+            </dl>
           </section>
         </>
       )}
