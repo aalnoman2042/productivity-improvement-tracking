@@ -1,29 +1,64 @@
 /**
- * Outgoing mail via Resend. Optional: without RESEND_API_KEY the app still
- * works, password-reset emails just can't be delivered — the caller is told
- * so it can show an honest message instead of pretending one was sent.
+ * Outgoing mail. Two ways to send, whichever is configured:
+ *
+ *  1. SMTP (GMAIL_USER + GMAIL_APP_PASSWORD) — needs no domain of your own,
+ *     just a Google App Password. Reaches any recipient.
+ *  2. Resend (RESEND_API_KEY) — needs a verified domain before it will
+ *     deliver to anyone but the Resend account holder.
+ *
+ * With neither set the app still runs; password-reset requests just say so
+ * honestly instead of pretending an email went out.
  */
+import nodemailer from "nodemailer";
 
-export const emailConfigured = () => Boolean(process.env.RESEND_API_KEY);
+type Sent = { ok: boolean; error?: string };
 
-export async function sendEmail(opts: {
+const smtpReady = () =>
+  Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+
+export const emailConfigured = () =>
+  smtpReady() || Boolean(process.env.RESEND_API_KEY);
+
+async function sendViaSmtp(opts: {
   to: string;
   subject: string;
   html: string;
   text: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return { ok: false, error: "Email is not configured" };
+}): Promise<Sent> {
+  const user = process.env.GMAIL_USER!;
+  try {
+    const transport = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass: process.env.GMAIL_APP_PASSWORD! },
+    });
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || `PIT <${user}>`,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      html: opts.html,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "SMTP failed" };
+  }
+}
 
+async function sendViaResend(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<Sent> {
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM || "PIT <onboarding@resend.dev>",
+        from: process.env.MAIL_FROM || "PIT <onboarding@resend.dev>",
         to: [opts.to],
         subject: opts.subject,
         html: opts.html,
@@ -31,13 +66,23 @@ export async function sendEmail(opts: {
       }),
     });
     if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, error: `Resend responded ${res.status}: ${body}` };
+      return { ok: false, error: `Resend responded ${res.status}: ${await res.text()}` };
     }
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Send failed" };
   }
+}
+
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<Sent> {
+  if (smtpReady()) return sendViaSmtp(opts);
+  if (process.env.RESEND_API_KEY) return sendViaResend(opts);
+  return { ok: false, error: "Email is not configured" };
 }
 
 export function resetEmail(name: string, link: string) {
