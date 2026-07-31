@@ -51,6 +51,10 @@ export default function ForgotPage() {
               expires in one hour — check your spam folder if it doesn&apos;t
               arrive.
             </p>
+            <p className="mt-3 text-xs text-muted">
+              Still nothing after a few minutes? Ask the owner of this tracker
+              to set a new password for you.
+            </p>
             <Link
               href="/login"
               className="mt-5 block rounded-md bg-brand-gradient py-2.5 text-center font-medium text-white hover:brightness-110"
