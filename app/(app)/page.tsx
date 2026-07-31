@@ -57,7 +57,7 @@ function StatTile({
   hint?: string;
 }) {
   return (
-    <div className="rounded-lg border border-edge bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-edge card p-4 shadow-sm">
       <div className="text-2xl font-bold">{value}</div>
       <div className="mt-0.5 text-xs text-muted">{label}</div>
       {hint && <div className="mt-1 text-xs text-secondary">{hint}</div>}
@@ -77,7 +77,7 @@ function GoalBar({ met, total }: { met: number; total: number }) {
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-background">
         <div
-          className="h-full rounded-full bg-accent"
+          className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -168,14 +168,14 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <div className="flex flex-wrap gap-1 rounded-lg border border-edge bg-surface p-1 shadow-sm">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-edge card p-1 shadow-sm">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                 period === p.value
-                  ? "bg-accent text-white"
+                  ? "bg-brand-gradient text-white shadow-sm"
                   : "text-secondary hover:bg-background"
               }`}
             >
@@ -196,14 +196,14 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/trackers"
-            className="mt-5 inline-block rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
+            className="mt-5 inline-block rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110"
           >
             Set up trackers
           </Link>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
               label="Time logged"
               value={formatValue(totalTime, "duration", "min")}
@@ -241,14 +241,14 @@ export default function DashboardPage() {
 
           {/* Time spent */}
           {totalTime > 0 && (
-            <div className="grid gap-4 lg:grid-cols-5">
-              <section className="rounded-lg border border-edge bg-surface p-4 shadow-sm lg:col-span-2">
+            <div className="animate-rise-in grid gap-4 lg:grid-cols-5">
+              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-2">
                 <h2 className="mb-3 text-sm font-semibold text-secondary">
                   Where your time went
                 </h2>
                 <DonutChart data={timeSlices} />
               </section>
-              <section className="rounded-lg border border-edge bg-surface p-4 shadow-sm lg:col-span-3">
+              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-3">
                 <h2 className="mb-3 text-sm font-semibold text-secondary">
                   Time per{" "}
                   {stats.granularity === "day"
@@ -276,7 +276,7 @@ export default function DashboardPage() {
             return (
               <section
                 key={t.id}
-                className="rounded-lg border border-edge bg-surface p-4 shadow-sm"
+                className="rounded-lg border border-edge card p-4 shadow-sm"
               >
                 <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                   <h2 className="text-sm font-semibold text-secondary">
@@ -317,7 +317,7 @@ export default function DashboardPage() {
 
           {/* Habits, food, health */}
           {otherTrackers.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="stagger grid gap-4 md:grid-cols-2">
               {otherTrackers.map((t) => {
                 const s = stats.summary[t.id];
                 const type = t.type as TrackerType;
@@ -338,7 +338,7 @@ export default function DashboardPage() {
                 return (
                   <section
                     key={t.id}
-                    className="rounded-lg border border-edge bg-surface p-4 shadow-sm"
+                    className="rounded-lg border border-edge card p-4 shadow-sm"
                   >
                     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                       <h2 className="text-sm font-semibold text-secondary">

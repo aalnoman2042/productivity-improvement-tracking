@@ -5,12 +5,16 @@ import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import {
   CATEGORIES,
   TRACKER_TYPES,
+  categoryMeta,
+  orderCategories,
   typeMeta,
   type Category,
   type Goal,
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
+
+const NEW_CATEGORY = "__new__";
 
 type Form = {
   name: string;
@@ -74,6 +78,7 @@ export default function TrackersPage() {
   const [trackers, setTrackers] = useState<Tracker[] | null>(null);
   const [form, setForm] = useState<Form>(BLANK);
   const [showForm, setShowForm] = useState(false);
+  const [customCategory, setCustomCategory] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -101,6 +106,7 @@ export default function TrackersPage() {
     const free = SERIES_PALETTE.find((p) => !used.has(p.light.toLowerCase()));
     setForm({ ...BLANK, color: free?.light ?? SERIES_PALETTE[0].light });
     setEditingId(null);
+    setCustomCategory(false);
     setShowForm(true);
     setError("");
   }
@@ -116,6 +122,7 @@ export default function TrackersPage() {
       ...goalToForm(t),
     } as Form);
     setEditingId(t.id);
+    setCustomCategory(false);
     setShowForm(true);
     setError("");
   }
@@ -190,10 +197,25 @@ export default function TrackersPage() {
     () => (trackers ?? []).filter((t) => t.archived),
     [trackers]
   );
-  const grouped = CATEGORIES.map((c) => ({
-    ...c,
-    items: active.filter((t) => t.category === c.value),
-  })).filter((g) => g.items.length > 0);
+  /** Suggested categories plus every one already in use. */
+  const categoryOptions = useMemo(
+    () =>
+      orderCategories([
+        ...CATEGORIES.map((c) => c.value),
+        ...(trackers ?? []).map((t) => t.category),
+      ]),
+    [trackers]
+  );
+
+  const grouped = orderCategories(active.map((t) => t.category))
+    .map((value) => ({
+      value,
+      ...categoryMeta(value),
+      items: active.filter(
+        (t) => t.category.toLowerCase() === value.toLowerCase()
+      ),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const isTimeType = form.type === "duration" || form.type === "sleep";
   const field =
@@ -211,7 +233,7 @@ export default function TrackersPage() {
         {!showForm && (
           <button
             onClick={openAdd}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+            className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
           >
             + New tracker
           </button>
@@ -221,7 +243,7 @@ export default function TrackersPage() {
       {showForm && (
         <form
           onSubmit={submit}
-          className="space-y-4 rounded-lg border border-edge bg-surface p-4 shadow-sm"
+          className="space-y-4 rounded-lg border border-edge card p-4 shadow-sm"
         >
           <div>
             <label className="mb-1 block text-sm font-medium">Name</label>
@@ -267,16 +289,38 @@ export default function TrackersPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">Category</label>
               <select
-                value={form.category}
-                onChange={(e) => setF("category", e.target.value as Category)}
+                value={customCategory ? NEW_CATEGORY : form.category}
+                onChange={(e) => {
+                  if (e.target.value === NEW_CATEGORY) {
+                    setCustomCategory(true);
+                    setF("category", "");
+                  } else {
+                    setCustomCategory(false);
+                    setF("category", e.target.value);
+                  }
+                }}
                 className={field}
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.icon} {c.label}
-                  </option>
-                ))}
+                {categoryOptions.map((value) => {
+                  const meta = categoryMeta(value);
+                  return (
+                    <option key={value} value={value}>
+                      {meta.icon} {meta.label}
+                    </option>
+                  );
+                })}
+                <option value={NEW_CATEGORY}>＋ New category…</option>
               </select>
+              {customCategory && (
+                <input
+                  value={form.category}
+                  onChange={(e) => setF("category", e.target.value)}
+                  placeholder="e.g. Skincare, Prayer, Side project"
+                  maxLength={30}
+                  autoFocus
+                  className={`${field} mt-2`}
+                />
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Unit</label>
@@ -361,7 +405,7 @@ export default function TrackersPage() {
             <button
               type="submit"
               disabled={busy || !form.name.trim()}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40"
+              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {editingId ? "Save changes" : "Add tracker"}
             </button>
@@ -392,7 +436,7 @@ export default function TrackersPage() {
           <button
             onClick={addStarterPack}
             disabled={busy}
-            className="mt-5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40"
+            className="mt-5 rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
           >
             {busy ? "Adding…" : "Add starter pack"}
           </button>
@@ -404,11 +448,11 @@ export default function TrackersPage() {
               <h2 className="mb-2 text-sm font-semibold text-secondary">
                 {group.icon} {group.label}
               </h2>
-              <ul className="space-y-2">
+              <ul className="stagger space-y-2">
                 {group.items.map((t) => (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center gap-3 rounded-lg border border-edge bg-surface p-4 shadow-sm"
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-edge card p-4 shadow-sm"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"
@@ -449,11 +493,11 @@ export default function TrackersPage() {
           {archived.length > 0 && (
             <section>
               <h2 className="mb-2 text-sm font-semibold text-muted">Archived</h2>
-              <ul className="space-y-2">
+              <ul className="stagger space-y-2">
                 {archived.map((t) => (
                   <li
                     key={t.id}
-                    className="flex items-center gap-3 rounded-lg border border-edge bg-surface p-4 opacity-60 shadow-sm"
+                    className="flex items-center gap-3 rounded-lg border border-edge card p-4 opacity-60 shadow-sm"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"

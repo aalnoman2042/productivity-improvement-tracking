@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { CATEGORIES } from "@/lib/trackers";
+import { normalizeCategory } from "@/lib/trackers";
 import { parseGoal } from "../route";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -26,8 +26,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     set.color = body.color;
   }
   if (typeof body.unit === "string") set.unit = body.unit.trim().slice(0, 12);
-  if (CATEGORIES.some((c) => c.value === body.category)) {
-    set.category = body.category;
+  if ("category" in body) {
+    const category = normalizeCategory(body.category);
+    if (category) set.category = category;
   }
   if (typeof body.archived === "boolean") set.archived = body.archived;
   if ("goal" in body) set.goal = parseGoal(body.goal);

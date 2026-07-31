@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Logo from "@/components/Logo";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -51,9 +52,12 @@ export default function SignupPage() {
     <main className="flex flex-1 items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-lg border border-edge bg-surface p-8 shadow-md"
+        className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md"
       >
-        <h1 className="text-center text-2xl font-bold tracking-tight text-accent">
+        <div className="mb-3 flex justify-center">
+          <Logo size={52} />
+        </div>
+        <h1 className="text-brand-gradient text-center text-2xl font-bold tracking-tight">
           PIT
         </h1>
         <p className="mt-1 mb-6 text-center text-sm text-secondary">
@@ -105,7 +109,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-5 w-full rounded-md bg-accent py-2.5 font-medium text-white hover:bg-accent-hover disabled:opacity-40"
+          className="mt-5 w-full rounded-md bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
         >
           {busy ? "Creating…" : "Create account"}
         </button>

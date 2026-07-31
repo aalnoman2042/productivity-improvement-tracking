@@ -2,16 +2,23 @@
 
 :root {
   color-scheme: light;
-  --background: #f3f4f6;
+  --background: #f4f6fa;
   --foreground: #111827;
   --surface: #ffffff;
   --ink-secondary: #4b5563;
   --ink-muted: #6b7280;
-  --chart-grid: #e5e7eb;
-  --chart-axis: #d1d5db;
+  --chart-grid: #eaecf0;
+  --chart-axis: #d5d8de;
   --edge: #e5e7eb;
+
   --accent: #1c5cab;
   --accent-hover: #184f95;
+  --accent-soft: #eef4fd;
+
+  /* Gradients */
+  --grad-brand: linear-gradient(135deg, #2a78d6 0%, #1c5cab 55%, #4a3aa7 100%);
+  --grad-page: linear-gradient(180deg, #f7f9fc 0%, #eef1f7 100%);
+  --grad-card: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
 
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -32,12 +39,134 @@
   --color-edge: var(--edge);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
+  background: var(--grad-page);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Momentum scrolling and no rubber-band flash on phones */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* ---------------------------------------------------------------- utils */
+
+.bg-brand-gradient {
+  background: var(--grad-brand);
+}
+
+.text-brand-gradient {
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card {
+  background: var(--grad-card);
+}
+
+/* Buttons and taps feel instant rather than sticky */
+button,
+a,
+select,
+input {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 120ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ----------------------------------------------------------- animations */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 220ms ease-out both;
+}
+
+.animate-rise-in {
+  animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1.4s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* Stagger a list without a JS animation library: each child starts a beat
+   later than the one above it. Capped so long lists don't crawl. */
+.stagger > * {
+  animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 35ms; }
+.stagger > *:nth-child(3) { animation-delay: 70ms; }
+.stagger > *:nth-child(4) { animation-delay: 105ms; }
+.stagger > *:nth-child(5) { animation-delay: 140ms; }
+.stagger > *:nth-child(6) { animation-delay: 175ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 210ms; }
+
+/* Anyone who asks for less motion gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }

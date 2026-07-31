@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { post } from "@/lib/sync";
 
 const KEY = "pit_timer";
 
@@ -82,12 +83,15 @@ export default function Timer({
     setRunning(null);
     broadcast();
     try {
-      await fetch("/api/entries/increment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackerId, date: running.date, minutes }),
+      // Queues itself if you're offline — the minutes are never lost.
+      await post("/api/entries/increment", {
+        trackerId,
+        date: running.date,
+        minutes,
       });
       onSaved();
+    } catch {
+      /* the queue will retry */
     } finally {
       setBusy(false);
     }
@@ -99,7 +103,7 @@ export default function Timer({
         type="button"
         onClick={stop}
         disabled={busy}
-        className="flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-sm font-medium text-white tabular-nums hover:bg-red-700 disabled:opacity-50"
+        className="animate-pulse-ring flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-sm font-medium text-white tabular-nums hover:bg-red-700 disabled:opacity-50"
         title="Stop and add this time"
       >
         <span className="h-2 w-2 rounded-xs bg-white" />

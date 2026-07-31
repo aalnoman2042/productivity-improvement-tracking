@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { type WithId, type Document } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { TEMPLATES, TRACKER_TYPES, CATEGORIES, type Goal } from "@/lib/trackers";
+import {
+  TEMPLATES,
+  TRACKER_TYPES,
+  normalizeCategory,
+  type Goal,
+} from "@/lib/trackers";
 
 export function toTracker(doc: WithId<Document>) {
   return {
@@ -70,7 +75,7 @@ export async function POST(req: Request) {
 
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const type = TRACKER_TYPES.find((t) => t.value === body?.type)?.value;
-  const category = CATEGORIES.find((c) => c.value === body?.category)?.value;
+  const category = normalizeCategory(body?.category);
   const color = typeof body?.color === "string" ? body.color : "";
   const unit = typeof body?.unit === "string" ? body.unit.trim().slice(0, 12) : "";
 
@@ -79,7 +84,10 @@ export async function POST(req: Request) {
   }
   if (!type) return NextResponse.json({ error: "Pick a type" }, { status: 400 });
   if (!category) {
-    return NextResponse.json({ error: "Pick a category" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Pick or type a category" },
+      { status: 400 }
+    );
   }
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
     return NextResponse.json({ error: "Invalid color" }, { status: 400 });

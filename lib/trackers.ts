@@ -6,14 +6,8 @@ export type TrackerType =
   | "check"
   | "measure";
 
-export type Category =
-  | "study"
-  | "work"
-  | "fitness"
-  | "health"
-  | "food"
-  | "sleep"
-  | "other";
+/** Free-form: the presets below are suggestions, not a closed list. */
+export type Category = string;
 
 export type Goal = {
   target: number;
@@ -85,6 +79,7 @@ export const TRACKER_TYPES: {
   },
 ];
 
+/** Suggested categories — you can type your own anywhere these appear. */
 export const CATEGORIES: { value: Category; label: string; icon: string }[] = [
   { value: "sleep", label: "Sleep", icon: "🌙" },
   { value: "study", label: "Study", icon: "📚" },
@@ -94,6 +89,46 @@ export const CATEGORIES: { value: Category; label: string; icon: string }[] = [
   { value: "health", label: "Health", icon: "❤️" },
   { value: "other", label: "Other", icon: "⭐" },
 ];
+
+/** Label and icon for any category, preset or made up. */
+export function categoryMeta(value: string): { label: string; icon: string } {
+  const preset = CATEGORIES.find(
+    (c) => c.value.toLowerCase() === value.toLowerCase()
+  );
+  if (preset) return { label: preset.label, icon: preset.icon };
+  return {
+    label: value.charAt(0).toUpperCase() + value.slice(1),
+    icon: "🏷️",
+  };
+}
+
+/** Trim and cap a category typed by the user; null if it's empty. */
+export function normalizeCategory(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().replace(/\s+/g, " ").slice(0, 30);
+  return value.length > 0 ? value : null;
+}
+
+/**
+ * Grouping order: presets first (so Sleep stays on top), then any custom
+ * categories alphabetically.
+ */
+export function orderCategories(values: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const v of values) {
+    const key = v.toLowerCase();
+    if (!seen.has(key)) seen.set(key, v);
+  }
+  const presetOrder = CATEGORIES.map((c) => c.value);
+  return [...seen.values()].sort((a, b) => {
+    const ai = presetOrder.indexOf(a.toLowerCase());
+    const bi = presetOrder.indexOf(b.toLowerCase());
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
 
 export function typeMeta(type: TrackerType) {
   return TRACKER_TYPES.find((t) => t.value === type) ?? TRACKER_TYPES[0];

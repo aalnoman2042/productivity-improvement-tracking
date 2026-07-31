@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,7 +15,23 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PIT — Productivity Improvement Tracker",
-  description: "Track where your time goes and watch it improve.",
+  description:
+    "Track sleep, study, work, workouts, food and habits — and watch the trends.",
+  applicationName: "PIT",
+  appleWebApp: {
+    capable: true,
+    title: "PIT",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1c5cab",
+  width: "device-width",
+  initialScale: 1,
+  // Keeps the app from zooming when you tap a number field on a phone.
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -27,7 +44,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

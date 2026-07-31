@@ -42,9 +42,8 @@ const VALIDATORS: Record<string, object> = {
       },
       unit: { bsonType: "string" },
       color: { bsonType: "string", pattern: "^#[0-9a-fA-F]{6}$" },
-      category: {
-        enum: ["study", "work", "fitness", "health", "food", "sleep", "other"],
-      },
+      // Free-form so you can invent your own categories.
+      category: { bsonType: "string", minLength: 1, maxLength: 30 },
       goal: {
         bsonType: ["object", "null"],
         required: ["target", "period", "direction"],

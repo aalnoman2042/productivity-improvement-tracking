@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Timer from "@/components/Timer";
+import { cacheSet, getCached, post } from "@/lib/sync";
 import { addDays, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import {
-  CATEGORIES,
+  categoryMeta,
   formatValue,
   minutesBetween,
-  type Category,
+  orderCategories,
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
@@ -89,32 +90,29 @@ export default function TodayPage() {
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [queued, setQueued] = useState(false);
   const [error, setError] = useState("");
 
   const today = toDateStr(new Date());
 
   useEffect(() => {
-    fetch("/api/trackers").then(async (res) => {
-      if (res.status === 401) return location.assign("/login");
-      const all: Tracker[] = await res.json();
-      setTrackers(all.filter((t) => !t.archived));
+    getCached<Tracker[]>("/api/trackers", "trackers").then(({ data }) => {
+      if (data) setTrackers(data.filter((t) => !t.archived));
     });
   }, []);
 
-  const loadDay = useCallback(
-    async (d: string, list: Tracker[] | null) => {
-      if (!list) return;
-      const res = await fetch(`/api/entries?date=${d}`);
-      if (!res.ok) return;
-      const rows: Entry[] = await res.json();
-      const byId = new Map(rows.map((r) => [r.trackerId, r]));
-      const next: Record<string, Draft> = {};
-      for (const t of list) next[t.id] = toDraft(t.type as TrackerType, byId.get(t.id));
-      setDraft(next);
-      setSaved(false);
-    },
-    []
-  );
+  const loadDay = useCallback(async (d: string, list: Tracker[] | null) => {
+    if (!list) return;
+    const { data } = await getCached<Entry[]>(
+      `/api/entries?date=${d}`,
+      `entries:${d}`
+    );
+    const byId = new Map((data ?? []).map((r) => [r.trackerId, r]));
+    const next: Record<string, Draft> = {};
+    for (const t of list) next[t.id] = toDraft(t.type as TrackerType, byId.get(t.id));
+    setDraft(next);
+    setSaved(false);
+  }, []);
 
   useEffect(() => {
     loadDay(date, trackers);
@@ -133,34 +131,41 @@ export default function TodayPage() {
     if (!trackers) return;
     setSaving(true);
     setError("");
+    setQueued(false);
     const entries = trackers.map((t) => ({
       trackerId: t.id,
       ...draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY),
     }));
     try {
-      const res = await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, entries }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        setError(d?.error ?? "Could not save");
-        return;
-      }
+      const result = await post("/api/entries", { date, entries });
+      // Keep the local copy in step so this day still reads back offline.
+      cacheSet(
+        `entries:${date}`,
+        entries
+          .filter((e) => e.value > 0 || e.meta)
+          .map((e) => ({ ...e, note: null }))
+      );
       setSaved(true);
+      setQueued(result === "queued");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
     } finally {
       setSaving(false);
     }
   }
 
-  // Group trackers into their categories, keeping the category order fixed.
+  // Group trackers by category — presets first, then any custom ones.
   const grouped = useMemo(() => {
     if (!trackers) return [];
-    return CATEGORIES.map((c) => ({
-      ...c,
-      items: trackers.filter((t) => t.category === c.value),
-    })).filter((g) => g.items.length > 0);
+    return orderCategories(trackers.map((t) => t.category))
+      .map((value) => ({
+        value,
+        ...categoryMeta(value),
+        items: trackers.filter(
+          (t) => t.category.toLowerCase() === value.toLowerCase()
+        ),
+      }))
+      .filter((g) => g.items.length > 0);
   }, [trackers]);
 
   const dayTotalMinutes = useMemo(() => {
@@ -356,7 +361,7 @@ export default function TodayPage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setDate((d) => addDays(d, -1))}
-          className="rounded-md border border-edge bg-surface px-3 py-2 shadow-sm hover:bg-background"
+          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-background"
           aria-label="Previous day"
         >
           ←
@@ -367,7 +372,7 @@ export default function TodayPage() {
             value={date}
             max={today}
             onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-center shadow-sm outline-none focus:border-accent"
+            className="w-full rounded-md border border-edge card px-3 py-2 text-center shadow-sm outline-none focus:border-accent"
           />
           <p className="mt-1 text-center text-xs text-muted">
             {date === today ? "Today" : date === addDays(today, -1) ? "Yesterday" : ""}
@@ -376,7 +381,7 @@ export default function TodayPage() {
         <button
           onClick={() => setDate((d) => addDays(d, 1))}
           disabled={date >= today}
-          className="rounded-md border border-edge bg-surface px-3 py-2 shadow-sm hover:bg-background disabled:opacity-30"
+          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-background disabled:opacity-30"
           aria-label="Next day"
         >
           →
@@ -400,11 +405,11 @@ export default function TodayPage() {
               <h2 className="mb-2 text-sm font-semibold text-secondary">
                 {group.icon} {group.label}
               </h2>
-              <ul className="space-y-2">
+              <ul className="stagger space-y-2">
                 {group.items.map((t) => (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge bg-surface p-3 shadow-sm"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"
@@ -420,7 +425,7 @@ export default function TodayPage() {
             </section>
           ))}
 
-          <div className="sticky bottom-16 z-10 flex items-center gap-3 rounded-lg border border-edge bg-surface p-3 shadow-md sm:bottom-4">
+          <div className="sticky bottom-16 z-10 flex items-center gap-3 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
             <span className="text-sm text-secondary">
               Time logged:{" "}
               <strong className="tabular-nums">
@@ -428,13 +433,19 @@ export default function TodayPage() {
               </strong>
             </span>
             {saved && !saving && (
-              <span className="text-sm font-medium text-green-700">✓ Saved</span>
+              <span
+                className={`animate-fade-in text-sm font-medium ${
+                  queued ? "text-amber-700" : "text-green-700"
+                }`}
+              >
+                {queued ? "✓ Saved on device — will sync" : "✓ Saved"}
+              </span>
             )}
             {error && <span className="text-sm text-red-600">{error}</span>}
             <button
               onClick={save}
               disabled={saving}
-              className="ml-auto rounded-md bg-accent px-6 py-2.5 font-medium text-white hover:bg-accent-hover disabled:opacity-40"
+              className="ml-auto rounded-md bg-brand-gradient px-6 py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {saving ? "Saving…" : "Save day"}
             </button>

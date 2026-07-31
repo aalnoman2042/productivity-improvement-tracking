@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Logo from "@/components/Logo";
+import SyncStatus from "@/components/SyncStatus";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -29,7 +31,7 @@ export default function Nav() {
   }
 
   const tabCls = (href: string) =>
-    `-mb-px border-b-2 px-3 py-3.5 text-sm font-medium transition-colors ${
+    `-mb-px border-b-2 px-3 py-3.5 text-sm font-medium ${
       pathname === href
         ? "border-accent text-accent"
         : "border-transparent text-secondary hover:text-foreground"
@@ -39,8 +41,11 @@ export default function Nav() {
     <>
       <header className="sticky top-0 z-20 border-b border-edge bg-surface shadow-sm">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-6 px-4">
-          <Link href="/" className="py-3 text-lg font-bold tracking-tight text-accent">
-            PIT
+          <Link href="/" className="flex items-center gap-2 py-3">
+            <Logo size={26} />
+            <span className="text-brand-gradient text-lg font-bold tracking-tight">
+              PIT
+            </span>
           </Link>
           <nav className="hidden gap-2 self-stretch sm:flex">
             {LINKS.map((l) => (
@@ -50,6 +55,7 @@ export default function Nav() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <SyncStatus />
             {name && (
               <span className="hidden text-sm text-secondary sm:inline">
                 {name}
