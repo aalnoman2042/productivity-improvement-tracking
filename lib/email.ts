@@ -26,10 +26,12 @@ async function sendViaSmtp(opts: {
   text: string;
 }): Promise<Sent> {
   const user = process.env.GMAIL_USER!;
+  // Google displays App Passwords in four spaced groups; accept them as shown.
+  const pass = process.env.GMAIL_APP_PASSWORD!.replace(/\s+/g, "");
   try {
     const transport = nodemailer.createTransport({
       service: "gmail",
-      auth: { user, pass: process.env.GMAIL_APP_PASSWORD! },
+      auth: { user, pass },
     });
     await transport.sendMail({
       from: process.env.MAIL_FROM || `PIT <${user}>`,
