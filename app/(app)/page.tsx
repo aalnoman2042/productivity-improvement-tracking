@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { PERIODS, toDateStr, type Period } from "@/lib/dates";
+import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
 import {
   formatValue,
   typeMeta,
@@ -10,6 +10,7 @@ import {
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
+import { seriesColor } from "@/lib/palette";
 import { DonutChart, TrendChart, SeriesChart } from "@/components/charts";
 import type { Slice } from "@/components/charts/DonutChart";
 import type { Point } from "@/components/charts/SeriesChart";
@@ -26,13 +27,18 @@ type Summary = {
   sum: number;
   days: number;
   best: number;
+  bestDate: string | null;
   avgPerDay: number;
   avgPerLoggedDay: number;
   goal: { met: number; total: number } | null;
+  previous: { sum: number; days: number; value: number };
+  changePct: number | null;
 };
 
 type Stats = {
   period: Period;
+  start: string;
+  end: string;
   days: number;
   granularity: "day" | "week" | "month";
   trackers: Tracker[];
@@ -40,27 +46,75 @@ type Stats = {
   summary: Record<string, Summary>;
   streak: number;
   daysLogged: number;
+  prevDaysLogged: number;
   hasEntries: boolean;
 };
 
-/** Compact axis labels: 90 → "1.5h", 45 → "45m". */
 const shortTime = (v: number) =>
   v >= 60 ? `${Math.round((v / 60) * 10) / 10}h` : `${Math.round(v)}m`;
+
+const PERIOD_WORD: Record<Period, string> = {
+  week: "last week",
+  "15d": "the previous 15 days",
+  month: "last month",
+  "6mo": "the previous 6 months",
+  year: "last year",
+};
+
+function prettyDate(date: string): string {
+  const d = parseDateStr(date);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/* ------------------------------- pieces -------------------------------- */
+
+/** ↑ 12% — green when it's movement in the direction you asked for. */
+function Delta({
+  changePct,
+  goodDirection,
+  compareTo,
+}: {
+  changePct: number | null;
+  goodDirection: "up" | "down" | "unknown";
+  compareTo: string;
+}) {
+  if (changePct === null || !Number.isFinite(changePct)) {
+    return <span className="text-xs text-muted">no earlier data</span>;
+  }
+  const rounded = Math.round(changePct);
+  if (rounded === 0) {
+    return <span className="text-xs text-muted">same as {compareTo}</span>;
+  }
+  const up = rounded > 0;
+  const good =
+    goodDirection === "unknown" ? null : up === (goodDirection === "up");
+  const tone =
+    good === null
+      ? "text-secondary"
+      : good
+        ? "text-green-700 dark:text-green-500"
+        : "text-red-600 dark:text-red-400";
+  return (
+    <span className={`text-xs font-medium ${tone}`} title={`vs ${compareTo}`}>
+      {up ? "↑" : "↓"} {Math.abs(rounded)}%
+    </span>
+  );
+}
 
 function StatTile({
   label,
   value,
-  hint,
+  footer,
 }: {
   label: string;
   value: string;
-  hint?: string;
+  footer?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-edge card p-4 shadow-sm">
       <div className="text-2xl font-bold">{value}</div>
       <div className="mt-0.5 text-xs text-muted">{label}</div>
-      {hint && <div className="mt-1 text-xs text-secondary">{hint}</div>}
+      {footer && <div className="mt-1">{footer}</div>}
     </div>
   );
 }
@@ -68,7 +122,7 @@ function StatTile({
 function GoalBar({ met, total }: { met: number; total: number }) {
   const pct = total > 0 ? Math.round((met / total) * 100) : 0;
   return (
-    <div className="mt-2">
+    <div className="mt-3">
       <div className="flex items-center justify-between text-xs text-secondary">
         <span>Goal met</span>
         <span className="tabular-nums">
@@ -84,6 +138,21 @@ function GoalBar({ met, total }: { met: number; total: number }) {
     </div>
   );
 }
+
+function Facts({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-edge pt-3">
+      {items.map((f) => (
+        <div key={f.label}>
+          <dt className="text-xs text-muted">{f.label}</dt>
+          <dd className="text-sm font-semibold tabular-nums">{f.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/* ------------------------------ the page ------------------------------- */
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
@@ -111,11 +180,10 @@ export default function DashboardPage() {
   );
   const durationTrackers = active.filter((t) => t.type === "duration");
   const sleepTrackers = active.filter((t) => t.type === "sleep");
-  const otherTrackers = active.filter(
+  const habitTrackers = active.filter(
     (t) => !["duration", "sleep"].includes(t.type)
   );
 
-  /** Per-bucket points for one tracker: summed, or averaged for avg types. */
   function pointsFor(t: Tracker): Point[] {
     if (!stats) return [];
     const aggregate = typeMeta(t.type as TrackerType).aggregate;
@@ -129,16 +197,18 @@ export default function DashboardPage() {
     });
   }
 
-  /**
-   * Only draw a goal line when it's an honest comparison with what the bars
-   * show — daily averages always, daily sums only on daily buckets.
-   */
   function goalLineFor(t: Tracker): number | null {
     const goal: Goal = t.goal;
     if (!goal || goal.period !== "day") return null;
     const aggregate = typeMeta(t.type as TrackerType).aggregate;
     if (aggregate === "avg") return goal.target;
     return stats?.granularity === "day" ? goal.target : null;
+  }
+
+  /** More of this is good unless the goal says "at most". */
+  function goodDirection(t: Tracker): "up" | "down" | "unknown" {
+    if (t.goal) return t.goal.direction === "max" ? "down" : "up";
+    return t.type === "measure" ? "unknown" : "up";
   }
 
   const timeSlices: Slice[] = durationTrackers
@@ -152,6 +222,12 @@ export default function DashboardPage() {
     .sort((a, b) => b.minutes - a.minutes);
 
   const totalTime = timeSlices.reduce((s, x) => s + x.minutes, 0);
+  const prevTotalTime = durationTrackers.reduce(
+    (s, t) => s + (stats?.summary[t.id]?.previous.sum ?? 0),
+    0
+  );
+  const timeChange =
+    prevTotalTime > 0 ? ((totalTime - prevTotalTime) / prevTotalTime) * 100 : null;
 
   const goalStats = active
     .map((t) => stats?.summary[t.id]?.goal)
@@ -160,14 +236,155 @@ export default function DashboardPage() {
   const goalsTotal = goalStats.reduce((s, g) => s + g.total, 0);
 
   const mainSleep = sleepTrackers[0];
-  const sleepAvg = mainSleep
-    ? (stats?.summary[mainSleep.id]?.avgPerLoggedDay ?? 0)
-    : 0;
+  const sleepSummary = mainSleep ? stats?.summary[mainSleep.id] : undefined;
+  const compareTo = PERIOD_WORD[period];
+
+  // How much of the period is actually accounted for: every activity plus
+  // sleep, against the 24 hours each day really has.
+  const sleepMinutes = sleepTrackers.reduce(
+    (s, t) => s + (stats?.summary[t.id]?.sum ?? 0),
+    0
+  );
+  const accountedMinutes = totalTime + sleepMinutes;
+  const periodHours = (stats?.days ?? 0) * 24;
+  const coveragePct =
+    periodHours > 0
+      ? Math.round((accountedMinutes / (periodHours * 60)) * 100)
+      : 0;
+
+  /** One tracker, one chart, with its own numbers underneath. */
+  function TrackerCard({ t }: { t: Tracker }) {
+    const s = stats?.summary[t.id];
+    const type = t.type as TrackerType;
+    const isTime = type === "duration" || type === "sleep";
+    const aggregate = typeMeta(type).aggregate;
+    const kind: "bar" | "line" =
+      type === "measure" || type === "scale" ? "line" : "bar";
+    const fmt = (v: number) => formatValue(v, type, t.unit);
+
+    if (!s || s.days === 0) {
+      return (
+        <section className="rounded-lg border border-edge card p-4 shadow-sm">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: seriesColor(t.color) }}
+            />
+            {t.name}
+          </h3>
+          <p className="py-10 text-center text-sm text-muted">
+            Nothing logged in this period
+          </p>
+        </section>
+      );
+    }
+
+    const headline =
+      type === "check"
+        ? `${s.sum} of ${stats?.days} days`
+        : aggregate === "avg"
+          ? fmt(s.avgPerLoggedDay)
+          : fmt(s.sum);
+
+    return (
+      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: seriesColor(t.color) }}
+          />
+          <h3 className="text-sm font-semibold">{t.name}</h3>
+          <span className="ml-auto">
+            <Delta
+              changePct={s.changePct}
+              goodDirection={goodDirection(t)}
+              compareTo={compareTo}
+            />
+          </span>
+        </div>
+
+        <div className="mb-2 flex items-baseline gap-2">
+          <span className="text-2xl font-bold tabular-nums">{headline}</span>
+          <span className="text-xs text-muted">
+            {aggregate === "avg" ? "average" : "total"}
+          </span>
+        </div>
+
+        <SeriesChart
+          data={pointsFor(t)}
+          color={t.color}
+          kind={kind}
+          title={t.name}
+          format={fmt}
+          tickFormat={
+            isTime ? shortTime : (v) => String(Math.round(v * 10) / 10)
+          }
+          goal={goalLineFor(t)}
+          goalLabel="goal"
+          domain={type === "scale" ? [0, 5] : undefined}
+          height={150}
+        />
+
+        <Facts
+          items={[
+            {
+              label: aggregate === "avg" ? "Best" : "Per active day",
+              value: fmt(aggregate === "avg" ? s.best : s.avgPerLoggedDay),
+            },
+            {
+              label: "Best day",
+              value: s.bestDate ? prettyDate(s.bestDate) : "—",
+            },
+            { label: "Days active", value: `${s.days}/${stats?.days}` },
+          ]}
+        />
+
+        {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          {stats && (
+            <>
+              <p className="mt-1 text-sm text-secondary">
+                <strong className="text-foreground tabular-nums">
+                  {formatValue(accountedMinutes, "duration", "min")}
+                </strong>{" "}
+                of{" "}
+                <strong className="text-foreground tabular-nums">
+                  {periodHours}h
+                </strong>{" "}
+                tracked
+                <span className="text-muted"> ({coveragePct}%)</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {prettyDate(stats.start)} – {prettyDate(stats.end)} ·{" "}
+                {stats.days} days · activities{" "}
+                <span className="tabular-nums">
+                  {formatValue(totalTime, "duration", "min")}
+                </span>
+                {sleepMinutes > 0 && (
+                  <>
+                    {" "}
+                    · sleep{" "}
+                    <span className="tabular-nums">
+                      {formatValue(sleepMinutes, "sleep", "min")}
+                    </span>
+                  </>
+                )}{" "}
+                · untracked{" "}
+                <span className="tabular-nums">
+                  {formatValue(Math.max(0, periodHours * 60 - accountedMinutes), "duration", "min")}
+                </span>
+              </p>
+            </>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1 rounded-lg border border-edge card p-1 shadow-sm">
           {PERIODS.map((p) => (
             <button
@@ -207,18 +424,42 @@ export default function DashboardPage() {
             <StatTile
               label="Time logged"
               value={formatValue(totalTime, "duration", "min")}
+              footer={
+                <Delta
+                  changePct={timeChange}
+                  goodDirection="up"
+                  compareTo={compareTo}
+                />
+              }
             />
             <StatTile
               label={mainSleep ? "Average sleep" : "Days logged"}
               value={
                 mainSleep
-                  ? sleepAvg > 0
-                    ? formatValue(sleepAvg, "sleep", "min")
+                  ? sleepSummary && sleepSummary.days > 0
+                    ? formatValue(sleepSummary.avgPerLoggedDay, "sleep", "min")
                     : "—"
                   : `${stats.daysLogged}`
               }
+              footer={
+                mainSleep && sleepSummary ? (
+                  <Delta
+                    changePct={sleepSummary.changePct}
+                    goodDirection="up"
+                    compareTo={compareTo}
+                  />
+                ) : undefined
+              }
             />
-            <StatTile label="Current streak" value={`${stats.streak}d`} />
+            <StatTile
+              label="Current streak"
+              value={`${stats.streak}d`}
+              footer={
+                <span className="text-xs text-muted">
+                  {stats.daysLogged}/{stats.days} days logged
+                </span>
+              }
+            />
             <StatTile
               label="Goals met"
               value={
@@ -226,7 +467,13 @@ export default function DashboardPage() {
                   ? `${Math.round((goalsMet / goalsTotal) * 100)}%`
                   : "—"
               }
-              hint={goalsTotal > 0 ? `${goalsMet} of ${goalsTotal}` : undefined}
+              footer={
+                goalsTotal > 0 ? (
+                  <span className="text-xs text-muted">
+                    {goalsMet} of {goalsTotal}
+                  </span>
+                ) : undefined
+              }
             />
           </div>
 
@@ -239,7 +486,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Time spent */}
+          {/* Everything together */}
           {totalTime > 0 && (
             <div className="animate-rise-in grid gap-4 lg:grid-cols-5">
               <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-2">
@@ -249,133 +496,81 @@ export default function DashboardPage() {
                 <DonutChart data={timeSlices} />
               </section>
               <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-3">
-                <h2 className="mb-3 text-sm font-semibold text-secondary">
-                  Time per{" "}
+                <h2 className="mb-1 text-sm font-semibold text-secondary">
+                  All activities stacked
+                </h2>
+                <p className="mb-3 text-xs text-muted">
+                  Total time per{" "}
                   {stats.granularity === "day"
                     ? "day"
                     : stats.granularity === "week"
                       ? "week"
                       : "month"}
-                </h2>
+                  , split by activity.
+                </p>
                 <TrendChart buckets={stats.buckets} series={durationTrackers} />
               </section>
             </div>
           )}
 
-          {/* Sleep */}
-          {sleepTrackers.map((t) => {
-            const s = stats.summary[t.id];
-            if (!s || s.days === 0) return null;
-            const quality = stats.buckets.reduce(
-              (acc, b) => {
-                const q = b.quality[t.id];
-                return q ? { sum: acc.sum + q.sum, n: acc.n + q.n } : acc;
-              },
-              { sum: 0, n: 0 }
-            );
-            return (
-              <section
-                key={t.id}
-                className="rounded-lg border border-edge card p-4 shadow-sm"
-              >
-                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-secondary">
-                    🌙 {t.name}
-                  </h2>
-                  <div className="flex gap-4 text-xs text-secondary">
-                    <span>
-                      Average{" "}
-                      <strong className="tabular-nums">
-                        {formatValue(s.avgPerLoggedDay, "sleep", "min")}
-                      </strong>
-                    </span>
-                    {quality.n > 0 && (
-                      <span>
-                        Quality{" "}
-                        <strong className="tabular-nums">
-                          {(Math.round((quality.sum / quality.n) * 10) / 10).toFixed(1)}/5
-                        </strong>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <SeriesChart
-                  data={pointsFor(t)}
-                  color={t.color}
-                  kind="bar"
-                  title={t.name}
-                  format={(v) => formatValue(v, "sleep", "min")}
-                  tickFormat={shortTime}
-                  goal={goalLineFor(t)}
-                  goalLabel="target"
-                  height={200}
-                />
-                {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
-              </section>
-            );
-          })}
+          {/* Then each one on its own */}
+          {durationTrackers.length > 0 && (
+            <section>
+              <h2 className="mb-1 text-lg font-semibold">Each activity on its own</h2>
+              <p className="mb-3 text-sm text-secondary">
+                One chart per activity, so you can see how each is moving —
+                compared with {compareTo}.
+              </p>
+              <div className="stagger grid gap-4 md:grid-cols-2">
+                {durationTrackers.map((t) => (
+                  <TrackerCard key={t.id} t={t} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Sleep gets its quality read-out too */}
+          {sleepTrackers.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">Sleep</h2>
+              <div className="stagger grid gap-4 md:grid-cols-2">
+                {sleepTrackers.map((t) => {
+                  const quality = stats.buckets.reduce(
+                    (acc, b) => {
+                      const q = b.quality[t.id];
+                      return q ? { sum: acc.sum + q.sum, n: acc.n + q.n } : acc;
+                    },
+                    { sum: 0, n: 0 }
+                  );
+                  return (
+                    <div key={t.id} className="space-y-0">
+                      <TrackerCard t={t} />
+                      {quality.n > 0 && (
+                        <p className="mt-1 px-1 text-xs text-secondary">
+                          Average quality{" "}
+                          <strong className="tabular-nums">
+                            {(Math.round((quality.sum / quality.n) * 10) / 10).toFixed(1)}/5
+                          </strong>{" "}
+                          across {quality.n} night{quality.n > 1 ? "s" : ""}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Habits, food, health */}
-          {otherTrackers.length > 0 && (
-            <div className="stagger grid gap-4 md:grid-cols-2">
-              {otherTrackers.map((t) => {
-                const s = stats.summary[t.id];
-                const type = t.type as TrackerType;
-                const isRating = type === "scale";
-                const isCheck = type === "check";
-                const kind: "bar" | "line" =
-                  type === "measure" || isRating ? "line" : "bar";
-                const headline = !s
-                  ? "—"
-                  : isCheck
-                    ? `${s.sum}/${stats.days} days`
-                    : typeMeta(type).aggregate === "avg"
-                      ? s.days > 0
-                        ? formatValue(s.avgPerLoggedDay, type, t.unit)
-                        : "—"
-                      : formatValue(s.sum, type, t.unit);
-
-                return (
-                  <section
-                    key={t.id}
-                    className="rounded-lg border border-edge card p-4 shadow-sm"
-                  >
-                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                      <h2 className="text-sm font-semibold text-secondary">
-                        {t.name}
-                      </h2>
-                      <span className="text-xs text-secondary">
-                        {typeMeta(type).aggregate === "avg" ? "avg" : "total"}{" "}
-                        <strong className="tabular-nums">{headline}</strong>
-                      </span>
-                    </div>
-                    {s && s.days > 0 ? (
-                      <>
-                        <SeriesChart
-                          data={pointsFor(t)}
-                          color={t.color}
-                          kind={kind}
-                          title={t.name}
-                          format={(v) => formatValue(v, type, t.unit)}
-                          tickFormat={(v) =>
-                            String(Math.round(v * 10) / 10)
-                          }
-                          goal={goalLineFor(t)}
-                          goalLabel="goal"
-                          domain={isRating ? [0, 5] : undefined}
-                          height={160}
-                        />
-                        {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
-                      </>
-                    ) : (
-                      <p className="py-8 text-center text-sm text-muted">
-                        No data in this period
-                      </p>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
+          {habitTrackers.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">Habits &amp; health</h2>
+              <div className="stagger grid gap-4 md:grid-cols-2">
+                {habitTrackers.map((t) => (
+                  <TrackerCard key={t.id} t={t} />
+                ))}
+              </div>
+            </section>
           )}
         </>
       )}

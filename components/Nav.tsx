@@ -61,29 +61,28 @@ export default function Nav() {
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
             <SyncStatus />
+            <ThemeToggle />
+            {/* On a phone this is the way to the account page, where signing
+                out is a full, clearly-labelled button. */}
             <Link
               href={ACCOUNT.href}
-              className={`rounded-md border px-2.5 py-1.5 text-sm sm:px-3 ${
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm sm:px-3 ${
                 pathname === ACCOUNT.href
                   ? "border-accent text-accent"
                   : "border-edge text-secondary hover:bg-surface-2"
               }`}
-              title="Account settings"
+              title="Account, password and sign out"
             >
-              <span className="hidden sm:inline">{name || ACCOUNT.label}</span>
-              <span className="sm:hidden" aria-label={ACCOUNT.label}>
-                👤
+              <span aria-hidden="true">👤</span>
+              <span className="max-w-28 truncate">
+                {name?.split(" ")[0] || ACCOUNT.label}
               </span>
             </Link>
-            <ThemeToggle />
             <button
               onClick={signOut}
-              className="rounded-md border border-edge px-2.5 py-1.5 text-sm text-secondary hover:bg-surface-2 sm:px-3"
+              className="hidden rounded-md border border-edge px-3 py-1.5 text-sm text-secondary hover:bg-surface-2 sm:block"
             >
-              <span className="hidden sm:inline">Sign out</span>
-              <span className="sm:hidden" aria-label="Sign out">
-                ⏻
-              </span>
+              Sign out
             </button>
           </div>
         </div>

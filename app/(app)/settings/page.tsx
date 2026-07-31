@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Me = { id: string; name: string; email: string };
 
@@ -20,10 +21,11 @@ function Note({ kind, children }: { kind: "ok" | "bad"; children: React.ReactNod
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [profileMsg, setProfileMsg] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -39,7 +41,6 @@ export default function SettingsPage() {
       .then((u: Me) => {
         setMe(u);
         setName(u.name);
-        setEmail(u.email);
       })
       .catch(() => location.assign("/login"));
   }, []);
@@ -51,13 +52,13 @@ export default function SettingsPage() {
     const res = await fetch("/api/auth/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
+      body: JSON.stringify({ name }),
     });
     const data = await res.json().catch(() => null);
     setSavingProfile(false);
     if (res.ok) {
       setProfileMsg({ kind: "ok", text: "Profile updated" });
-      setMe((m) => (m ? { ...m, name, email } : m));
+      setMe((m) => (m ? { ...m, name } : m));
     } else {
       setProfileMsg({ kind: "bad", text: data?.error ?? "Could not save" });
     }
@@ -121,19 +122,20 @@ export default function SettingsPage() {
               <label className="mb-1 block text-sm font-medium">Email</label>
               <input
                 type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={field}
+                value={me.email}
+                readOnly
+                disabled
+                className={`${field} cursor-not-allowed bg-surface-2 text-secondary`}
               />
               <p className="mt-1 text-xs text-muted">
-                You sign in with this address.
+                🔒 You sign in with this address and it can&apos;t be changed
+                after sign-up.
               </p>
             </div>
             {profileMsg && <Note kind={profileMsg.kind}>{profileMsg.text}</Note>}
             <button
               type="submit"
-              disabled={savingProfile || (name === me.name && email === me.email)}
+              disabled={savingProfile || name === me.name}
               className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {savingProfile ? "Saving…" : "Save profile"}
@@ -194,6 +196,26 @@ export default function SettingsPage() {
               {savingPw ? "Changing…" : "Change password"}
             </button>
           </form>
+
+          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+            <h2 className="font-semibold">Sign out</h2>
+            <p className="mt-1 mb-4 text-sm text-secondary">
+              You&apos;ll need your email and password to get back in. Anything
+              saved on this device while offline syncs first.
+            </p>
+            <button
+              onClick={async () => {
+                setSigningOut(true);
+                await fetch("/api/auth/logout", { method: "POST" });
+                router.replace("/login");
+                router.refresh();
+              }}
+              disabled={signingOut}
+              className="w-full rounded-md border border-red-600 px-4 py-2.5 font-medium text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-40 sm:w-auto"
+            >
+              {signingOut ? "Signing out…" : "Sign out of PIT"}
+            </button>
+          </section>
         </>
       )}
     </div>

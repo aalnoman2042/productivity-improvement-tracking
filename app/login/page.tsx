@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import Footer from "@/components/Footer";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
+    <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
       <form
         onSubmit={submit}
         className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md"
@@ -97,6 +98,7 @@ export default function LoginPage() {
           </Link>
         </p>
       </form>
+      <Footer />
     </main>
   );
 }
