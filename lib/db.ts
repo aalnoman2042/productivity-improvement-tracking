@@ -32,6 +32,18 @@ const VALIDATORS: Record<string, object> = {
       // Password reset: only the hash of the token is kept, never the token.
       resetTokenHash: { bsonType: ["string", "null"] },
       resetExpires: { bsonType: ["date", "null"] },
+      // Nightly "did you log today?" push. The cron decides *when* it fires;
+      // tzOffset only decides *which day* the reminder is about.
+      reminder: {
+        bsonType: ["object", "null"],
+        properties: {
+          enabled: { bsonType: "bool" },
+          // Minutes to add to UTC to get local time (+360 for UTC+6).
+          tzOffset: { bsonType: "number", minimum: -840, maximum: 840 },
+          // The last day-to-log we nagged about, so a re-run can't double-send.
+          lastSentFor: { bsonType: ["string", "null"] },
+        },
+      },
     },
   },
   trackers: {
@@ -82,6 +94,27 @@ const VALIDATORS: Record<string, object> = {
       updatedAt: { bsonType: "date" },
     },
   },
+  // One row per browser that agreed to receive reminders — a phone and a
+  // laptop are separate rows, so both get the nudge.
+  pushSubs: {
+    bsonType: "object",
+    required: ["userId", "endpoint", "keys", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      endpoint: { bsonType: "string" },
+      keys: {
+        bsonType: "object",
+        required: ["p256dh", "auth"],
+        properties: {
+          p256dh: { bsonType: "string" },
+          auth: { bsonType: "string" },
+        },
+      },
+      label: { bsonType: ["string", "null"] },
+      createdAt: { bsonType: "date" },
+      lastUsedAt: { bsonType: ["date", "null"] },
+    },
+  },
 };
 
 async function ensureSchema(d: Db): Promise<void> {
@@ -106,6 +139,9 @@ async function ensureSchema(d: Db): Promise<void> {
       .collection("entries")
       .createIndex({ userId: 1, trackerId: 1, date: 1 }, { unique: true }),
     d.collection("entries").createIndex({ userId: 1, date: 1 }),
+    // The same browser re-subscribing must update its row, not add another.
+    d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
+    d.collection("pushSubs").createIndex({ userId: 1 }),
   ]);
 }
 

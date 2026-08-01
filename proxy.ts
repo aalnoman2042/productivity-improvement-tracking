@@ -9,6 +9,10 @@ export default async function proxy(req: NextRequest) {
 
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();
 
+  // The nightly reminder job arrives with no cookie — it proves itself with
+  // CRON_SECRET inside the route instead.
+  if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+
   if (PUBLIC_PAGES.has(pathname)) {
     // A signed-in visitor following a reset link should still be able to use
     // it — everything else bounces to the dashboard.

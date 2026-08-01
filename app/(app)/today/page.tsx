@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import DeleteDays from "@/components/DeleteDays";
 import Timer from "@/components/Timer";
 import { cacheSet, getCached, post } from "@/lib/sync";
-import { addDays, toDateStr } from "@/lib/dates";
+import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import {
   categoryMeta,
@@ -94,6 +95,14 @@ export default function TodayPage() {
   const [error, setError] = useState("");
 
   const today = toDateStr(new Date());
+
+  // `?date=YYYY-MM-DD` opens straight on that day — it's how the nightly
+  // reminder lands you on the day it's nagging about. Applied after mount
+  // so the server and the first client render still agree.
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get("date");
+    if (isValidDateStr(asked) && asked <= toDateStr(new Date())) setDate(asked);
+  }, []);
 
   useEffect(() => {
     getCached<Tracker[]>("/api/trackers", "trackers").then(({ data }) => {
@@ -454,6 +463,8 @@ export default function TodayPage() {
               {saving ? "Saving…" : "Save day"}
             </button>
           </div>
+
+          <DeleteDays date={date} onDeleted={() => loadDay(date, trackers)} />
         </>
       )}
     </div>

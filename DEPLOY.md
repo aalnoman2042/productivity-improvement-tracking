@@ -65,6 +65,55 @@ name `pit`).
 4. Click **Deploy**. After ~1 minute you get your URL, e.g.
    `https://pit-yourname.vercel.app`.
 
+## 3b. Turn on the nightly reminder (optional)
+
+PIT can send a phone notification each night reminding you to log the day.
+Skip this and everything else still works — the Account page just says
+reminders aren't set up.
+
+1. Generate the keys once, on your PC:
+
+   ```powershell
+   cd D:\PIT\pit
+   npm run vapid-keys
+   ```
+
+2. Add all four values it prints to Vercel → Project → Settings →
+   **Environment Variables**:
+
+   | Name | Value |
+   |---|---|
+   | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | from the script |
+   | `VAPID_PRIVATE_KEY` | from the script |
+   | `VAPID_SUBJECT` | `mailto:your@email.com` |
+   | `CRON_SECRET` | from the script — Vercel sends it to the job automatically |
+
+3. Redeploy, then open **Account** in the app and tap **Turn on reminders**.
+   Do this on every device you want notified; **Send a test** confirms it
+   works. On iPhone, add PIT to your Home Screen first — iOS only delivers
+   notifications to installed web apps.
+
+### Setting the time
+
+`vercel.json` schedules the job in **UTC**, and it ships set to `0 18 * * *` —
+18:00 UTC, which is **midnight in UTC+6 (Bangladesh)**. If you're somewhere
+else, change the hour to `24 − your UTC offset`:
+
+| Your timezone | Line in `vercel.json` |
+|---|---|
+| UTC+6 (Dhaka) | `"schedule": "0 18 * * *"` |
+| UTC+5:30 (India) | `"schedule": "30 18 * * *"` |
+| UTC+1 (London, summer) | `"schedule": "0 23 * * *"` |
+| UTC−5 (New York) | `"schedule": "0 5 * * *"` |
+
+Vercel's free Hobby plan allows one trigger per day, which is exactly what a
+nightly reminder needs. The job is safe to run more than once — it records
+which day it last nagged you about, so a retry can't produce a second
+notification.
+
+> The reminder is always about the **day that just ended**, and it's skipped
+> entirely on days you've already logged. Tapping it opens that day's log.
+
 ## 4. Use it from your phone
 
 Open the URL on your phone, sign in, and (optional but recommended) use the

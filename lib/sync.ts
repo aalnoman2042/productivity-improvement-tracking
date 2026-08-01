@@ -86,6 +86,25 @@ function enqueue(path: string, body: unknown) {
   writeQueue([...next, job]);
 }
 
+/**
+ * Forget any queued save for these days. Used after deleting a date range:
+ * without this, a save typed while offline would replay afterwards and
+ * bring the deleted day back.
+ */
+export function dropQueuedDays(dates: string[]) {
+  if (dates.length === 0) return;
+  const drop = new Set(dates);
+  const jobs = getQueue();
+  const kept = jobs.filter(
+    (j) =>
+      !(
+        (j.path === "/api/entries" || j.path === "/api/entries/increment") &&
+        drop.has(String((j.body as { date?: string })?.date))
+      )
+  );
+  if (kept.length !== jobs.length) writeQueue(kept);
+}
+
 /* ------------------------------- writes ------------------------------- */
 
 class PermanentError extends Error {}
@@ -172,6 +191,15 @@ export function cacheSet(key: string, value: unknown) {
   if (!isBrowser()) return;
   try {
     localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function cacheRemove(key: string) {
+  if (!isBrowser()) return;
+  try {
+    localStorage.removeItem(CACHE_PREFIX + key);
   } catch {
     /* ignore */
   }

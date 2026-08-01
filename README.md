@@ -40,19 +40,52 @@ It survives a refresh — the running timer is kept in `localStorage`.
 - **Dashboard** (`/`) — period selector (week / 15 days / month / 6 months /
   year), stat tiles, time donut + trend, sleep chart, one card per habit.
 - **Today** (`/today`) — log a day; every tracker gets the input its type needs.
+  Also where you delete logged days (see below). `?date=YYYY-MM-DD` opens on a
+  specific day.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive; one-click
   starter pack for a new account.
+- **Account** (`/settings`) — profile, password, and the nightly reminder.
+
+## Nightly reminder
+
+With push notifications set up, PIT nudges you each night to fill in the day
+that just ended — and stays quiet on days you've already logged.
+
+```powershell
+npm run vapid-keys   # once; paste the output into .env.local
+```
+
+Turn it on per device from the Account page (each phone or computer subscribes
+separately) and use **Send a test** to confirm it arrives. Tapping the
+notification opens that day's log. On iPhone, PIT must be added to the Home
+Screen first — iOS only delivers push to installed web apps.
+
+The schedule lives in `vercel.json` and fires once a day in UTC;
+[DEPLOY.md](./DEPLOY.md) explains how to set it to your local midnight.
+
+## Deleting days
+
+**Delete logged days** at the bottom of `/today` clears a date range — a single
+day, a weekend, a whole month. It's a two-step action: check the range first,
+then type back the number of days it found. The server independently re-counts
+and refuses if the total has changed since you looked, so you can never confirm
+a deletion you haven't seen the size of. Deleted days are also dropped from the
+offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Three collections, all with `$jsonSchema` validators so the BSON types stay
+Four collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
-- `users` — email (unique), name, scrypt `passwordHash`, `createdAt`
+- `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
+  `reminder` (`enabled`, `tzOffset`, `lastSentFor`)
 - `trackers` — `userId`, name, type, unit, color, category, goal, archived, order
 - `entries` — `userId`, `trackerId`, `date` (`YYYY-MM-DD`), `value`, optional
   `meta` (sleep times & quality), `note`, timestamps.
   Unique on `(userId, trackerId, date)`.
+- `pushSubs` — one row per subscribed browser: `userId`, `endpoint` (unique),
+  `keys`. Rows are deleted automatically when a push service reports the
+  endpoint is gone.
 
 ## Demo data
 

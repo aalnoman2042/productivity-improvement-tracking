@@ -73,6 +73,16 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+const DAYS = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+];
+
+/** "Friday 1 Aug" — for notification text and delete confirmations. */
+export function prettyDate(s: string): string {
+  const d = parseDateStr(s);
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 export function bucketLabel(key: string, granularity: "day" | "week" | "month"): string {
   if (granularity === "month") {
     const [, m] = key.split("-").map(Number);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReminderSettings from "@/components/ReminderSettings";
 import { APP_VERSION } from "@/lib/version";
 
 type Me = { id: string; name: string; email: string };
@@ -142,6 +143,8 @@ export default function SettingsPage() {
               {savingProfile ? "Saving…" : "Save profile"}
             </button>
           </form>
+
+          <ReminderSettings />
 
           <form
             onSubmit={changePassword}
