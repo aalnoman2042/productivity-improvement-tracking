@@ -4,7 +4,9 @@ export type TrackerType =
   | "count"
   | "scale"
   | "check"
-  | "measure";
+  | "measure"
+  | "prayer"
+  | "streak";
 
 /** Free-form: the presets below are suggestions, not a closed list. */
 export type Category = string;
@@ -26,6 +28,8 @@ export type Tracker = {
   archived: boolean;
   order: number;
 };
+
+export { PRAYERS, PRAYER_KEYS, orderPrayers } from "./prayers";
 
 export const TRACKER_TYPES: {
   value: TrackerType;
@@ -71,6 +75,20 @@ export const TRACKER_TYPES: {
     aggregate: "sum",
   },
   {
+    value: "prayer",
+    label: "Namaz — 5 prayers",
+    hint: "Tap each prayer you prayed: Fajr, Dhuhr, Asr, Maghrib, Isha.",
+    defaultUnit: "",
+    aggregate: "avg",
+  },
+  {
+    value: "streak",
+    label: "Clean streak",
+    hint: "Staying away from something. Mark the day clean, or mark a slip — the streak counts itself.",
+    defaultUnit: "",
+    aggregate: "sum",
+  },
+  {
     value: "measure",
     label: "Measurement",
     hint: "A number you record, like body weight or calories.",
@@ -81,10 +99,12 @@ export const TRACKER_TYPES: {
 
 /** Suggested categories — you can type your own anywhere these appear. */
 export const CATEGORIES: { value: Category; label: string; icon: string }[] = [
+  { value: "faith", label: "Faith", icon: "🕌" },
   { value: "sleep", label: "Sleep", icon: "🌙" },
   { value: "study", label: "Study", icon: "📚" },
   { value: "work", label: "Work", icon: "💼" },
   { value: "fitness", label: "Fitness", icon: "🏋️" },
+  { value: "discipline", label: "Discipline", icon: "🛡️" },
   { value: "food", label: "Food", icon: "🍽️" },
   { value: "health", label: "Health", icon: "❤️" },
   { value: "other", label: "Other", icon: "⭐" },
@@ -110,8 +130,8 @@ export function normalizeCategory(raw: unknown): string | null {
 }
 
 /**
- * Grouping order: presets first (so Sleep stays on top), then any custom
- * categories alphabetically.
+ * Grouping order: presets first (so Faith and Sleep stay on top), then any
+ * custom categories alphabetically.
  */
 export function orderCategories(values: string[]): string[] {
   const seen = new Map<string, string>();
@@ -134,82 +154,135 @@ export function typeMeta(type: TrackerType) {
   return TRACKER_TYPES.find((t) => t.value === type) ?? TRACKER_TYPES[0];
 }
 
-/** One-click starter trackers, offered on an empty account. */
-export const TEMPLATES: {
+/** Types where the unit is fixed by the type itself, so it isn't editable. */
+export function hasFixedUnit(type: TrackerType): boolean {
+  return ["duration", "sleep", "check", "prayer", "streak"].includes(type);
+}
+
+export type Template = {
   name: string;
   type: TrackerType;
   unit: string;
   category: Category;
   color: string;
   goal: Goal;
+};
+
+/** Ready-made trackers, added a whole pack at a time from the Trackers page. */
+export const TEMPLATE_PACKS: {
+  id: string;
+  label: string;
+  hint: string;
+  items: Template[];
 }[] = [
   {
-    name: "Sleep",
-    type: "sleep",
-    unit: "min",
-    category: "sleep",
-    color: "#4a3aa7",
-    goal: { target: 420, period: "day", direction: "min" },
+    id: "essentials",
+    label: "Essentials",
+    hint: "Sleep, study, work, workout, water, junk food, diet and weight.",
+    items: [
+      {
+        name: "Sleep",
+        type: "sleep",
+        unit: "min",
+        category: "sleep",
+        color: "#4a3aa7",
+        goal: { target: 420, period: "day", direction: "min" },
+      },
+      {
+        name: "Self study",
+        type: "duration",
+        unit: "min",
+        category: "study",
+        color: "#2a78d6",
+        goal: { target: 180, period: "day", direction: "min" },
+      },
+      {
+        name: "Work",
+        type: "duration",
+        unit: "min",
+        category: "work",
+        color: "#1baf7a",
+        goal: null,
+      },
+      {
+        name: "Workout",
+        type: "duration",
+        unit: "min",
+        category: "fitness",
+        color: "#eb6834",
+        goal: { target: 45, period: "day", direction: "min" },
+      },
+      {
+        name: "Water",
+        type: "count",
+        unit: "glasses",
+        category: "food",
+        color: "#eda100",
+        goal: { target: 8, period: "day", direction: "min" },
+      },
+      {
+        name: "Junk food",
+        type: "count",
+        unit: "times",
+        category: "food",
+        color: "#e34948",
+        goal: { target: 2, period: "week", direction: "max" },
+      },
+      {
+        name: "Diet quality",
+        type: "scale",
+        unit: "/5",
+        category: "food",
+        color: "#e87ba4",
+        goal: null,
+      },
+      {
+        name: "Weight",
+        type: "measure",
+        unit: "kg",
+        category: "health",
+        color: "#008300",
+        goal: null,
+      },
+    ],
   },
   {
-    name: "Self study",
-    type: "duration",
-    unit: "min",
-    category: "study",
-    color: "#2a78d6",
-    goal: { target: 180, period: "day", direction: "min" },
-  },
-  {
-    name: "Work",
-    type: "duration",
-    unit: "min",
-    category: "work",
-    color: "#1baf7a",
-    goal: null,
-  },
-  {
-    name: "Workout",
-    type: "duration",
-    unit: "min",
-    category: "fitness",
-    color: "#eb6834",
-    goal: { target: 45, period: "day", direction: "min" },
-  },
-  {
-    name: "Water",
-    type: "count",
-    unit: "glasses",
-    category: "food",
-    color: "#eda100",
-    goal: { target: 8, period: "day", direction: "min" },
-  },
-  {
-    name: "Junk food",
-    type: "count",
-    unit: "times",
-    category: "food",
-    color: "#e34948",
-    goal: { target: 2, period: "week", direction: "max" },
-  },
-  {
-    name: "Diet quality",
-    type: "scale",
-    unit: "/5",
-    category: "food",
-    color: "#e87ba4",
-    goal: null,
-  },
-  {
-    name: "Weight",
-    type: "measure",
-    unit: "kg",
-    category: "health",
-    color: "#008300",
-    goal: null,
+    id: "deen",
+    label: "Faith & discipline",
+    hint: "Namaz (all five prayers), Quran, and a clean streak for no fap.",
+    items: [
+      {
+        name: "Namaz",
+        type: "prayer",
+        unit: "",
+        category: "faith",
+        color: "#008300",
+        goal: { target: 5, period: "day", direction: "min" },
+      },
+      {
+        name: "Quran",
+        type: "duration",
+        unit: "min",
+        category: "faith",
+        color: "#1baf7a",
+        goal: { target: 15, period: "day", direction: "min" },
+      },
+      {
+        name: "No fap",
+        type: "streak",
+        unit: "",
+        category: "discipline",
+        color: "#4a3aa7",
+        goal: null,
+      },
+    ],
   },
 ];
 
-/** "7h 30m" for durations, "8 glasses" / "4.2 /5" for everything else. */
+/** The original starter set, kept for the one-click empty-account button. */
+export const TEMPLATES: Template[] = TEMPLATE_PACKS[0].items;
+
+/** "7h 30m" for durations, "4/5" for namaz, "8 glasses" for the rest. */
 export function formatValue(value: number, type: TrackerType, unit: string): string {
   if (type === "duration" || type === "sleep") {
     const h = Math.floor(value / 60);
@@ -219,6 +292,12 @@ export function formatValue(value: number, type: TrackerType, unit: string): str
     return `${h}h ${m}m`;
   }
   if (type === "check") return value > 0 ? "Done" : "—";
+  if (type === "prayer") return `${Math.round(value * 10) / 10}/5`;
+  if (type === "streak") {
+    if (value <= 0) return "Slip";
+    const n = Math.round(value);
+    return `${n} clean day${n === 1 ? "" : "s"}`;
+  }
   const rounded = Math.round(value * 10) / 10;
   return unit ? `${rounded} ${unit}` : String(rounded);
 }

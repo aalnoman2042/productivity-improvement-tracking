@@ -2,20 +2,58 @@ import { NextResponse } from "next/server";
 import { type Document, type WithId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { toTracker } from "../trackers/route";
+import { toTracker } from "@/lib/trackerDoc";
 import { typeMeta, type Goal, type TrackerType } from "@/lib/trackers";
+import type { StreakInfo } from "@/lib/stats";
 import {
   PERIOD_BUCKET,
   addDays,
   bucketLabel,
   bucketOf,
   bucketsForRange,
+  daysBetween,
   isValidDateStr,
   periodRange,
   type Period,
 } from "@/lib/dates";
 
 const VALID_PERIODS: Period[] = ["week", "15d", "month", "6mo", "year"];
+
+/**
+ * Clean-streak trackers count days since the last slip, not consecutive
+ * check-ins — a day you simply didn't open the app shouldn't reset a
+ * three-month run.
+ */
+function streakInfo(
+  first: string | null,
+  slipDates: string[],
+  today: string
+): StreakInfo {
+  if (!first) {
+    return { current: 0, best: 0, slips: 0, lastSlip: null, since: null };
+  }
+
+  const slips = [...new Set(slipDates)].filter((d) => d <= today).sort();
+  // The day before the first entry: every run is measured from a boundary,
+  // and this is the boundary the first run starts from.
+  const boundaries = [addDays(first, -1), ...slips];
+
+  let best = 0;
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    best = Math.max(best, daysBetween(boundaries[i], boundaries[i + 1]) - 1);
+  }
+
+  const last = boundaries[boundaries.length - 1];
+  const current = Math.max(0, daysBetween(last, today));
+
+  return {
+    current,
+    best: Math.max(best, current),
+    slips: slips.length,
+    lastSlip: slips.length > 0 ? slips[slips.length - 1] : null,
+    since: first,
+  };
+}
 
 function meetsGoal(value: number, goal: NonNullable<Goal>): boolean {
   return goal.direction === "min" ? value >= goal.target : value <= goal.target;
@@ -119,6 +157,40 @@ export async function GET(req: Request) {
   ]);
 
   const trackers = trackerDocs.map(toTracker);
+
+  // Clean streaks run for as long as they run — a week's worth of entries
+  // says nothing about a four-month streak — so they get their own all-time
+  // roll-up. One small grouped read, and only when such a tracker exists.
+  const streakIds = trackerDocs
+    .filter((t) => t.type === "streak")
+    .map((t) => t._id);
+  const streaks = new Map<string, StreakInfo>();
+  if (streakIds.length > 0) {
+    const rows = await d
+      .collection("entries")
+      .aggregate<{ _id: unknown; first: string; slips: string[] }>([
+        { $match: { userId, trackerId: { $in: streakIds } } },
+        {
+          $group: {
+            _id: "$trackerId",
+            first: { $min: "$date" },
+            slips: {
+              $push: {
+                $cond: [{ $lte: ["$value", 0] }, "$date", "$$REMOVE"],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+    for (const row of rows) {
+      streaks.set(
+        String(row._id),
+        streakInfo(row.first ?? null, row.slips ?? [], today)
+      );
+    }
+  }
+
   const current = allEntries.filter((e) => String(e.date) >= start);
   const previous = allEntries.filter((e) => String(e.date) < start);
 
@@ -175,6 +247,7 @@ export async function GET(req: Request) {
       goal: goalProgress(tracker.goal, r, start, end, days),
       previous: { sum: p.sum, days: p.days, value: prevValue },
       changePct,
+      streak: streaks.get(tracker.id) ?? null,
     };
   }
 

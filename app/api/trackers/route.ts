@@ -1,38 +1,8 @@
 import { NextResponse } from "next/server";
-import { type WithId, type Document } from "mongodb";
-import { db } from "@/lib/db";
+import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import {
-  TEMPLATES,
-  TRACKER_TYPES,
-  normalizeCategory,
-  type Goal,
-} from "@/lib/trackers";
-
-export function toTracker(doc: WithId<Document>) {
-  return {
-    id: String(doc._id),
-    name: doc.name as string,
-    type: doc.type as string,
-    unit: doc.unit as string,
-    color: doc.color as string,
-    category: doc.category as string,
-    goal: (doc.goal ?? null) as Goal,
-    archived: Boolean(doc.archived),
-    order: Number(doc.order ?? 0),
-  };
-}
-
-/** Validate an incoming goal object; returns null for "no goal". */
-export function parseGoal(raw: unknown): Goal {
-  if (!raw || typeof raw !== "object") return null;
-  const g = raw as Record<string, unknown>;
-  const target = Number(g.target);
-  if (!Number.isFinite(target) || target <= 0) return null;
-  const period = g.period === "week" ? "week" : "day";
-  const direction = g.direction === "max" ? "max" : "min";
-  return { target, period, direction };
-}
+import { toTracker, parseGoal } from "@/lib/trackerDoc";
+import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
 
 export async function GET() {
   const userId = await currentUserId();
@@ -52,25 +22,45 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const d = await db();
+  // Creating a tracker is the one write that can hit a validator older than
+  // the code — a `prayer` or `streak` type is rejected until the collection's
+  // rules have caught up — so this one waits for the sync.
+  const d = await dbReady();
 
-  // { template: true } seeds the starter set on a fresh account.
-  if (body?.template === true) {
-    const count = await d.collection("trackers").countDocuments({ userId });
-    const docs = TEMPLATES.map((t, i) => ({
-      userId,
-      name: t.name,
-      type: t.type,
-      unit: t.unit,
-      color: t.color,
-      category: t.category,
-      goal: t.goal,
-      archived: false,
-      order: count + i,
-      createdAt: new Date(),
-    }));
-    await d.collection("trackers").insertMany(docs);
-    return NextResponse.json({ ok: true, added: docs.length }, { status: 201 });
+  // { pack: "essentials" | "deen" } adds a ready-made set. Trackers whose
+  // name you already have are skipped, so adding a pack twice is harmless.
+  // ({ template: true } is the original spelling of the essentials pack.)
+  const packId = body?.template === true ? "essentials" : body?.pack;
+  if (typeof packId === "string") {
+    const pack = TEMPLATE_PACKS.find((p) => p.id === packId);
+    if (!pack) return NextResponse.json({ error: "Unknown pack" }, { status: 400 });
+
+    const mine = await d
+      .collection("trackers")
+      .find({ userId }, { projection: { name: 1 } })
+      .toArray();
+    const taken = new Set(mine.map((t) => String(t.name).toLowerCase()));
+
+    const docs = pack.items
+      .filter((t) => !taken.has(t.name.toLowerCase()))
+      .map((t, i) => ({
+        userId,
+        name: t.name,
+        type: t.type,
+        unit: t.unit,
+        color: t.color,
+        category: t.category,
+        goal: t.goal,
+        archived: false,
+        order: mine.length + i,
+        createdAt: new Date(),
+      }));
+
+    if (docs.length > 0) await d.collection("trackers").insertMany(docs);
+    return NextResponse.json(
+      { ok: true, added: docs.length, skipped: pack.items.length - docs.length },
+      { status: 201 }
+    );
   }
 
   const name = typeof body?.name === "string" ? body.name.trim() : "";

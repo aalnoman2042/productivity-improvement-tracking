@@ -1,11 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Footer from "@/components/Footer";
 import ReminderSettings from "@/components/ReminderSettings";
+import { toDateStr } from "@/lib/dates";
+import { buildInsights, type InsightLevel } from "@/lib/insights";
+import type { Stats } from "@/lib/stats";
+import { useCached } from "@/lib/useCached";
 import { APP_VERSION } from "@/lib/version";
 
 type Me = { id: string; name: string; email: string };
+
+const LEVEL: Record<
+  InsightLevel,
+  { icon: string; label: string; ring: string; text: string }
+> = {
+  bad: {
+    icon: "⚠️",
+    label: "Needs attention",
+    ring: "border-red-600/40 bg-red-600/5",
+    text: "text-red-600",
+  },
+  warn: {
+    icon: "⚡",
+    label: "Worth a look",
+    ring: "border-amber-600/40 bg-amber-600/5",
+    text: "text-amber-700 dark:text-amber-500",
+  },
+  good: {
+    icon: "✓",
+    label: "Going well",
+    ring: "border-green-700/40 bg-green-700/5",
+    text: "text-green-700 dark:text-green-500",
+  },
+};
 
 const field =
   "w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent";
@@ -36,6 +66,15 @@ export default function SettingsPage() {
   const [confirm, setConfirm] = useState("");
   const [pwMsg, setPwMsg] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
   const [savingPw, setSavingPw] = useState(false);
+
+  // Same request and same cache the dashboard uses, so this costs nothing
+  // extra if you've just come from there.
+  const statsQ = useCached<Stats>(
+    `/api/stats?period=month&today=${toDateStr(new Date())}`,
+    "stats:month"
+  );
+  const insights = useMemo(() => buildInsights(statsQ.data), [statsQ.data]);
+  const needsAttention = insights.filter((i) => i.level !== "good").length;
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -144,6 +183,67 @@ export default function SettingsPage() {
             </button>
           </form>
 
+          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-semibold">How your last 30 days look</h2>
+              {statsQ.data && (
+                <span className="text-xs text-muted">
+                  {statsQ.data.daysLogged} of {statsQ.data.days} days logged
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-secondary">
+              Read straight off what you logged — sleep, namaz, streaks and the
+              goals you set yourself.
+            </p>
+
+            {statsQ.loading ? (
+              <div className="mt-4 space-y-2" aria-hidden="true">
+                <div className="skeleton h-16 rounded-md" />
+                <div className="skeleton h-16 rounded-md" />
+              </div>
+            ) : insights.length === 0 ? (
+              <p className="mt-4 text-sm text-muted">
+                Not enough logged yet to say anything useful.{" "}
+                <Link href="/today" className="font-medium text-accent underline">
+                  Log a few days
+                </Link>{" "}
+                and this fills in.
+              </p>
+            ) : (
+              <>
+                <p className="mt-3 text-sm font-medium">
+                  {needsAttention === 0
+                    ? "Nothing looks off this month."
+                    : `${needsAttention} thing${needsAttention === 1 ? "" : "s"} worth your attention.`}
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {insights.map((insight, i) => {
+                    const look = LEVEL[insight.level];
+                    return (
+                      <li
+                        key={`${insight.level}-${i}`}
+                        className={`rounded-md border p-3 ${look.ring}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span aria-hidden="true">{look.icon}</span>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-semibold ${look.text}`}>
+                              {insight.title}
+                            </p>
+                            <p className="mt-0.5 text-sm text-secondary">
+                              {insight.detail}
+                            </p>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </section>
+
           <ReminderSettings />
 
           <form
@@ -240,6 +340,8 @@ export default function SettingsPage() {
               </div>
             </dl>
           </section>
+
+          <Footer className="pb-2" />
         </>
       )}
     </div>

@@ -1,10 +1,39 @@
 import { NextResponse } from "next/server";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
-import { db } from "@/lib/db";
+import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { isValidDateStr } from "@/lib/dates";
+import { PRAYER_KEYS, orderPrayers } from "@/lib/prayers";
 
 const HHMM = /^\d{2}:\d{2}$/;
+
+/**
+ * The extras an entry can carry: sleep clock times, which of the five prayers
+ * were prayed, and whether a clean-streak day was clean or a slip.
+ * Returns null when there's nothing worth storing.
+ */
+function parseMeta(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as Record<string, unknown>;
+
+  const start = typeof m.start === "string" && HHMM.test(m.start) ? m.start : null;
+  const end = typeof m.end === "string" && HHMM.test(m.end) ? m.end : null;
+  const q = Number(m.quality);
+  const quality = Number.isFinite(q) && q >= 1 && q <= 5 ? Math.round(q) : null;
+
+  const named: string[] = [];
+  if (Array.isArray(m.parts)) {
+    for (const p of m.parts) {
+      if (typeof p === "string" && PRAYER_KEYS.includes(p)) named.push(p);
+    }
+  }
+  const parts = orderPrayers(named);
+
+  const status = m.status === "clean" || m.status === "slip" ? m.status : null;
+
+  if (!start && !end && !quality && parts.length === 0 && !status) return null;
+  return { start, end, quality, parts: parts.length > 0 ? parts : null, status };
+}
 
 export async function GET(req: Request) {
   const userId = await currentUserId();
@@ -60,18 +89,11 @@ export async function POST(req: Request) {
     }
 
     const filter = { userId, trackerId: new ObjectId(e.trackerId), date };
+    const meta = parseMeta(e?.meta);
 
-    // Sleep entries carry clock times; everything else is just a number.
-    let meta: Record<string, unknown> | null = null;
-    if (e?.meta && typeof e.meta === "object") {
-      const m = e.meta as Record<string, unknown>;
-      const start = typeof m.start === "string" && HHMM.test(m.start) ? m.start : null;
-      const end = typeof m.end === "string" && HHMM.test(m.end) ? m.end : null;
-      const q = Number(m.quality);
-      const quality = Number.isFinite(q) && q >= 1 && q <= 5 ? Math.round(q) : null;
-      if (start || end || quality) meta = { start, end, quality };
-    }
-
+    // Nothing recorded and nothing extra attached — clear the day.
+    // A slip is *not* nothing: it arrives as value 0 with a status, so it
+    // has meta and survives this check.
     if (value === 0 && !meta) {
       ops.push({ deleteOne: { filter } });
       continue;
@@ -94,7 +116,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const d = await db();
+  const d = await dbReady();
   if (ops.length > 0) await d.collection("entries").bulkWrite(ops);
   return NextResponse.json({ ok: true });
 }

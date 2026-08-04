@@ -1,54 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
 import {
+  categoryMeta,
   formatValue,
+  orderCategories,
   typeMeta,
   type Goal,
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
+import { useCached } from "@/lib/useCached";
+import type { Stats, Summary } from "@/lib/stats";
 import { seriesColor } from "@/lib/palette";
 import { DonutChart, TrendChart, SeriesChart } from "@/components/charts";
 import type { Slice } from "@/components/charts/DonutChart";
 import type { Point } from "@/components/charts/SeriesChart";
-
-type Bucket = {
-  key: string;
-  label: string;
-  values: Record<string, number>;
-  counts: Record<string, number>;
-  quality: Record<string, { sum: number; n: number }>;
-};
-
-type Summary = {
-  sum: number;
-  days: number;
-  best: number;
-  bestDate: string | null;
-  avgPerDay: number;
-  avgPerLoggedDay: number;
-  goal: { met: number; total: number } | null;
-  previous: { sum: number; days: number; value: number };
-  changePct: number | null;
-};
-
-type Stats = {
-  period: Period;
-  start: string;
-  end: string;
-  days: number;
-  granularity: "day" | "week" | "month";
-  trackers: Tracker[];
-  buckets: Bucket[];
-  summary: Record<string, Summary>;
-  streak: number;
-  daysLogged: number;
-  prevDaysLogged: number;
-  hasEntries: boolean;
-};
 
 const shortTime = (v: number) =>
   v >= 60 ? `${Math.round((v / 60) * 10) / 10}h` : `${Math.round(v)}m`;
@@ -156,23 +125,14 @@ function Facts({ items }: { items: { label: string; value: string }[] }) {
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetch(`/api/stats?period=${period}&today=${toDateStr(new Date())}`)
-      .then(async (res) => {
-        if (res.status === 401) return location.assign("/login");
-        const data = await res.json();
-        if (!cancelled) setStats(data);
-      })
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [period]);
+  // The numbers from the last visit go up straight away and are replaced when
+  // the fresh ones arrive — opening the dashboard shouldn't be a blank wait.
+  const statsQ = useCached<Stats>(
+    `/api/stats?period=${period}&today=${toDateStr(new Date())}`,
+    `stats:${period}`
+  );
+  const stats = statsQ.data;
 
   const active = useMemo(
     () => (stats?.trackers ?? []).filter((t) => !t.archived),
@@ -182,6 +142,21 @@ export default function DashboardPage() {
   const sleepTrackers = active.filter((t) => t.type === "sleep");
   const habitTrackers = active.filter(
     (t) => !["duration", "sleep"].includes(t.type)
+  );
+
+  // Habits are easier to read grouped the way they're grouped everywhere else.
+  const habitGroups = useMemo(
+    () =>
+      orderCategories(habitTrackers.map((t) => t.category))
+        .map((value) => ({
+          value,
+          ...categoryMeta(value),
+          items: habitTrackers.filter(
+            (t) => t.category.toLowerCase() === value.toLowerCase()
+          ),
+        }))
+        .filter((g) => g.items.length > 0),
+    [habitTrackers]
   );
 
   function pointsFor(t: Tracker): Point[] {
@@ -252,6 +227,58 @@ export default function DashboardPage() {
       ? Math.round((accountedMinutes / (periodHours * 60)) * 100)
       : 0;
 
+  /** A clean streak is about the run, not the period — so it says so. */
+  function StreakCard({ t, s }: { t: Tracker; s: Summary }) {
+    const run = s.streak;
+    const days = run?.current ?? 0;
+    return (
+      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: seriesColor(t.color) }}
+          />
+          <h3 className="text-sm font-semibold">{t.name}</h3>
+        </div>
+
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-bold tabular-nums">{days}</span>
+          <span className="text-sm text-secondary">
+            day{days === 1 ? "" : "s"} clean
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          {run?.lastSlip
+            ? `Last slip ${prettyDate(run.lastSlip)}`
+            : run?.since
+              ? `No slips since you started on ${prettyDate(run.since)}`
+              : "Log a day to start the count"}
+        </p>
+
+        <Facts
+          items={[
+            { label: "Best run", value: `${run?.best ?? 0}d` },
+            { label: "Slips (all time)", value: String(run?.slips ?? 0) },
+            {
+              label: "Clean this period",
+              value: `${s.sum}/${stats?.days ?? 0}`,
+            },
+          ]}
+        />
+
+        <SeriesChart
+          data={pointsFor(t)}
+          color={t.color}
+          kind="bar"
+          title={t.name}
+          format={(v) => formatValue(v, "streak", t.unit)}
+          tickFormat={(v) => String(Math.round(v))}
+          height={110}
+        />
+      </section>
+    );
+  }
+
   /** One tracker, one chart, with its own numbers underneath. */
   function TrackerCard({ t }: { t: Tracker }) {
     const s = stats?.summary[t.id];
@@ -261,6 +288,10 @@ export default function DashboardPage() {
     const kind: "bar" | "line" =
       type === "measure" || type === "scale" ? "line" : "bar";
     const fmt = (v: number) => formatValue(v, type, t.unit);
+
+    // The streak card stands on its own — it means something even in a week
+    // where nothing was logged, because the run carries on regardless.
+    if (type === "streak" && s) return <StreakCard t={t} s={s} />;
 
     if (!s || s.days === 0) {
       return (
@@ -285,6 +316,9 @@ export default function DashboardPage() {
         : aggregate === "avg"
           ? fmt(s.avgPerLoggedDay)
           : fmt(s.sum);
+
+    const domain: [number, number] | undefined =
+      type === "scale" ? [0, 5] : type === "prayer" ? [0, 5] : undefined;
 
     return (
       <section className="rounded-lg border border-edge card p-4 shadow-sm">
@@ -321,7 +355,7 @@ export default function DashboardPage() {
           }
           goal={goalLineFor(t)}
           goalLabel="goal"
-          domain={type === "scale" ? [0, 5] : undefined}
+          domain={domain}
           height={150}
         />
 
@@ -381,6 +415,11 @@ export default function DashboardPage() {
                 <span className="tabular-nums">
                   {formatValue(Math.max(0, periodHours * 60 - accountedMinutes), "duration", "min")}
                 </span>
+                {statsQ.refreshing && (
+                  <span className="ml-2 animate-fade-in text-muted">
+                    updating…
+                  </span>
+                )}
               </p>
             </>
           )}
@@ -402,8 +441,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {stats === null || loading ? (
-        <p className="text-sm text-muted">Loading…</p>
+      {stats === null ? (
+        statsQ.error ? (
+          <div className="rounded-lg border border-dashed border-edge p-8 text-center">
+            <p className="text-sm text-secondary">{statsQ.error}</p>
+            <button
+              onClick={() => void statsQ.refresh()}
+              className="mt-3 rounded-md border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4" aria-hidden="true">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="skeleton h-24 rounded-lg" />
+              ))}
+            </div>
+            <div className="skeleton h-64 rounded-lg" />
+          </div>
+        )
       ) : active.length === 0 ? (
         <div className="rounded-lg border border-dashed border-edge p-10 text-center">
           <p className="text-lg font-medium">Welcome to PIT 👋</p>
@@ -561,15 +619,22 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {/* Habits, food, health */}
-          {habitTrackers.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-lg font-semibold">Habits &amp; health</h2>
-              <div className="stagger grid gap-4 md:grid-cols-2">
-                {habitTrackers.map((t) => (
-                  <TrackerCard key={t.id} t={t} />
-                ))}
-              </div>
+          {/* Habits, faith, food, health — grouped the way you filed them */}
+          {habitGroups.length > 0 && (
+            <section className="space-y-5">
+              <h2 className="text-lg font-semibold">Habits &amp; health</h2>
+              {habitGroups.map((group) => (
+                <div key={group.value}>
+                  <h3 className="mb-2 text-sm font-semibold text-secondary">
+                    {group.icon} {group.label}
+                  </h3>
+                  <div className="stagger grid gap-4 md:grid-cols-2">
+                    {group.items.map((t) => (
+                      <TrackerCard key={t.id} t={t} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </section>
           )}
         </>

@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
+import { useCached } from "@/lib/useCached";
 import {
   CATEGORIES,
+  TEMPLATE_PACKS,
   TRACKER_TYPES,
   categoryMeta,
+  hasFixedUnit,
   orderCategories,
   typeMeta,
   type Category,
@@ -42,7 +45,7 @@ const BLANK: Form = {
 
 /** Goal targets for time trackers are typed in hours but stored in minutes. */
 function goalFromForm(f: Form): Goal {
-  if (!f.goalOn) return null;
+  if (!f.goalOn || f.type === "streak") return null;
   const raw = parseFloat(f.goalTarget);
   if (!Number.isFinite(raw) || raw <= 0) return null;
   const isTime = f.type === "duration" || f.type === "sleep";
@@ -75,22 +78,17 @@ function goalLabel(t: Tracker): string | null {
 }
 
 export default function TrackersPage() {
-  const [trackers, setTrackers] = useState<Tracker[] | null>(null);
   const [form, setForm] = useState<Form>(BLANK);
   const [showForm, setShowForm] = useState(false);
   const [customCategory, setCustomCategory] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPacks, setShowPacks] = useState(false);
 
-  async function load() {
-    const res = await fetch("/api/trackers");
-    if (res.status === 401) return location.assign("/login");
-    setTrackers(await res.json());
-  }
-  useEffect(() => {
-    load();
-  }, []);
+  const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
+  const trackers = trackersQ.data;
+  const load = trackersQ.refresh;
 
   function setF<K extends keyof Form>(key: K, value: Form[K]) {
     setForm((f) => {
@@ -159,14 +157,26 @@ export default function TrackersPage() {
     load();
   }
 
-  async function addStarterPack() {
+  async function addPack(id: string) {
     setBusy(true);
-    await fetch("/api/trackers", {
+    setError("");
+    const res = await fetch("/api/trackers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template: true }),
+      body: JSON.stringify({ pack: id }),
     });
     setBusy(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => null);
+      setError(d?.error ?? "Could not add that pack");
+      return;
+    }
+    const { added, skipped } = (await res.json()) as {
+      added: number;
+      skipped: number;
+    };
+    if (added === 0 && skipped > 0) setError("You already have all of those");
+    setShowPacks(false);
     load();
   }
 
@@ -231,14 +241,60 @@ export default function TrackersPage() {
           </p>
         </div>
         {!showForm && (
-          <button
-            onClick={openAdd}
-            className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
-          >
-            + New tracker
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowPacks((v) => !v)}
+              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            >
+              Ready-made packs
+            </button>
+            <button
+              onClick={openAdd}
+              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+            >
+              + New tracker
+            </button>
+          </div>
         )}
       </div>
+
+      {showPacks && !showForm && (
+        <div className="animate-rise-in grid gap-3 sm:grid-cols-2">
+          {TEMPLATE_PACKS.map((pack) => (
+            <section
+              key={pack.id}
+              className="rounded-lg border border-edge card p-4 shadow-sm"
+            >
+              <h2 className="font-semibold">{pack.label}</h2>
+              <p className="mt-1 text-sm text-secondary">{pack.hint}</p>
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {pack.items.map((item) => (
+                  <li
+                    key={item.name}
+                    className="flex items-center gap-1.5 rounded-full border border-edge px-2.5 py-1 text-xs"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: seriesColor(item.color) }}
+                    />
+                    {item.name}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => addPack(pack.id)}
+                disabled={busy}
+                className="mt-4 rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              >
+                {busy ? "Adding…" : `Add ${pack.label.toLowerCase()}`}
+              </button>
+              <p className="mt-2 text-xs text-muted">
+                Anything you already have is skipped.
+              </p>
+            </section>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <form
@@ -328,7 +384,7 @@ export default function TrackersPage() {
                 value={form.unit}
                 onChange={(e) => setF("unit", e.target.value)}
                 placeholder="glasses, kg, ×"
-                disabled={isTimeType || form.type === "check"}
+                disabled={hasFixedUnit(form.type)}
                 className={`${field} disabled:opacity-50`}
               />
             </div>
@@ -354,7 +410,12 @@ export default function TrackersPage() {
             </div>
           </div>
 
-          <div className="rounded-md border border-edge p-3">
+          {/* A clean streak has no target to hit — the streak is the point. */}
+          <div
+            className={`rounded-md border border-edge p-3 ${
+              form.type === "streak" ? "hidden" : ""
+            }`}
+          >
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
@@ -423,23 +484,31 @@ export default function TrackersPage() {
         </form>
       )}
 
-      {trackers === null ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : active.length === 0 && !showForm ? (
+      {trackersQ.loading ? (
+        <div className="space-y-2" aria-hidden="true">
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+        </div>
+      ) : active.length === 0 && !showForm && !showPacks ? (
         <div className="rounded-lg border border-dashed border-edge p-8 text-center">
-          <p className="text-lg font-medium">Start with the essentials</p>
+          <p className="text-lg font-medium">Start with a ready-made pack</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-secondary">
-            Add a ready-made set — sleep, self study, work, workout, water, junk
-            food, diet quality and weight. You can rename, delete or add your own
-            afterwards.
+            The essentials — sleep, study, work, workout, water, food and weight
+            — or faith &amp; discipline: namaz, Quran and a clean streak. You can
+            rename, delete or add your own afterwards.
           </p>
-          <button
-            onClick={addStarterPack}
-            disabled={busy}
-            className="mt-5 rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
-          >
-            {busy ? "Adding…" : "Add starter pack"}
-          </button>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {TEMPLATE_PACKS.map((pack) => (
+              <button
+                key={pack.id}
+                onClick={() => addPack(pack.id)}
+                disabled={busy}
+                className="rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              >
+                {busy ? "Adding…" : `Add ${pack.label.toLowerCase()}`}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <>

@@ -1,11 +1,29 @@
 /**
- * Minimal service worker: makes the app installable, keeps it usable when
- * the connection drops, and receives the nightly reminder. Pages and static
- * assets are served network-first with a cache fallback; API calls always go
- * to the network, because stale numbers would be worse than an error.
+ * Minimal service worker: makes the app installable, keeps it usable when the
+ * connection drops, and receives the nightly reminder.
+ *
+ * The app shell is served from the cache first and refreshed in the
+ * background, so opening PIT paints immediately instead of waiting on the
+ * network for HTML and JavaScript it already has. Build assets under
+ * /_next/static are content-hashed, so those can be cached outright.
+ *
+ * API calls are never cached here — the pages hold their own copy of the last
+ * response and know when it's stale, which the service worker can't.
  */
-const CACHE = "pit-v2";
+const CACHE = "pit-v3";
 const OFFLINE_FALLBACK = "/today";
+
+/** Hashed build output: the URL changes whenever the file does. */
+const isImmutable = (url) => url.pathname.startsWith("/_next/static/");
+
+/**
+ * React Server Component payloads are tied to the running build, so a stale
+ * one can't be handed to a newer client. Always fetch these.
+ */
+const isVersioned = (url, request) =>
+  url.searchParams.has("_rsc") ||
+  request.headers.get("RSC") === "1" ||
+  request.headers.get("Next-Router-Prefetch") === "1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,6 +43,17 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/** Fetch, and quietly keep the cached copy up to date. */
+function fetchAndCache(request) {
+  return fetch(request).then((response) => {
+    if (response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE).then((cache) => cache.put(request, copy));
+    }
+    return response;
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -32,25 +61,26 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return; // always live data
+  if (isVersioned(url, request)) return;
 
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
+    caches.match(request).then((cached) => {
+      if (cached) {
+        // Serve what we have now and fetch a fresh copy for next time. A
+        // failure here is fine — the cached response has already gone out.
+        const updating = fetchAndCache(request).catch(() => null);
+        if (!isImmutable(url)) event.waitUntil(updating);
+        return cached;
+      }
+
+      return fetchAndCache(request).catch(async () => {
         if (request.mode === "navigate") {
           const fallback = await caches.match(OFFLINE_FALLBACK);
           if (fallback) return fallback;
         }
         return new Response("Offline", { status: 503 });
-      })
+      });
+    })
   );
 });
 

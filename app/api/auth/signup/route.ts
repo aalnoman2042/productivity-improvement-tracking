@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { dbReady } from "@/lib/db";
 import { COOKIE_NAME, cookieOptions, hashPassword, signSession } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const d = await db();
+  const d = await dbReady();
   const existing = await d.collection("users").findOne({ email });
   if (existing) {
     return NextResponse.json(

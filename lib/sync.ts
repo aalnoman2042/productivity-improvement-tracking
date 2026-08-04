@@ -12,6 +12,7 @@
 const QUEUE_KEY = "pit_sync_queue";
 const CACHE_PREFIX = "pit_cache:";
 const CHANGE_EVENT = "pit-sync-change";
+const CACHE_EVENT = "pit-cache-change";
 
 export type Job = { id: string; path: string; body: unknown; at: number };
 export type PostResult = "sent" | "queued";
@@ -194,6 +195,7 @@ export function cacheSet(key: string, value: unknown) {
   } catch {
     /* ignore */
   }
+  window.dispatchEvent(new Event(CACHE_EVENT));
 }
 
 export function cacheRemove(key: string) {
@@ -203,6 +205,48 @@ export function cacheRemove(key: string) {
   } catch {
     /* ignore */
   }
+  window.dispatchEvent(new Event(CACHE_EVENT));
+}
+
+/**
+ * The cache as a store components can subscribe to.
+ *
+ * Parsed values are memoised against the raw text they came from, so a
+ * component that re-reads an unchanged key gets the *same object* back and
+ * doesn't re-render. That's what makes this safe for useSyncExternalStore.
+ */
+const snapshots = new Map<string, { raw: string | null; value: unknown }>();
+
+export function cacheSnapshot<T>(key: string): T | null {
+  if (!isBrowser()) return null;
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(CACHE_PREFIX + key);
+  } catch {
+    return null;
+  }
+  const memo = snapshots.get(key);
+  if (memo && memo.raw === raw) return memo.value as T | null;
+
+  let value: unknown = null;
+  try {
+    value = raw === null ? null : JSON.parse(raw);
+  } catch {
+    value = null;
+  }
+  snapshots.set(key, { raw, value });
+  return value as T | null;
+}
+
+/** Fires when any cached key is written — including from another tab. */
+export function subscribeCache(handler: () => void): () => void {
+  if (!isBrowser()) return () => {};
+  window.addEventListener(CACHE_EVENT, handler);
+  window.addEventListener("storage", handler);
+  return () => {
+    window.removeEventListener(CACHE_EVENT, handler);
+    window.removeEventListener("storage", handler);
+  };
 }
 
 export function cacheGet<T>(key: string): T | null {

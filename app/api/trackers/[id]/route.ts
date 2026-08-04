@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { normalizeCategory } from "@/lib/trackers";
-import { parseGoal } from "../route";
+import { parseGoal } from "@/lib/trackerDoc";
 
 type Ctx = { params: Promise<{ id: string }> };
 

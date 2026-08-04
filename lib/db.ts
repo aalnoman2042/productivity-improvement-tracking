@@ -7,12 +7,31 @@ const g = globalThis as typeof globalThis & {
 };
 
 function getClient(): Promise<MongoClient> {
-  if (!g._pitMongo) {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) throw new Error("MONGODB_URI is not set");
-    g._pitMongo = new MongoClient(uri).connect();
-  }
-  return g._pitMongo;
+  const existing = g._pitMongo;
+  if (existing) return existing;
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error("MONGODB_URI is not set");
+  const connecting = new MongoClient(uri, {
+    // Every page load is a handful of small queries, so the pool stays tiny —
+    // but idle sockets are kept long enough that the next request on a warm
+    // instance doesn't pay for a new handshake.
+    maxPoolSize: 10,
+    minPoolSize: 0,
+    maxIdleTimeMS: 60_000,
+    // Fail fast and show an error rather than hanging the page for 30 seconds.
+    serverSelectionTimeoutMS: 8_000,
+    connectTimeoutMS: 8_000,
+  }).connect();
+
+  // Don't leave a rejected promise cached for every later request to trip
+  // over — a failed connect should be retried by the next one.
+  connecting.catch(() => {
+    if (g._pitMongo === connecting) g._pitMongo = undefined;
+  });
+
+  g._pitMongo = connecting;
+  return connecting;
 }
 
 /**
@@ -53,7 +72,16 @@ const VALIDATORS: Record<string, object> = {
       userId: { bsonType: "objectId" },
       name: { bsonType: "string", maxLength: 60 },
       type: {
-        enum: ["duration", "sleep", "count", "scale", "check", "measure"],
+        enum: [
+          "duration",
+          "sleep",
+          "count",
+          "scale",
+          "check",
+          "measure",
+          "prayer",
+          "streak",
+        ],
       },
       unit: { bsonType: "string" },
       color: { bsonType: "string", pattern: "^#[0-9a-fA-F]{6}$" },
@@ -88,6 +116,15 @@ const VALIDATORS: Record<string, object> = {
           start: { bsonType: ["string", "null"], pattern: "^\\d{2}:\\d{2}$" },
           end: { bsonType: ["string", "null"], pattern: "^\\d{2}:\\d{2}$" },
           quality: { bsonType: ["number", "null"], minimum: 1, maximum: 5 },
+          // Namaz: which of the five prayers were prayed.
+          parts: {
+            bsonType: ["array", "null"],
+            items: { bsonType: "string" },
+            maxItems: 5,
+          },
+          // Clean-streak trackers: a slip is stored as value 0 *with* meta, so
+          // it stays on record instead of reading as a day you never logged.
+          status: { enum: ["clean", "slip", null] },
         },
       },
       createdAt: { bsonType: "date" },
@@ -122,15 +159,16 @@ async function ensureSchema(d: Db): Promise<void> {
     (await d.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name)
   );
 
-  for (const [name, schema] of Object.entries(VALIDATORS)) {
-    const validator = { $jsonSchema: schema };
-    if (existing.has(name)) {
-      // Keep validators current without touching the documents already stored.
-      await d.command({ collMod: name, validator, validationLevel: "moderate" });
-    } else {
-      await d.createCollection(name, { validator });
-    }
-  }
+  // One round trip per collection, so run them together rather than in turn.
+  await Promise.all(
+    Object.entries(VALIDATORS).map(([name, schema]) => {
+      const validator = { $jsonSchema: schema };
+      return existing.has(name)
+        ? // Keep validators current without touching the stored documents.
+          d.command({ collMod: name, validator, validationLevel: "moderate" })
+        : d.createCollection(name, { validator });
+    })
+  );
 
   await Promise.all([
     d.collection("users").createIndex({ email: 1 }, { unique: true }),
@@ -145,10 +183,42 @@ async function ensureSchema(d: Db): Promise<void> {
   ]);
 }
 
+/**
+ * Start the validator/index sync if it hasn't been started on this instance,
+ * and hand back the promise so a caller that needs it can wait.
+ *
+ * It is deliberately *not* awaited by `db()`. The sync is a dozen round trips
+ * to the database, and a serverless instance is thrown away and rebuilt often
+ * enough that paying for it on the way to every read made the app feel slow to
+ * open. Reads run straight away; the sync catches up behind them.
+ */
+function startSchemaSync(d: Db): Promise<void> | null {
+  if (process.env.PIT_SKIP_SCHEMA_SYNC === "1") return null;
+  if (!g._pitSchema) {
+    g._pitSchema = ensureSchema(d).catch((err) => {
+      // Let the next request try again rather than caching the failure.
+      g._pitSchema = undefined;
+      console.error("Schema sync failed:", err);
+    });
+  }
+  return g._pitSchema;
+}
+
 export async function db(): Promise<Db> {
   const client = await getClient();
   const d = client.db(process.env.MONGODB_DB || "pit");
-  if (!g._pitSchema) g._pitSchema = ensureSchema(d);
-  await g._pitSchema;
+  startSchemaSync(d);
+  return d;
+}
+
+/**
+ * Like `db()`, but waits for the indexes to exist first. Used by the writes
+ * that depend on a unique index to be correct — creating an account, and
+ * upserting a day's entries.
+ */
+export async function dbReady(): Promise<Db> {
+  const client = await getClient();
+  const d = client.db(process.env.MONGODB_DB || "pit");
+  await startSchemaSync(d);
   return d;
 }

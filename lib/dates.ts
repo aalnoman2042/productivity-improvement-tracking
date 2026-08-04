@@ -48,6 +48,13 @@ export function addDays(s: string, n: number): string {
   return toDateStr(d);
 }
 
+/** Whole days from `a` to `b` — negative if `b` is earlier. */
+export function daysBetween(a: string, b: string): number {
+  const ms = parseDateStr(b).getTime() - parseDateStr(a).getTime();
+  // Rounded, so a daylight-saving shift inside the range can't lose a day.
+  return Math.round(ms / 86_400_000);
+}
+
 /** Inclusive date range ending on `today` for the given period. */
 export function periodRange(
   period: Period,
