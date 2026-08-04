@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
+import { guard } from "@/lib/rateLimit";
 import {
   COOKIE_NAME,
   cookieOptions,
@@ -13,6 +14,14 @@ import {
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Signed in, but the current password is still a secret worth guessing —
+  // a borrowed unlocked phone shouldn't get unlimited tries at it.
+  const blocked = await guard(
+    [{ action: "password", subject: String(userId) }],
+    "attempts"
+  );
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => null);
   const current = typeof body?.current === "string" ? body.current : "";

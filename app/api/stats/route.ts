@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { toTracker } from "@/lib/trackerDoc";
 import { typeMeta, type Goal, type TrackerType } from "@/lib/trackers";
-import type { StreakInfo } from "@/lib/stats";
+import { toNight } from "@/lib/clock";
+import type { ClockSummary, StreakInfo } from "@/lib/stats";
 import {
   PERIOD_BUCKET,
   addDays,
@@ -93,6 +94,77 @@ function rollupEntries(entries: WithId<Document>[]): Map<string, Rollup> {
     out.set(id, r);
   }
   return out;
+}
+
+/**
+ * A night on the night axis, or null unless *both* ends were logged — a bar
+ * needs two ends, and an average of half-filled nights would say nothing.
+ */
+function nightOf(meta: unknown): { bed: number; wake: number } | null {
+  if (!meta || typeof meta !== "object") return null;
+  const m = meta as { start?: unknown; end?: unknown };
+  const bed = toNight(m.start);
+  const wake = toNight(m.end);
+  if (bed === null || wake === null) return null;
+  // Woke "before" bed on the axis means the night crossed 18:00 the other way
+  // — a daytime sleep. Push the wake round so the pair still reads as a span.
+  return { bed, wake: wake >= bed ? wake : wake + 24 * 60 };
+}
+
+type ClockRoll = {
+  nights: number;
+  bedSum: number;
+  wakeSum: number;
+  earliestBed: number;
+  latestBed: number;
+  latestBedDate: string | null;
+};
+
+/** Bedtimes and wake times per sleep tracker, over one slice of time. */
+function rollupClocks(
+  entries: WithId<Document>[],
+  sleepIds: Set<string>
+): Map<string, ClockRoll> {
+  const out = new Map<string, ClockRoll>();
+  for (const e of entries) {
+    const id = String(e.trackerId);
+    if (!sleepIds.has(id)) continue;
+    const night = nightOf(e.meta);
+    if (!night) continue;
+    const r =
+      out.get(id) ??
+      {
+        nights: 0,
+        bedSum: 0,
+        wakeSum: 0,
+        earliestBed: Infinity,
+        latestBed: -Infinity,
+        latestBedDate: null,
+      };
+    r.nights += 1;
+    r.bedSum += night.bed;
+    r.wakeSum += night.wake;
+    if (night.bed < r.earliestBed) r.earliestBed = night.bed;
+    if (night.bed > r.latestBed) {
+      r.latestBed = night.bed;
+      r.latestBedDate = String(e.date);
+    }
+    out.set(id, r);
+  }
+  return out;
+}
+
+function clockSummary(r: ClockRoll | undefined, prev: ClockRoll | undefined): ClockSummary | null {
+  if (!r || r.nights === 0) return null;
+  return {
+    nights: r.nights,
+    bed: r.bedSum / r.nights,
+    wake: r.wakeSum / r.nights,
+    earliestBed: r.earliestBed,
+    latestBed: r.latestBed,
+    latestBedDate: r.latestBedDate,
+    prevBed: prev && prev.nights > 0 ? prev.bedSum / prev.nights : null,
+  };
 }
 
 function goalProgress(
@@ -205,8 +277,12 @@ export async function GET(req: Request) {
     values: {} as Record<string, number>,
     counts: {} as Record<string, number>,
     quality: {} as Record<string, { sum: number; n: number }>,
+    clock: {} as Record<string, { nights: number; bed: number; wake: number }>,
   }));
   const byKey = new Map(buckets.map((b) => [b.key, b]));
+  const sleepIds = new Set(
+    trackers.filter((t) => t.type === "sleep").map((t) => t.id)
+  );
 
   for (const e of current) {
     const bucket = byKey.get(bucketOf(String(e.date), granularity));
@@ -220,7 +296,33 @@ export async function GET(req: Request) {
       const slot = bucket.quality[id] ?? { sum: 0, n: 0 };
       bucket.quality[id] = { sum: slot.sum + q, n: slot.n + 1 };
     }
+    // Bedtimes accumulate as sums here and are divided through below, so a
+    // week bucket shows the average night rather than the last one in it.
+    if (sleepIds.has(id)) {
+      const night = nightOf(e.meta);
+      if (night) {
+        const slot = bucket.clock[id] ?? { nights: 0, bed: 0, wake: 0 };
+        bucket.clock[id] = {
+          nights: slot.nights + 1,
+          bed: slot.bed + night.bed,
+          wake: slot.wake + night.wake,
+        };
+      }
+    }
   }
+
+  for (const bucket of buckets) {
+    for (const [id, slot] of Object.entries(bucket.clock)) {
+      bucket.clock[id] = {
+        nights: slot.nights,
+        bed: slot.bed / slot.nights,
+        wake: slot.wake / slot.nights,
+      };
+    }
+  }
+
+  const nowClocks = rollupClocks(current, sleepIds);
+  const beforeClocks = rollupClocks(previous, sleepIds);
 
   // --- Per-tracker summary ----------------------------------------------
   const summary: Record<string, unknown> = {};
@@ -248,6 +350,10 @@ export async function GET(req: Request) {
       previous: { sum: p.sum, days: p.days, value: prevValue },
       changePct,
       streak: streaks.get(tracker.id) ?? null,
+      clock: clockSummary(
+        nowClocks.get(tracker.id),
+        beforeClocks.get(tracker.id)
+      ),
     };
   }
 

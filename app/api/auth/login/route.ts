@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { clientIp, guard } from "@/lib/rateLimit";
 import { COOKIE_NAME, cookieOptions, signSession, verifyPassword } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -7,6 +8,17 @@ export async function POST(req: Request) {
   const email =
     typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+
+  // Counted per address *and* per account: one machine can't work through a
+  // password list, and a pool of addresses can't gang up on one email.
+  const blocked = await guard(
+    [
+      { action: "login", subject: clientIp(req) },
+      ...(email ? [{ action: "loginEmail" as const, subject: email }] : []),
+    ],
+    "sign-in attempts"
+  );
+  if (blocked) return blocked;
 
   const d = await db();
   const user = await d.collection("users").findOne({ email });

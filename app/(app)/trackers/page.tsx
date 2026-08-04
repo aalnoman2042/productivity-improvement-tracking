@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
+import { cacheRemove } from "@/lib/sync";
+import { PERIODS, prettyDate } from "@/lib/dates";
 import {
   CATEGORIES,
   TEMPLATE_PACKS,
   TRACKER_TYPES,
   categoryMeta,
+  deletePhrase,
   hasFixedUnit,
   orderCategories,
   typeMeta,
@@ -18,6 +21,16 @@ import {
 } from "@/lib/trackers";
 
 const NEW_CATEGORY = "__new__";
+
+/** What `GET /api/trackers/:id` reports about what a delete would cost. */
+type Usage = {
+  id: string;
+  name: string;
+  entries: number;
+  days: number;
+  first: string | null;
+  last: string | null;
+};
 
 type Form = {
   name: string;
@@ -83,8 +96,14 @@ export default function TrackersPage() {
   const [customCategory, setCustomCategory] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [done, setDone] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPacks, setShowPacks] = useState(false);
+  /** The tracker waiting on a delete confirmation, with what it would cost. */
+  const [pending, setPending] = useState<Usage | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [query, setQuery] = useState("");
 
   const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
   const trackers = trackersQ.data;
@@ -107,6 +126,7 @@ export default function TrackersPage() {
     setCustomCategory(false);
     setShowForm(true);
     setError("");
+    setDone("");
   }
 
   function openEdit(t: Tracker) {
@@ -189,24 +209,107 @@ export default function TrackersPage() {
     load();
   }
 
-  async function remove(id: string) {
-    const res = await fetch(`/api/trackers/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json().catch(() => null);
-      setError(d?.error ?? "Could not delete");
-      return;
+  /**
+   * Ask the server what this tracker is actually holding before offering to
+   * delete it. Nobody should confirm a deletion whose size they haven't seen.
+   */
+  async function askDelete(t: Tracker) {
+    setError("");
+    setDone("");
+    setConfirmText("");
+    setPending({ id: t.id, name: t.name, entries: 0, days: 0, first: null, last: null });
+    setChecking(true);
+    try {
+      const res = await fetch(`/api/trackers/${t.id}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Could not check that tracker");
+      setPending(data as Usage);
+    } catch (err) {
+      setPending(null);
+      setError(
+        err instanceof Error && err.message !== "Failed to fetch"
+          ? err.message
+          : "You need to be online to delete a tracker"
+      );
+    } finally {
+      setChecking(false);
     }
-    load();
   }
 
+  async function confirmDelete() {
+    if (!pending || checking || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const query = new URLSearchParams({
+        entries: String(pending.entries),
+        confirm: confirmText.trim().toLowerCase(),
+      });
+      const res = await fetch(`/api/trackers/${pending.id}?${query}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // The count moved under us — re-read it so the dialog shows what's
+        // really there now, and make them confirm against the new number.
+        if (res.status === 409) {
+          void askDelete({ id: pending.id, name: pending.name } as Tracker);
+        }
+        throw new Error(data?.error ?? "Could not delete");
+      }
+
+      // The dashboard reads from its own cached copies, which still have this
+      // tracker in them — drop those so it doesn't reappear until the next
+      // refresh lands.
+      PERIODS.forEach((p) => cacheRemove(`stats:${p.value}`));
+      setPending(null);
+      setConfirmText("");
+      setDone(
+        pending.entries > 0
+          ? `Deleted “${pending.name}” and ${pending.entries} ${pending.entries === 1 ? "entry" : "entries"}.`
+          : `Deleted “${pending.name}”.`
+      );
+      load();
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message !== "Failed to fetch"
+          ? err.message
+          : "You need to be online to delete a tracker"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Name, category or kind — whichever you remember. "sleep" finds the sleep
+   * tracker and everything filed under Sleep; "streak" finds the clean
+   * streaks. Archived rows are searched too, since a name you can't find is
+   * often one you archived and forgot.
+   */
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return null;
+    return (t: Tracker) =>
+      t.name.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      typeMeta(t.type as TrackerType).label.toLowerCase().includes(q) ||
+      t.type.toLowerCase().includes(q);
+  }, [query]);
+
   const active = useMemo(
-    () => (trackers ?? []).filter((t) => !t.archived),
-    [trackers]
+    () => (trackers ?? []).filter((t) => !t.archived && (!matches || matches(t))),
+    [trackers, matches]
   );
   const archived = useMemo(
-    () => (trackers ?? []).filter((t) => t.archived),
-    [trackers]
+    () => (trackers ?? []).filter((t) => t.archived && (!matches || matches(t))),
+    [trackers, matches]
   );
+
+  const total = (trackers ?? []).length;
+  const shown = active.length + archived.length;
+  // Below a certain number you can just look, and a search box is clutter.
+  const searchable = total > 8 || query !== "";
   /** Suggested categories plus every one already in use. */
   const categoryOptions = useMemo(
     () =>
@@ -484,12 +587,58 @@ export default function TrackersPage() {
         </form>
       )}
 
+      {searchable && !showForm && (
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <span
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            >
+              🔍
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, category or kind…"
+              aria-label="Search trackers"
+              autoComplete="off"
+              className="w-full rounded-md border border-edge card py-2 pl-9 pr-3 shadow-sm outline-none focus:border-accent"
+            />
+          </div>
+          {query && (
+            <>
+              <span className="shrink-0 text-sm tabular-nums text-muted">
+                {shown}/{total}
+              </span>
+              <button
+                onClick={() => setQuery("")}
+                className="shrink-0 rounded-md border border-edge px-3 py-2 text-sm text-secondary hover:bg-surface-2"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {trackersQ.loading ? (
         <div className="space-y-2" aria-hidden="true">
           <div className="skeleton h-16 w-full rounded-lg" />
           <div className="skeleton h-16 w-full rounded-lg" />
         </div>
-      ) : active.length === 0 && !showForm && !showPacks ? (
+      ) : query && shown === 0 ? (
+        <div className="rounded-lg border border-dashed border-edge p-8 text-center">
+          <p className="text-sm text-secondary">
+            Nothing matches &ldquo;{query}&rdquo;.
+          </p>
+          <button
+            onClick={() => setQuery("")}
+            className="mt-3 rounded-md border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
+          >
+            Show all {total}
+          </button>
+        </div>
+      ) : active.length === 0 && !showForm && !showPacks && total === 0 ? (
         <div className="rounded-lg border border-dashed border-edge p-8 text-center">
           <p className="text-lg font-medium">Start with a ready-made pack</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-secondary">
@@ -549,7 +698,7 @@ export default function TrackersPage() {
                         Archive
                       </button>
                       <button
-                        onClick={() => remove(t.id)}
+                        onClick={() => askDelete(t)}
                         className="rounded-md border border-edge px-2.5 py-1 text-sm text-red-600 hover:bg-surface-2"
                       >
                         Delete
@@ -589,7 +738,174 @@ export default function TrackersPage() {
         </>
       )}
 
-      {error && !showForm && <p className="text-sm text-red-600">{error}</p>}
+      {error && !showForm && !pending && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
+      {done && (
+        <p className="animate-fade-in text-sm font-medium text-green-700 dark:text-green-500">
+          {done}
+        </p>
+      )}
+
+      {pending && (
+        <DeleteDialog
+          usage={pending}
+          checking={checking}
+          busy={busy}
+          error={error}
+          confirmText={confirmText}
+          onConfirmText={setConfirmText}
+          onCancel={() => {
+            setPending(null);
+            setConfirmText("");
+            setError("");
+          }}
+          onArchive={() => {
+            setPending(null);
+            setConfirmText("");
+            setDone(`Archived “${pending.name}” — its history is still there.`);
+            void patch(pending.id, { archived: true });
+          }}
+          onDelete={confirmDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Deleting a tracker takes its whole history with it, so this is the one place
+ * in the app that stands in the way rather than getting out of it: it names
+ * what will be lost, offers archiving as the way out, and — once there's
+ * anything to lose — only unlocks once the phrase has been typed back.
+ */
+function DeleteDialog({
+  usage,
+  checking,
+  busy,
+  error,
+  confirmText,
+  onConfirmText,
+  onCancel,
+  onArchive,
+  onDelete,
+}: {
+  usage: Usage;
+  checking: boolean;
+  busy: boolean;
+  error: string;
+  confirmText: string;
+  onConfirmText: (v: string) => void;
+  onCancel: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const phrase = deletePhrase(usage.name);
+  const hasHistory = usage.entries > 0;
+  const armed =
+    !checking && (!hasHistory || confirmText.trim().toLowerCase() === phrase);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Delete ${usage.name}`}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onCancel();
+      }}
+    >
+      <div className="animate-rise-in w-full max-w-md rounded-lg border border-red-600/40 card p-5 shadow-lg">
+        <h2 className="text-lg font-semibold text-red-600">
+          Delete “{usage.name}”?
+        </h2>
+
+        {checking ? (
+          <p className="mt-3 text-sm text-secondary">
+            Checking what this tracker is holding…
+          </p>
+        ) : hasHistory ? (
+          <>
+            <p className="mt-2 text-sm text-secondary">
+              This also deletes{" "}
+              <strong className="tabular-nums text-foreground">
+                {usage.entries}
+              </strong>{" "}
+              {usage.entries === 1 ? "entry" : "entries"} across{" "}
+              <strong className="tabular-nums text-foreground">
+                {usage.days}
+              </strong>{" "}
+              {usage.days === 1 ? "day" : "days"}
+              {usage.first && usage.last && (
+                <>
+                  , from {prettyDate(usage.first)} to {prettyDate(usage.last)}
+                </>
+              )}
+              . It can&apos;t be undone.
+            </p>
+            <p className="mt-2 text-sm text-secondary">
+              If you just want it off your daily log,{" "}
+              <strong className="text-foreground">archive</strong> it instead —
+              that keeps every day you&apos;ve logged.
+            </p>
+
+            <label className="mt-4 block text-sm">
+              <span className="mb-1 block text-secondary">
+                To confirm, type{" "}
+                <code className="rounded bg-surface-2 px-1 font-semibold">
+                  {phrase}
+                </code>
+              </span>
+              <input
+                value={confirmText}
+                onChange={(e) => onConfirmText(e.target.value)}
+                placeholder={phrase}
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                className="w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-red-600"
+              />
+            </label>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-secondary">
+            Nothing has ever been logged against it, so nothing else goes with
+            it.
+          </p>
+        )}
+
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            onClick={onDelete}
+            disabled={!armed || busy}
+            className="rounded-md bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+          >
+            {busy
+              ? "Deleting…"
+              : hasHistory
+                ? `Delete it and ${usage.days} ${usage.days === 1 ? "day" : "days"} of history`
+                : "Delete tracker"}
+          </button>
+          {hasHistory && (
+            <button
+              onClick={onArchive}
+              disabled={busy}
+              className="rounded-md border border-edge px-4 py-2.5 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
+            >
+              Archive instead
+            </button>
+          )}
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="ml-auto rounded-md px-4 py-2.5 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -152,6 +152,35 @@ const VALIDATORS: Record<string, object> = {
       lastUsedAt: { bsonType: ["date", "null"] },
     },
   },
+  // Attempt counters for the routes reachable without a session. `_id` is
+  // "action:subject" and rows delete themselves once the window has passed.
+  rateLimits: {
+    bsonType: "object",
+    required: ["count", "resetAt"],
+    properties: {
+      _id: { bsonType: "string" },
+      count: { bsonType: "number" },
+      resetAt: { bsonType: "date" },
+    },
+  },
+  // One row per run of the nightly reminder, so "did it fire?" has an answer
+  // that doesn't depend on noticing you weren't reminded.
+  cronRuns: {
+    bsonType: "object",
+    required: ["job", "startedAt", "ok"],
+    properties: {
+      job: { bsonType: "string" },
+      startedAt: { bsonType: "date" },
+      finishedAt: { bsonType: ["date", "null"] },
+      ok: { bsonType: "bool" },
+      tookMs: { bsonType: ["number", "null"] },
+      checked: { bsonType: ["number", "null"] },
+      notified: { bsonType: ["number", "null"] },
+      alreadyLogged: { bsonType: ["number", "null"] },
+      skipped: { bsonType: ["number", "null"] },
+      error: { bsonType: ["string", "null"] },
+    },
+  },
 };
 
 async function ensureSchema(d: Db): Promise<void> {
@@ -180,6 +209,14 @@ async function ensureSchema(d: Db): Promise<void> {
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
     d.collection("pushSubs").createIndex({ userId: 1 }),
+    // Both of these are self-cleaning: MongoDB drops the row once the date
+    // field is in the past (plus the TTL), so neither collection grows.
+    d
+      .collection("rateLimits")
+      .createIndex({ resetAt: 1 }, { expireAfterSeconds: 0 }),
+    d
+      .collection("cronRuns")
+      .createIndex({ startedAt: -1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 }),
   ]);
 }
 

@@ -10,8 +10,8 @@
  * API calls are never cached here — the pages hold their own copy of the last
  * response and know when it's stale, which the service worker can't.
  */
-const CACHE = "pit-v3";
-const OFFLINE_FALLBACK = "/today";
+const CACHE = "pit-v4";
+const OFFLINE_FALLBACK = "/";
 
 /** Hashed build output: the URL changes whenever the file does. */
 const isImmutable = (url) => url.pathname.startsWith("/_next/static/");
@@ -27,7 +27,7 @@ const isVersioned = (url, request) =>
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(["/", "/today", "/trackers"]))
+    caches.open(CACHE).then((cache) => cache.addAll(["/", "/dashboard", "/history", "/trackers"]))
   );
   self.skipWaiting();
 });
@@ -94,7 +94,7 @@ self.addEventListener("push", (event) => {
     /* not our payload — show the generic nudge below */
   }
 
-  const url = data.url || "/today";
+  const url = data.url || "/";
   event.waitUntil(
     self.registration.showNotification(data.title || "Log your day", {
       body: data.body || "Add today's trackers in PIT.",
@@ -112,7 +112,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/today", self.location.origin);
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
 
   // Reuse an open PIT window if there is one — nobody wants a third copy of
   // the app opening at midnight.

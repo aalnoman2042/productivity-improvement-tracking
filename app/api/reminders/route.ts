@@ -2,16 +2,22 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { pushConfigured } from "@/lib/push";
+import { REMINDER_JOB, cronHealth } from "@/lib/cronLog";
 
-/** Whether reminders are on, and how many browsers would receive one. */
+/**
+ * Whether reminders are on, how many browsers would receive one — and whether
+ * the schedule behind them is actually running. That last part matters
+ * because a stopped cron announces itself by staying quiet.
+ */
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const d = await db();
-  const [user, devices] = await Promise.all([
+  const [user, devices, schedule] = await Promise.all([
     d.collection("users").findOne({ _id: userId }, { projection: { reminder: 1 } }),
     d.collection("pushSubs").countDocuments({ userId }),
+    cronHealth(REMINDER_JOB),
   ]);
 
   return NextResponse.json({
@@ -19,6 +25,7 @@ export async function GET() {
     enabled: Boolean(user?.reminder?.enabled),
     tzOffset: Number(user?.reminder?.tzOffset ?? 0),
     devices,
+    schedule,
   });
 }
 

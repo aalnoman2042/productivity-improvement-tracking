@@ -36,7 +36,7 @@ export async function POST() {
   const { sent } = await sendToUser(userId, {
     title: "PIT reminder — this is a test",
     body: `The real one arrives at midnight. Tap to log ${prettyDate(today)}.`,
-    url: `/today?date=${today}`,
+    url: `/?date=${today}`,
     tag: "pit-test",
   });
 

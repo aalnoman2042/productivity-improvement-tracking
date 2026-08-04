@@ -29,3 +29,8 @@ export const SeriesChart = dynamic(() => import("./SeriesChart"), {
   ssr: false,
   loading: () => <Placeholder height={180} />,
 });
+
+export const SleepClockChart = dynamic(() => import("./SleepClockChart"), {
+  ssr: false,
+  loading: () => <Placeholder height={180} />,
+});

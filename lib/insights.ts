@@ -1,4 +1,5 @@
 import { formatValue, type Tracker, type TrackerType } from "./trackers";
+import { nightLabel, shiftLabel, toNight } from "./clock";
 import type { Stats, Summary } from "./stats";
 
 export type InsightLevel = "bad" | "warn" | "good";
@@ -40,6 +41,48 @@ function sleepInsight(s: Summary): Insight | null {
     level: "good",
     title: `Sleep is healthy — ${hours(avg)} a night`,
     detail: `Across ${nights}. Keep it there.`,
+  };
+}
+
+/**
+ * Late nights are their own problem — you can sleep eight hours and still be
+ * doing it from 3am. Midnight is the line; past 1am it's the headline.
+ */
+const MIDNIGHT = toNight("00:00") as number;
+const ONE_AM = toNight("01:00") as number;
+
+function bedtimeInsight(s: Summary): Insight | null {
+  const clock = s.clock;
+  if (!clock || clock.nights < 3) return null;
+
+  const at = nightLabel(clock.bed);
+  const nights = `${clock.nights} night${clock.nights === 1 ? "" : "s"}`;
+  const versus =
+    clock.prevBed != null ? shiftLabel(clock.bed, clock.prevBed) : null;
+  const trend = versus
+    ? versus === "about the same"
+      ? " That's about where you were last period."
+      : ` That's ${versus} than last period.`
+    : "";
+
+  if (clock.bed >= ONE_AM) {
+    return {
+      level: "bad",
+      title: `You're getting to bed at ${at}`,
+      detail: `Averaged over ${nights}, and up at ${nightLabel(clock.wake)}.${trend} Pulling the bedtime back is worth more than catching up in the morning.`,
+    };
+  }
+  if (clock.bed >= MIDNIGHT) {
+    return {
+      level: "warn",
+      title: `Bedtime is drifting past midnight — ${at}`,
+      detail: `Averaged over ${nights}, up at ${nightLabel(clock.wake)}.${trend} Half an hour earlier would put you back the right side of midnight.`,
+    };
+  }
+  return {
+    level: "good",
+    title: `You're in bed by ${at}`,
+    detail: `Averaged over ${nights}, up at ${nightLabel(clock.wake)}.${trend}`,
   };
 }
 
@@ -190,6 +233,9 @@ export function buildInsights(stats: Stats | null): Insight[] {
     if (type === "sleep") {
       const i = sleepInsight(s);
       if (i) out.push(i);
+      // How long and how late are separate problems with separate fixes.
+      const bed = bedtimeInsight(s);
+      if (bed) out.push(bed);
       continue;
     }
     if (type === "prayer") {

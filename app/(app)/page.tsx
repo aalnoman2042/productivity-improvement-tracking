@@ -1,641 +1,598 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
+import DeleteDays from "@/components/DeleteDays";
+import QuickLog from "@/components/QuickLog";
+import TrackerInput from "@/components/TrackerInput";
+import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
+import { useCached, useStored } from "@/lib/useCached";
+import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
+import { seriesColor } from "@/lib/palette";
+import {
+  EMPTY,
+  buildDraft,
+  draftToEntry,
+  isLogged,
+  type Draft,
+  type Entry,
+} from "@/lib/draft";
 import {
   categoryMeta,
   formatValue,
   orderCategories,
-  typeMeta,
-  type Goal,
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
-import { useCached } from "@/lib/useCached";
-import type { Stats, Summary } from "@/lib/stats";
-import { seriesColor } from "@/lib/palette";
-import { DonutChart, TrendChart, SeriesChart } from "@/components/charts";
-import type { Slice } from "@/components/charts/DonutChart";
-import type { Point } from "@/components/charts/SeriesChart";
 
-const shortTime = (v: number) =>
-  v >= 60 ? `${Math.round((v / 60) * 10) / 10}h` : `${Math.round(v)}m`;
+type SaveState = "idle" | "saving" | "saved" | "queued" | "error";
 
-const PERIOD_WORD: Record<Period, string> = {
-  week: "last week",
-  "15d": "the previous 15 days",
-  month: "last month",
-  "6mo": "the previous 6 months",
-  year: "last year",
-};
+/** How long after you stop typing the day is saved for you. */
+const AUTOSAVE_MS = 900;
 
-function prettyDate(date: string): string {
-  const d = parseDateStr(date);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+/**
+ * How long the way back stays open after a save.
+ *
+ * This page saves itself a second after you stop typing, which is right for
+ * logging on a phone at midnight and wrong for the moment you realise you
+ * typed 12 hours of study into the sleep row. Long enough to notice, short
+ * enough that it isn't clutter.
+ */
+const UNDO_MS = 10_000;
+
+const CLOSED_KEY = "closed-sections";
+
+/** Stable empty default, so it doesn't look like a new value every render. */
+const NONE_CLOSED: string[] = [];
+
+/** Send a whole day, and keep the offline copy in step. */
+async function persist(
+  date: string,
+  trackers: Tracker[],
+  draft: Record<string, Draft>
+): Promise<PostResult> {
+  const entries = trackers.map((t) => ({
+    trackerId: t.id,
+    ...draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY),
+  }));
+  const result = await post("/api/entries", { date, entries });
+  cacheSet(
+    `entries:${date}`,
+    entries
+      .filter((e) => e.value > 0 || e.meta)
+      .map((e) => ({ ...e, note: null }))
+  );
+  return result;
 }
 
-/* ------------------------------- pieces -------------------------------- */
+const chipCls = (on: boolean) =>
+  `rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+    on
+      ? "border-accent bg-accent text-white"
+      : "border-edge text-secondary hover:bg-surface-2"
+  }`;
 
-/** ↑ 12% — green when it's movement in the direction you asked for. */
-function Delta({
-  changePct,
-  goodDirection,
-  compareTo,
-}: {
-  changePct: number | null;
-  goodDirection: "up" | "down" | "unknown";
-  compareTo: string;
-}) {
-  if (changePct === null || !Number.isFinite(changePct)) {
-    return <span className="text-xs text-muted">no earlier data</span>;
+export default function TodayPage() {
+  const [date, setDate] = useState(() => toDateStr(new Date()));
+  const [draft, setDraft] = useState<Record<string, Draft>>({});
+  const [state, setState] = useState<SaveState>("idle");
+  const [error, setError] = useState("");
+  const [closed, setClosed] = useStored<string[]>(CLOSED_KEY, NONE_CLOSED);
+  const [quick, setQuick] = useState(false);
+
+  const today = toDateStr(new Date());
+
+  const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
+  const entriesQ = useCached<Entry[]>(`/api/entries?date=${date}`, `entries:${date}`);
+
+  const trackers = useMemo(
+    () => (trackersQ.data ?? []).filter((t) => !t.archived),
+    [trackersQ.data]
+  );
+
+  /* --------------------------- saving as you go -------------------------- */
+
+  // Kept in a ref so the save that fires on a timer, or as you leave the page,
+  // always sends what's on screen right now rather than a stale copy.
+  const latest = useRef({ date, trackers, draft });
+  useEffect(() => {
+    latest.current = { date, trackers, draft };
+  });
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  const scheduleRef = useRef<() => void>(() => {});
+
+  // The day as it stood before the current run of edits. Captured on the first
+  // change after a save, so one undo takes back the whole burst rather than a
+  // single keystroke.
+  const beforeRef = useRef<Record<string, Draft> | null>(null);
+  const [undo, setUndo] = useState<{
+    date: string;
+    draft: Record<string, Draft>;
+  } | null>(null);
+
+  const saveNow = useCallback(async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (!dirtyRef.current || savingRef.current) return;
+    const { date: d, trackers: ts, draft: dr } = latest.current;
+    if (ts.length === 0) return;
+
+    const before = beforeRef.current;
+    dirtyRef.current = false;
+    beforeRef.current = null;
+    savingRef.current = true;
+    setState("saving");
+    try {
+      const result = await persist(d, ts, dr);
+      setState(result === "queued" ? "queued" : "saved");
+      setError("");
+      // Only offer the way back if this actually changed something, and only
+      // for the day it belongs to.
+      if (before && JSON.stringify(before) !== JSON.stringify(dr)) {
+        setUndo({ date: d, draft: before });
+      }
+    } catch (err) {
+      dirtyRef.current = true; // it never landed — try again on the next edit
+      beforeRef.current = before; // and the way back still points at the right day
+      setState("error");
+      setError(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      savingRef.current = false;
+      // Anything typed while that request was in the air still needs sending.
+      if (dirtyRef.current) scheduleRef.current();
+    }
+  }, []);
+
+  const schedule = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      void saveNow();
+    }, AUTOSAVE_MS);
+  }, [saveNow]);
+
+  useEffect(() => {
+    scheduleRef.current = schedule;
+  }, [schedule]);
+
+  // Closing the tab, switching apps or locking the phone shouldn't lose the
+  // second and a half between the last keystroke and the autosave.
+  useEffect(() => {
+    const flush = () => {
+      if (dirtyRef.current) void saveNow();
+    };
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+      flush();
+    };
+  }, [saveNow]);
+
+  /* ----------------------------- loading a day --------------------------- */
+
+  // `?date=YYYY-MM-DD` opens straight on that day — it's how the nightly
+  // reminder lands you on the day it's nagging about. Applied after mount
+  // so the server and the first client render still agree.
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get("date");
+    if (isValidDateStr(asked) && asked <= toDateStr(new Date())) setDate(asked);
+  }, []);
+
+  const appliedRef = useRef<Entry[] | null>(null);
+
+  useEffect(() => {
+    const rows = entriesQ.data;
+    if (trackersQ.data === null) return;
+    if (dirtyRef.current || savingRef.current) return; // don't stomp on edits
+    if (rows === null) {
+      // A day with nothing cached yet: empty boxes, not the last day's.
+      if (appliedRef.current !== null) {
+        appliedRef.current = null;
+        setDraft({});
+      }
+      return;
+    }
+    if (appliedRef.current === rows) return;
+    appliedRef.current = rows;
+    setDraft(buildDraft(trackers, rows));
+  }, [trackers, trackersQ.data, entriesQ.data]);
+
+  /**
+   * The stopwatch writes its minutes straight to the server, so the page has
+   * to flush what's on screen and then read the day back rather than trusting
+   * its own copy.
+   */
+  const afterTimer = useCallback(async () => {
+    await saveNow();
+    dirtyRef.current = false;
+    appliedRef.current = null;
+    await entriesQ.refresh();
+  }, [saveNow, entriesQ]);
+
+  /** Remember where the day stood, if this is the first change since a save. */
+  function markDirty() {
+    if (!dirtyRef.current && beforeRef.current === null) {
+      beforeRef.current = latest.current.draft;
+    }
+    dirtyRef.current = true;
   }
-  const rounded = Math.round(changePct);
-  if (rounded === 0) {
-    return <span className="text-xs text-muted">same as {compareTo}</span>;
+
+  function set(id: string, patch: Partial<Draft>) {
+    markDirty();
+    setDraft((d) => ({ ...d, [id]: { ...(d[id] ?? EMPTY), ...patch } }));
+    setState("idle");
+    schedule();
   }
-  const up = rounded > 0;
-  const good =
-    goodDirection === "unknown" ? null : up === (goodDirection === "up");
-  const tone =
-    good === null
-      ? "text-secondary"
-      : good
-        ? "text-green-700 dark:text-green-500"
-        : "text-red-600 dark:text-red-400";
-  return (
-    <span className={`text-xs font-medium ${tone}`} title={`vs ${compareTo}`}>
-      {up ? "↑" : "↓"} {Math.abs(rounded)}%
-    </span>
-  );
-}
 
-function StatTile({
-  label,
-  value,
-  footer,
-}: {
-  label: string;
-  value: string;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-edge card p-4 shadow-sm">
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="mt-0.5 text-xs text-muted">{label}</div>
-      {footer && <div className="mt-1">{footer}</div>}
-    </div>
-  );
-}
+  /**
+   * Put the day back the way it was before the last save, and save that. It
+   * goes through the same path as any other edit, so the offline queue and
+   * the local cache follow it.
+   */
+  function undoLast() {
+    if (!undo) return;
+    if (undo.date !== date) {
+      // They've moved to another day; the snapshot no longer applies.
+      setUndo(null);
+      return;
+    }
+    beforeRef.current = latest.current.draft;
+    dirtyRef.current = true;
+    setDraft(undo.draft);
+    setUndo(null);
+    setState("idle");
+    schedule();
+  }
 
-function GoalBar({ met, total }: { met: number; total: number }) {
-  const pct = total > 0 ? Math.round((met / total) * 100) : 0;
-  return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between text-xs text-secondary">
-        <span>Goal met</span>
-        <span className="tabular-nums">
-          {met}/{total} · {pct}%
-        </span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div
-          className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+  // The offer expires on its own. It's also tied to the day it was made for —
+  // putting yesterday's values onto today would be a worse mistake than the
+  // one being undone — which is why both the button and `undoLast` check the
+  // date rather than this clearing the state the moment you navigate.
+  useEffect(() => {
+    if (!undo) return;
+    const timer = setTimeout(() => setUndo(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [undo]);
 
-function Facts({ items }: { items: { label: string; value: string }[] }) {
-  return (
-    <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-edge pt-3">
-      {items.map((f) => (
-        <div key={f.label}>
-          <dt className="text-xs text-muted">{f.label}</dt>
-          <dd className="text-sm font-semibold tabular-nums">{f.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
+  function changeDate(next: string) {
+    void saveNow(); // reads the day being left out of the ref, before it moves
+    setDraft({});
+    setState("idle");
+    setError("");
+    appliedRef.current = null;
+    dirtyRef.current = false;
+    setDate(next);
+  }
 
-/* ------------------------------ the page ------------------------------- */
+  async function copyYesterday() {
+    const prev = addDays(date, -1);
+    const { data } = await getCached<Entry[]>(
+      `/api/entries?date=${prev}`,
+      `entries:${prev}`
+    );
+    if (!data || data.length === 0) {
+      setError("Nothing logged yesterday to copy");
+      return;
+    }
+    // Overwriting a whole day in one tap is exactly what undo is for.
+    markDirty();
+    setDraft(buildDraft(trackers, data));
+    setError("");
+    setState("idle");
+    schedule();
+  }
 
-export default function DashboardPage() {
-  const [period, setPeriod] = useState<Period>("week");
+  function toggleSection(value: string) {
+    setClosed(
+      closed.includes(value)
+        ? closed.filter((v) => v !== value)
+        : [...closed, value]
+    );
+  }
 
-  // The numbers from the last visit go up straight away and are replaced when
-  // the fresh ones arrive — opening the dashboard shouldn't be a blank wait.
-  const statsQ = useCached<Stats>(
-    `/api/stats?period=${period}&today=${toDateStr(new Date())}`,
-    `stats:${period}`
-  );
-  const stats = statsQ.data;
+  /* ------------------------------- grouping ------------------------------ */
 
-  const active = useMemo(
-    () => (stats?.trackers ?? []).filter((t) => !t.archived),
-    [stats]
-  );
-  const durationTrackers = active.filter((t) => t.type === "duration");
-  const sleepTrackers = active.filter((t) => t.type === "sleep");
-  const habitTrackers = active.filter(
-    (t) => !["duration", "sleep"].includes(t.type)
-  );
-
-  // Habits are easier to read grouped the way they're grouped everywhere else.
-  const habitGroups = useMemo(
+  const grouped = useMemo(
     () =>
-      orderCategories(habitTrackers.map((t) => t.category))
+      orderCategories(trackers.map((t) => t.category))
         .map((value) => ({
           value,
           ...categoryMeta(value),
-          items: habitTrackers.filter(
+          items: trackers.filter(
             (t) => t.category.toLowerCase() === value.toLowerCase()
           ),
         }))
         .filter((g) => g.items.length > 0),
-    [habitTrackers]
+    [trackers]
   );
 
-  function pointsFor(t: Tracker): Point[] {
-    if (!stats) return [];
-    const aggregate = typeMeta(t.type as TrackerType).aggregate;
-    return stats.buckets.map((b) => {
-      const sum = b.values[t.id] ?? 0;
-      const n = b.counts[t.id] ?? 0;
-      if (aggregate === "avg") {
-        return { label: b.label, value: n > 0 ? sum / n : null };
-      }
-      return { label: b.label, value: sum };
-    });
-  }
-
-  function goalLineFor(t: Tracker): number | null {
-    const goal: Goal = t.goal;
-    if (!goal || goal.period !== "day") return null;
-    const aggregate = typeMeta(t.type as TrackerType).aggregate;
-    if (aggregate === "avg") return goal.target;
-    return stats?.granularity === "day" ? goal.target : null;
-  }
-
-  /** More of this is good unless the goal says "at most". */
-  function goodDirection(t: Tracker): "up" | "down" | "unknown" {
-    if (t.goal) return t.goal.direction === "max" ? "down" : "up";
-    return t.type === "measure" ? "unknown" : "up";
-  }
-
-  const timeSlices: Slice[] = durationTrackers
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      color: t.color,
-      minutes: stats?.summary[t.id]?.sum ?? 0,
-    }))
-    .filter((s) => s.minutes > 0)
-    .sort((a, b) => b.minutes - a.minutes);
-
-  const totalTime = timeSlices.reduce((s, x) => s + x.minutes, 0);
-  const prevTotalTime = durationTrackers.reduce(
-    (s, t) => s + (stats?.summary[t.id]?.previous.sum ?? 0),
-    0
+  const loggedCount = useMemo(
+    () =>
+      trackers.filter((t) =>
+        isLogged(t.type as TrackerType, draft[t.id] ?? EMPTY)
+      ).length,
+    [trackers, draft]
   );
-  const timeChange =
-    prevTotalTime > 0 ? ((totalTime - prevTotalTime) / prevTotalTime) * 100 : null;
 
-  const goalStats = active
-    .map((t) => stats?.summary[t.id]?.goal)
-    .filter(Boolean) as { met: number; total: number }[];
-  const goalsMet = goalStats.reduce((s, g) => s + g.met, 0);
-  const goalsTotal = goalStats.reduce((s, g) => s + g.total, 0);
-
-  const mainSleep = sleepTrackers[0];
-  const sleepSummary = mainSleep ? stats?.summary[mainSleep.id] : undefined;
-  const compareTo = PERIOD_WORD[period];
-
-  // How much of the period is actually accounted for: every activity plus
-  // sleep, against the 24 hours each day really has.
-  const sleepMinutes = sleepTrackers.reduce(
-    (s, t) => s + (stats?.summary[t.id]?.sum ?? 0),
-    0
+  const dayTotalMinutes = useMemo(
+    () =>
+      trackers
+        .filter((t) => t.type === "duration")
+        .reduce(
+          (s, t) => s + draftToEntry("duration", draft[t.id] ?? EMPTY).value,
+          0
+        ),
+    [trackers, draft]
   );
-  const accountedMinutes = totalTime + sleepMinutes;
-  const periodHours = (stats?.days ?? 0) * 24;
-  const coveragePct =
-    periodHours > 0
-      ? Math.round((accountedMinutes / (periodHours * 60)) * 100)
-      : 0;
 
-  /** A clean streak is about the run, not the period — so it says so. */
-  function StreakCard({ t, s }: { t: Tracker; s: Summary }) {
-    const run = s.streak;
-    const days = run?.current ?? 0;
-    return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className="h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: seriesColor(t.color) }}
-          />
-          <h3 className="text-sm font-semibold">{t.name}</h3>
-        </div>
+  const doneInGroup = (items: Tracker[]) =>
+    items.filter((t) => isLogged(t.type as TrackerType, draft[t.id] ?? EMPTY))
+      .length;
 
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold tabular-nums">{days}</span>
-          <span className="text-sm text-secondary">
-            day{days === 1 ? "" : "s"} clean
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-muted">
-          {run?.lastSlip
-            ? `Last slip ${prettyDate(run.lastSlip)}`
-            : run?.since
-              ? `No slips since you started on ${prettyDate(run.since)}`
-              : "Log a day to start the count"}
-        </p>
+  /* -------------------------------- render ------------------------------- */
 
-        <Facts
-          items={[
-            { label: "Best run", value: `${run?.best ?? 0}d` },
-            { label: "Slips (all time)", value: String(run?.slips ?? 0) },
-            {
-              label: "Clean this period",
-              value: `${s.sum}/${stats?.days ?? 0}`,
-            },
-          ]}
-        />
+  const statusLine =
+    state === "saving"
+      ? { text: "Saving…", tone: "text-muted" }
+      : state === "saved"
+        ? { text: "✓ Saved", tone: "text-green-700 dark:text-green-500" }
+        : state === "queued"
+          ? { text: "✓ Saved on device — will sync", tone: "text-amber-700" }
+          : state === "error"
+            ? { text: error || "Could not save", tone: "text-red-600" }
+            : null;
 
-        <SeriesChart
-          data={pointsFor(t)}
-          color={t.color}
-          kind="bar"
-          title={t.name}
-          format={(v) => formatValue(v, "streak", t.unit)}
-          tickFormat={(v) => String(Math.round(v))}
-          height={110}
-        />
-      </section>
-    );
-  }
-
-  /** One tracker, one chart, with its own numbers underneath. */
-  function TrackerCard({ t }: { t: Tracker }) {
-    const s = stats?.summary[t.id];
-    const type = t.type as TrackerType;
-    const isTime = type === "duration" || type === "sleep";
-    const aggregate = typeMeta(type).aggregate;
-    const kind: "bar" | "line" =
-      type === "measure" || type === "scale" ? "line" : "bar";
-    const fmt = (v: number) => formatValue(v, type, t.unit);
-
-    // The streak card stands on its own — it means something even in a week
-    // where nothing was logged, because the run carries on regardless.
-    if (type === "streak" && s) return <StreakCard t={t} s={s} />;
-
-    if (!s || s.days === 0) {
-      return (
-        <section className="rounded-lg border border-edge card p-4 shadow-sm">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <span
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: seriesColor(t.color) }}
-            />
-            {t.name}
-          </h3>
-          <p className="py-10 text-center text-sm text-muted">
-            Nothing logged in this period
-          </p>
-        </section>
-      );
-    }
-
-    const headline =
-      type === "check"
-        ? `${s.sum} of ${stats?.days} days`
-        : aggregate === "avg"
-          ? fmt(s.avgPerLoggedDay)
-          : fmt(s.sum);
-
-    const domain: [number, number] | undefined =
-      type === "scale" ? [0, 5] : type === "prayer" ? [0, 5] : undefined;
-
-    return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className="h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: seriesColor(t.color) }}
-          />
-          <h3 className="text-sm font-semibold">{t.name}</h3>
-          <span className="ml-auto">
-            <Delta
-              changePct={s.changePct}
-              goodDirection={goodDirection(t)}
-              compareTo={compareTo}
-            />
-          </span>
-        </div>
-
-        <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums">{headline}</span>
-          <span className="text-xs text-muted">
-            {aggregate === "avg" ? "average" : "total"}
-          </span>
-        </div>
-
-        <SeriesChart
-          data={pointsFor(t)}
-          color={t.color}
-          kind={kind}
-          title={t.name}
-          format={fmt}
-          tickFormat={
-            isTime ? shortTime : (v) => String(Math.round(v * 10) / 10)
-          }
-          goal={goalLineFor(t)}
-          goalLabel="goal"
-          domain={domain}
-          height={150}
-        />
-
-        <Facts
-          items={[
-            {
-              label: aggregate === "avg" ? "Best" : "Per active day",
-              value: fmt(aggregate === "avg" ? s.best : s.avgPerLoggedDay),
-            },
-            {
-              label: "Best day",
-              value: s.bestDate ? prettyDate(s.bestDate) : "—",
-            },
-            { label: "Days active", value: `${s.days}/${stats?.days}` },
-          ]}
-        />
-
-        {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
-      </section>
-    );
-  }
+  const pct =
+    trackers.length > 0 ? Math.round((loggedCount / trackers.length) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          {stats && (
-            <>
-              <p className="mt-1 text-sm text-secondary">
-                <strong className="text-foreground tabular-nums">
-                  {formatValue(accountedMinutes, "duration", "min")}
-                </strong>{" "}
-                of{" "}
-                <strong className="text-foreground tabular-nums">
-                  {periodHours}h
-                </strong>{" "}
-                tracked
-                <span className="text-muted"> ({coveragePct}%)</span>
-              </p>
-              <p className="mt-0.5 text-xs text-muted">
-                {prettyDate(stats.start)} – {prettyDate(stats.end)} ·{" "}
-                {stats.days} days · activities{" "}
-                <span className="tabular-nums">
-                  {formatValue(totalTime, "duration", "min")}
-                </span>
-                {sleepMinutes > 0 && (
-                  <>
-                    {" "}
-                    · sleep{" "}
-                    <span className="tabular-nums">
-                      {formatValue(sleepMinutes, "sleep", "min")}
-                    </span>
-                  </>
-                )}{" "}
-                · untracked{" "}
-                <span className="tabular-nums">
-                  {formatValue(Math.max(0, periodHours * 60 - accountedMinutes), "duration", "min")}
-                </span>
-                {statsQ.refreshing && (
-                  <span className="ml-2 animate-fade-in text-muted">
-                    updating…
-                  </span>
-                )}
-              </p>
-            </>
-          )}
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Daily log</h1>
+        <p className="mt-1 text-sm text-secondary">
+          Tap or type — it saves itself. Leave anything blank if it doesn&apos;t
+          apply.
+        </p>
+      </div>
+
+      {/* Which day */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => changeDate(addDays(date, -1))}
+            className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2"
+            aria-label="Previous day"
+          >
+            ←
+          </button>
+          <input
+            type="date"
+            value={date}
+            max={today}
+            onChange={(e) => e.target.value && changeDate(e.target.value)}
+            className="min-w-0 flex-1 rounded-md border border-edge card px-3 py-2 text-center shadow-sm outline-none focus:border-accent"
+          />
+          <button
+            onClick={() => changeDate(addDays(date, 1))}
+            disabled={date >= today}
+            className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2 disabled:opacity-30"
+            aria-label="Next day"
+          >
+            →
+          </button>
         </div>
-        <div className="flex flex-wrap gap-1 rounded-lg border border-edge card p-1 shadow-sm">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                period === p.value
-                  ? "bg-brand-gradient text-white shadow-sm"
-                  : "text-secondary hover:bg-surface-2"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex justify-center gap-1.5">
+          <button onClick={() => changeDate(today)} className={chipCls(date === today)}>
+            Today
+          </button>
+          <button
+            onClick={() => changeDate(addDays(today, -1))}
+            className={chipCls(date === addDays(today, -1))}
+          >
+            Yesterday
+          </button>
         </div>
       </div>
 
-      {stats === null ? (
-        statsQ.error ? (
-          <div className="rounded-lg border border-dashed border-edge p-8 text-center">
-            <p className="text-sm text-secondary">{statsQ.error}</p>
-            <button
-              onClick={() => void statsQ.refresh()}
-              className="mt-3 rounded-md border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4" aria-hidden="true">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="skeleton h-24 rounded-lg" />
-              ))}
-            </div>
-            <div className="skeleton h-64 rounded-lg" />
-          </div>
-        )
-      ) : active.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-edge p-10 text-center">
-          <p className="text-lg font-medium">Welcome to PIT 👋</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-secondary">
-            Set up what you want to track — sleep, study, work, workouts, food,
-            habits — then log your days and your progress shows up here.
-          </p>
-          <Link
-            href="/trackers"
-            className="mt-5 inline-block rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110"
-          >
-            Set up trackers
-          </Link>
+      {trackersQ.loading ? (
+        <div className="space-y-2" aria-hidden="true">
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+        </div>
+      ) : trackers.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-secondary">
+          You don&apos;t have any trackers yet.{" "}
+          <Link href="/trackers" className="font-medium text-accent underline">
+            Set them up
+          </Link>{" "}
+          to start logging.
         </div>
       ) : (
         <>
-          <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile
-              label="Time logged"
-              value={formatValue(totalTime, "duration", "min")}
-              footer={
-                <Delta
-                  changePct={timeChange}
-                  goodDirection="up"
-                  compareTo={compareTo}
-                />
-              }
-            />
-            <StatTile
-              label={mainSleep ? "Average sleep" : "Days logged"}
-              value={
-                mainSleep
-                  ? sleepSummary && sleepSummary.days > 0
-                    ? formatValue(sleepSummary.avgPerLoggedDay, "sleep", "min")
-                    : "—"
-                  : `${stats.daysLogged}`
-              }
-              footer={
-                mainSleep && sleepSummary ? (
-                  <Delta
-                    changePct={sleepSummary.changePct}
-                    goodDirection="up"
-                    compareTo={compareTo}
-                  />
-                ) : undefined
-              }
-            />
-            <StatTile
-              label="Current streak"
-              value={`${stats.streak}d`}
-              footer={
-                <span className="text-xs text-muted">
-                  {stats.daysLogged}/{stats.days} days logged
+          {/* How much of the day is filled in */}
+          <div className="rounded-lg border border-edge card p-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-sm font-medium">
+                <span className="tabular-nums">{loggedCount}</span> of{" "}
+                <span className="tabular-nums">{trackers.length}</span> filled in
+              </span>
+              {loggedCount === 0 && (
+                <button
+                  onClick={copyYesterday}
+                  className="rounded-md border border-edge px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-2"
+                >
+                  Copy yesterday
+                </button>
+              )}
+              {/* The way through a whole day without hunting for rows. */}
+              {loggedCount < trackers.length && (
+                <button
+                  onClick={() => setQuick(true)}
+                  className="rounded-md border border-accent px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/5"
+                >
+                  ⚡ Quick log
+                  {loggedCount > 0 && ` (${trackers.length - loggedCount} left)`}
+                </button>
+              )}
+              {statusLine && (
+                <span
+                  className={`ml-auto animate-fade-in text-sm font-medium ${statusLine.tone}`}
+                >
+                  {statusLine.text}
                 </span>
-              }
-            />
-            <StatTile
-              label="Goals met"
-              value={
-                goalsTotal > 0
-                  ? `${Math.round((goalsMet / goalsTotal) * 100)}%`
-                  : "—"
-              }
-              footer={
-                goalsTotal > 0 ? (
-                  <span className="text-xs text-muted">
-                    {goalsMet} of {goalsTotal}
-                  </span>
-                ) : undefined
-              }
-            />
+              )}
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
           </div>
 
-          {!stats.hasEntries && (
-            <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-secondary">
-              Nothing logged in this period yet.{" "}
-              <Link href="/today" className="font-medium text-accent underline">
-                Log today
-              </Link>
-            </div>
-          )}
-
-          {/* Everything together */}
-          {totalTime > 0 && (
-            <div className="animate-rise-in grid gap-4 lg:grid-cols-5">
-              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-2">
-                <h2 className="mb-3 text-sm font-semibold text-secondary">
-                  Where your time went
-                </h2>
-                <DonutChart data={timeSlices} />
-              </section>
-              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-3">
-                <h2 className="mb-1 text-sm font-semibold text-secondary">
-                  All activities stacked
-                </h2>
-                <p className="mb-3 text-xs text-muted">
-                  Total time per{" "}
-                  {stats.granularity === "day"
-                    ? "day"
-                    : stats.granularity === "week"
-                      ? "week"
-                      : "month"}
-                  , split by activity.
-                </p>
-                <TrendChart buckets={stats.buckets} series={durationTrackers} />
-              </section>
-            </div>
-          )}
-
-          {/* Then each one on its own */}
-          {durationTrackers.length > 0 && (
-            <section>
-              <h2 className="mb-1 text-lg font-semibold">Each activity on its own</h2>
-              <p className="mb-3 text-sm text-secondary">
-                One chart per activity, so you can see how each is moving —
-                compared with {compareTo}.
-              </p>
-              <div className="stagger grid gap-4 md:grid-cols-2">
-                {durationTrackers.map((t) => (
-                  <TrackerCard key={t.id} t={t} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Sleep gets its quality read-out too */}
-          {sleepTrackers.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-lg font-semibold">Sleep</h2>
-              <div className="stagger grid gap-4 md:grid-cols-2">
-                {sleepTrackers.map((t) => {
-                  const quality = stats.buckets.reduce(
-                    (acc, b) => {
-                      const q = b.quality[t.id];
-                      return q ? { sum: acc.sum + q.sum, n: acc.n + q.n } : acc;
-                    },
-                    { sum: 0, n: 0 }
-                  );
-                  return (
-                    <div key={t.id} className="space-y-0">
-                      <TrackerCard t={t} />
-                      {quality.n > 0 && (
-                        <p className="mt-1 px-1 text-xs text-secondary">
-                          Average quality{" "}
-                          <strong className="tabular-nums">
-                            {(Math.round((quality.sum / quality.n) * 10) / 10).toFixed(1)}/5
-                          </strong>{" "}
-                          across {quality.n} night{quality.n > 1 ? "s" : ""}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Habits, faith, food, health — grouped the way you filed them */}
-          {habitGroups.length > 0 && (
-            <section className="space-y-5">
-              <h2 className="text-lg font-semibold">Habits &amp; health</h2>
-              {habitGroups.map((group) => (
-                <div key={group.value}>
-                  <h3 className="mb-2 text-sm font-semibold text-secondary">
+          {grouped.map((group) => {
+            const isClosed = closed.includes(group.value);
+            const done = doneInGroup(group.items);
+            return (
+              <section key={group.value}>
+                <button
+                  onClick={() => toggleSection(group.value)}
+                  className="mb-2 flex w-full items-center gap-2 text-sm font-semibold text-secondary"
+                  aria-expanded={!isClosed}
+                >
+                  <span
+                    className={`text-xs text-muted transition-transform ${
+                      isClosed ? "" : "rotate-90"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ▶
+                  </span>
+                  <span>
                     {group.icon} {group.label}
-                  </h3>
-                  <div className="stagger grid gap-4 md:grid-cols-2">
+                  </span>
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                      done === group.items.length
+                        ? "bg-green-700/10 text-green-700 dark:text-green-500"
+                        : "bg-surface-2 text-muted"
+                    }`}
+                  >
+                    {done}/{group.items.length}
+                  </span>
+                </button>
+                {!isClosed && (
+                  <ul className="stagger space-y-2">
                     {group.items.map((t) => (
-                      <TrackerCard key={t.id} t={t} />
+                      <li
+                        key={t.id}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
+                      >
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full"
+                          style={{ backgroundColor: seriesColor(t.color) }}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {t.name}
+                        </span>
+                        {/* Inputs sit beside the name on a wide screen and drop
+                            to their own full-width row on a phone. */}
+                        <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
+                          <TrackerInput
+                            tracker={t}
+                            draft={draft[t.id]}
+                            set={set}
+                            date={date}
+                            onTimerSaved={afterTimer}
+                          />
+                        </div>
+                      </li>
                     ))}
-                  </div>
-                </div>
-              ))}
-            </section>
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+
+          {/* Sits above the save bar so it's the first thing under your thumb
+              in the seconds after a save you didn't mean. */}
+          {undo && undo.date === date && (
+            <div className="animate-rise-in sticky bottom-36 z-10 flex items-center gap-3 rounded-lg border border-amber-600/40 card p-3 shadow-md sm:bottom-20">
+              <span className="min-w-0 flex-1 text-sm text-secondary">
+                Saved. Changed something by mistake?
+              </span>
+              <button
+                onClick={undoLast}
+                className="shrink-0 rounded-md border border-edge px-3.5 py-1.5 text-sm font-medium hover:bg-surface-2"
+              >
+                ↩ Undo
+              </button>
+              <button
+                onClick={() => setUndo(null)}
+                className="shrink-0 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-surface-2"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
+            <span className="text-sm text-secondary">
+              Time logged:{" "}
+              <strong className="tabular-nums">
+                {formatValue(dayTotalMinutes, "duration", "min")}
+              </strong>
+            </span>
+            {statusLine && (
+              <span className={`animate-fade-in text-sm font-medium ${statusLine.tone}`}>
+                {statusLine.text}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                markDirty();
+                void saveNow();
+              }}
+              disabled={state === "saving"}
+              className="ml-auto rounded-md bg-brand-gradient px-6 py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+            >
+              {state === "saving" ? "Saving…" : "Save now"}
+            </button>
+          </div>
+
+          <DeleteDays
+            date={date}
+            onDeleted={() => {
+              dirtyRef.current = false;
+              appliedRef.current = null;
+              void entriesQ.refresh();
+            }}
+          />
+
+          {quick && (
+            <QuickLog
+              trackers={trackers}
+              draft={draft}
+              set={set}
+              date={date}
+              onClose={() => {
+                setQuick(false);
+                void saveNow();
+              }}
+              onTimerSaved={afterTimer}
+            />
           )}
         </>
       )}

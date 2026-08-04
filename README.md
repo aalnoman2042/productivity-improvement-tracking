@@ -15,6 +15,12 @@ Open http://localhost:3000. Settings live in `.env.local` (copy `.env.example`
 if it's missing). Data is stored in MongoDB — a local server in dev, MongoDB
 Atlas in production.
 
+`dev` passes `--webpack` because Windows Application Control blocks Next's
+native SWC binary on this machine, and Turbopack won't run on the WASM
+fallback. Drop the flag on a machine where the native binding loads. `build`
+keeps the default for Vercel, which has no such problem — use `npm run
+build:local` to build here.
+
 ## How it works
 
 Everything you track is a **tracker**, and its *type* decides both how you enter
@@ -23,7 +29,7 @@ it and how it's charted:
 | Type | Good for | You enter | Chart |
 |---|---|---|---|
 | `duration` | Study, work, workout, reading | Hours/minutes, or a stopwatch | Stacked bars + share donut |
-| `sleep` | Sleep | Bedtime & wake time (+ quality 1–5) | Hours per night vs target |
+| `sleep` | Sleep | Bedtime & wake time (+ quality 1–5) | Hours per night, and the night itself |
 | `count` | Water, meals, junk food | A number, with +/− buttons | Bars per day |
 | `scale` | Mood, diet quality, focus | 1–5 rating | Trend line |
 | `check` | Vitamins, meditation | Done / not done | Completion + streak |
@@ -36,6 +42,20 @@ meals per week"). The dashboard scores every day or week against it.
 
 The stopwatch adds its minutes to the day's total, so several sessions add up.
 It survives a refresh — the running timer is kept in `localStorage`.
+
+### Sleep: how long, and when
+
+Hours slept is only half of it — you can sleep eight hours and still be doing
+it from 3am. So sleep gets two charts: one for how much, and one for the night
+itself, where each bar runs from the time you got into bed up to the time you
+got out of it.
+
+Averaging bedtimes is the part that's easy to get wrong. 23:40 and 00:20 are
+forty minutes apart, but on a midnight-based clock they're 1,400 minutes apart,
+so the naive average lands at lunchtime. Everything in [`lib/clock.ts`](./lib/clock.ts)
+is measured on a **night axis** instead — minutes since 18:00, wrapping once —
+which puts an evening bedtime and the morning after it in order and makes the
+average, the range bar and "22 min earlier than last week" all mean something.
 
 ### Namaz and clean streaks
 
@@ -50,19 +70,39 @@ which is what keeps it distinct from a day you never filled in.
 
 ## Pages
 
-- **Dashboard** (`/`) — period selector (week / 15 days / month / 6 months /
-  year), stat tiles, time donut + trend, sleep chart, then one card per habit
-  grouped by category.
-- **Today** (`/today`) — log a day; every tracker gets the input its type
-  needs. It **saves as you type** (and when you leave the page), shows how much
-  of the day is filled in, groups trackers into collapsible sections, and can
-  copy yesterday onto a blank day. Also where you delete logged days (see
-  below). `?date=YYYY-MM-DD` opens on a specific day.
-- **Trackers** (`/trackers`) — create, edit, set goals, archive, and add
+The app **opens on the log**, because logging is a daily act and reading the
+charts is a weekly one — the most frequent thing shouldn't be the deepest.
+
+- **Today** (`/`) — log a day; every tracker gets the input its type needs. It
+  **saves as you type** (and when you leave the page), shows how much of the
+  day is filled in, groups trackers into collapsible sections, and can copy
+  yesterday onto a blank day. Also where you delete logged days (see below).
+  `?date=YYYY-MM-DD` opens on a specific day.
+  - **Quick log** walks one tracker at a time, full screen, with controls big
+    enough to hit without looking and Enter to move on — a twelve-tracker day
+    becomes a rhythm instead of a scroll. It starts on the first thing not yet
+    filled in.
+  - **Undo** stays available for ten seconds after each save. The page saves
+    itself a second after you stop typing, which is right for logging on a
+    phone at midnight and wrong for the moment you notice you typed into the
+    wrong row.
+- **Stats** (`/dashboard`) — period selector (week / 15 days / month / 6 months
+  / year), stat tiles, time donut + trend, sleep charts, then one card per
+  habit grouped by category.
+- **History** (`/history`) — a month at a time. Each day is a square: a ring
+  means you logged it, the fill says how it went against your goals. Two
+  channels rather than one, because a blank day and a bad day are different
+  things and collapsing them hides exactly the gaps you're looking for. Tap any
+  day to open it ready to fill in.
+- **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
   ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
-  a clean streak). Adding a pack twice skips what you already have.
+  a clean streak). Adding a pack twice skips what you already have. Past eight
+  trackers a search box appears, matching on name, category or kind.
 - **Account** (`/settings`) — a read on your last 30 days (see below), profile,
   password, and the nightly reminder.
+
+`/today` still redirects to `/`, query string intact, so notifications sitting
+unread in a tray from before the move still land on the right day.
 
 ## Lifestyle warnings
 
@@ -89,9 +129,42 @@ Screen first — iOS only delivers push to installed web apps.
 The schedule lives in `vercel.json` and fires once a day in UTC;
 [DEPLOY.md](./DEPLOY.md) explains how to set it to your local midnight.
 
+### Knowing it still runs
+
+A cron job that quietly stops looks exactly like a run of days you happened to
+log early — the only symptom is the absence of something, which is what nobody
+notices. So every run writes a row to `cronRuns`, failures included, and the
+Account page reads the last one back: *"Schedule last ran 6 hours ago, sending
+1 reminder."* Going quiet for more than 26 hours, or failing, is called out
+rather than left to be inferred.
+
+## Attempt limits
+
+`proxy.ts` has to let `/api/auth/*` through unauthenticated — it's where you go
+to *get* a session — which left password guessing and reset-mail sending
+unbounded. [`lib/rateLimit.ts`](./lib/rateLimit.ts) counts attempts per
+(action, subject) in a fixed window, kept in MongoDB so the count holds across
+serverless instances instead of resetting whenever a new one warms up.
+
+| Route | Per address | Per account |
+|---|---|---|
+| `login` | 10 / 15 min | 6 / 15 min per email |
+| `signup` | 5 / hour | — |
+| `forgot` | 8 / hour | 3 / hour per email |
+| `reset` | 10 / hour | — |
+| `password` | — | 10 / 15 min per user |
+
+Two subjects where it's worth it: the address stops one machine working through
+a password list, and the email stops a rotating pool converging on one account
+— or pumping one inbox full of reset mail, which matters here because that mail
+goes out through a personal Gmail account. Refusals are a `429` with
+`Retry-After` and a message that names the wait. If the database is unhappy the
+check fails **open**: a guard rail shouldn't be able to lock you out of your own
+app.
+
 ## Deleting days
 
-**Delete logged days** at the bottom of `/today` clears a date range — a single
+**Delete logged days** at the bottom of the daily log clears a date range — a single
 day, a weekend, a whole month. It's a two-step action: check the range first,
 then type back the number of days it found. The server independently re-counts
 and refuses if the total has changed since you looked, so you can never confirm
@@ -100,7 +173,7 @@ offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Four collections, all with `$jsonSchema` validators so the BSON types stay
+Six collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
 - `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
@@ -112,6 +185,9 @@ honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 - `pushSubs` — one row per subscribed browser: `userId`, `endpoint` (unique),
   `keys`. Rows are deleted automatically when a push service reports the
   endpoint is gone.
+- `rateLimits` — attempt counters keyed `action:subject` (see below). Rows
+  delete themselves when their window closes, via a TTL index on `resetAt`.
+- `cronRuns` — one row per run of the nightly job, kept for 30 days.
 
 ## Demo data
 
@@ -119,9 +195,21 @@ To fill an account with a believable month of history:
 
 ```powershell
 npm run seed:demo -- your@email.com
+npm run seed:demo -- demo@example.com --create "Demo" "password"   # make it too
 ```
 
-This **replaces** that account's trackers and entries. Nothing else is touched.
+Sixteen trackers covering **all eight types**, five categories, and every
+shape of goal — daily and weekly, "at least" and "at most". The month is
+deliberately imperfect, because a flawless one demonstrates nothing: three
+blank days so gaps are visible on the calendar, two streak slips so the run
+has something to have survived, an archived tracker that kept its history,
+and a Fajr that gets missed far more than the other four prayers. Bedtime
+walks back about ninety minutes across the month, so the sleep clock has a
+trend to show.
+
+It **replaces** that account's trackers and entries. Nothing else is touched.
+`--create` also bypasses the sign-up form's 8-character password minimum, which
+is usually what you want for an account whose password goes on a slide.
 
 ## Why it opens fast
 

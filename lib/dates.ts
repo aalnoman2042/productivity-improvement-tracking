@@ -120,6 +120,59 @@ export function bucketsForRange(
   return keys;
 }
 
+/* -------------------------- calendar months --------------------------- */
+
+export function isValidMonthStr(s: unknown): s is string {
+  return typeof s === "string" && /^\d{4}-\d{2}$/.test(s);
+}
+
+/** The month a date falls in, as YYYY-MM. */
+export function monthOf(date: string): string {
+  return date.slice(0, 7);
+}
+
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** First and last day of a month, inclusive. */
+export function monthRange(month: string): { start: string; end: string } {
+  const [y, m] = month.split("-").map(Number);
+  return {
+    start: `${month}-01`,
+    // Day 0 of the next month is the last day of this one, leap years included.
+    end: toDateStr(new Date(y, m, 0)),
+  };
+}
+
+/** "August 2026" — for the calendar's heading. */
+export function monthTitle(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * Every date in a month, padded to whole weeks starting Monday, with nulls
+ * for the leading and trailing blanks so a grid can render it straight out.
+ */
+export function calendarGrid(month: string): (string | null)[] {
+  const { start, end } = monthRange(month);
+  const lead = (parseDateStr(start).getDay() + 6) % 7; // Mon=0
+  const days: (string | null)[] = Array(lead).fill(null);
+  for (let d = start; d <= end; d = addDays(d, 1)) days.push(d);
+  while (days.length % 7 !== 0) days.push(null);
+  return days;
+}
+
+export const WEEKDAY_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
+
 export function formatMinutes(min: number): string {
   const h = Math.floor(min / 60);
   const m = Math.round(min % 60);

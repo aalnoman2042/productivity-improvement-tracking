@@ -1,12 +1,64 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { CronHealth } from "@/lib/cronLog";
 
 type Status = {
   available: boolean;
   enabled: boolean;
   devices: number;
+  schedule?: CronHealth;
 };
+
+/** "4 hours ago", "yesterday" — vague on purpose; the exact minute is noise. */
+function ago(hours: number): string {
+  if (hours < 1.5) return "in the last hour";
+  if (hours < 24) return `${Math.round(hours)} hours ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "about a day ago" : `${days} days ago`;
+}
+
+/**
+ * Whether the schedule behind the reminder is alive.
+ *
+ * The failure mode this exists for is silent: a cron that stops firing looks
+ * exactly like a run of days you happened to log early. So the last run is
+ * stated outright, and going quiet for more than a day is called out.
+ */
+function ScheduleHealth({ schedule }: { schedule: CronHealth }) {
+  if (!schedule.everRan) {
+    return (
+      <p className="mt-3 rounded-md border border-edge bg-surface-2 p-2.5 text-xs text-secondary">
+        The nightly schedule hasn&apos;t run yet — no run has ever been
+        recorded. If reminders never arrive, check the cron job in{" "}
+        <code className="rounded bg-surface px-1">vercel.json</code> and that{" "}
+        <code className="rounded bg-surface px-1">CRON_SECRET</code> is set.
+      </p>
+    );
+  }
+
+  const broken = schedule.overdue || !schedule.lastRunOk;
+  const tone = broken
+    ? "border-amber-600/40 text-amber-700 dark:text-amber-500"
+    : "border-edge text-secondary";
+
+  return (
+    <p className={`mt-3 rounded-md border bg-surface-2 p-2.5 text-xs ${tone}`}>
+      {broken ? "⚠ " : "✓ "}
+      Schedule last ran{" "}
+      <strong>{ago(schedule.hoursAgo ?? 0)}</strong>
+      {schedule.lastRunOk
+        ? schedule.notified !== null &&
+          `, sending ${schedule.notified} ${schedule.notified === 1 ? "reminder" : "reminders"}`
+        : ` and failed${schedule.lastError ? `: ${schedule.lastError}` : ""}`}
+      .
+      {schedule.overdue &&
+        " That's more than a day — a daily job should have run again by now."}
+      {schedule.recentFailures > 1 &&
+        ` ${schedule.recentFailures} of the last 5 runs failed.`}
+    </p>
+  );
+}
 
 /**
  * The VAPID public key arrives as base64url; PushManager wants bytes. Backed
@@ -248,6 +300,8 @@ export default function ReminderSettings() {
               {msg.text}
             </p>
           )}
+
+          {status.schedule && <ScheduleHealth schedule={status.schedule} />}
         </>
       )}
     </section>

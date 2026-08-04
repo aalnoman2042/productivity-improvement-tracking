@@ -24,8 +24,9 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
-      { name: "Log today", short_name: "Log", url: "/today" },
-      { name: "Dashboard", short_name: "Stats", url: "/" },
+      { name: "Log today", short_name: "Log", url: "/" },
+      { name: "Dashboard", short_name: "Stats", url: "/dashboard" },
+      { name: "History", short_name: "History", url: "/history" },
     ],
   };
 }

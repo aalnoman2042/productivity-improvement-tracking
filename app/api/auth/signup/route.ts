@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { dbReady } from "@/lib/db";
+import { clientIp, guard } from "@/lib/rateLimit";
 import { COOKIE_NAME, cookieOptions, hashPassword, signSession } from "@/lib/auth";
 
 export async function POST(req: Request) {
+  // Counted before the invite code is even checked — otherwise this is a
+  // free oracle for guessing it.
+  const blocked = await guard(
+    [{ action: "signup", subject: clientIp(req) }],
+    "sign-up attempts"
+  );
+  if (blocked) return blocked;
+
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const email =

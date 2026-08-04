@@ -3,12 +3,24 @@ import type { Tracker } from "./trackers";
 
 /** The shape `/api/stats` returns, shared by everything that reads it. */
 
+/**
+ * When a night started and ended, averaged over whatever the bucket covers.
+ * Both are on the night axis (minutes since 18:00) — see `lib/clock.ts`.
+ */
+export type SleepClock = {
+  nights: number;
+  bed: number;
+  wake: number;
+};
+
 export type Bucket = {
   key: string;
   label: string;
   values: Record<string, number>;
   counts: Record<string, number>;
   quality: Record<string, { sum: number; n: number }>;
+  /** Sleep trackers only, and only for nights with both times filled in. */
+  clock: Record<string, SleepClock>;
 };
 
 export type StreakInfo = {
@@ -23,6 +35,15 @@ export type StreakInfo = {
   since: string | null;
 };
 
+/** The period's bedtimes and wake times, for sleep trackers. */
+export type ClockSummary = SleepClock & {
+  earliestBed: number;
+  latestBed: number;
+  latestBedDate: string | null;
+  /** The same average over the period before, so "earlier or later?" has an answer. */
+  prevBed: number | null;
+};
+
 export type Summary = {
   sum: number;
   days: number;
@@ -35,6 +56,8 @@ export type Summary = {
   changePct: number | null;
   /** Only set for clean-streak trackers, and counted over all time. */
   streak: StreakInfo | null;
+  /** Only set for sleep trackers, and only when clock times were logged. */
+  clock: ClockSummary | null;
 };
 
 export type Stats = {

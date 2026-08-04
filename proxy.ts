@@ -5,6 +5,17 @@ const PUBLIC_PAGES = new Set(["/login", "/signup", "/forgot", "/reset"]);
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // The daily log used to live at /today and is now the home page. Push
+  // notifications sitting unread in a tray still point at the old address,
+  // as do bookmarks and any page a service worker cached — so it keeps
+  // working, query string and all.
+  if (pathname === "/today") {
+    const to = new URL("/", req.url);
+    to.search = req.nextUrl.search;
+    return NextResponse.redirect(to);
+  }
+
   const signedIn = Boolean(await readSession(req.cookies.get(COOKIE_NAME)?.value));
 
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();

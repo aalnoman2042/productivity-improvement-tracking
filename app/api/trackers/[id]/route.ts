@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { normalizeCategory } from "@/lib/trackers";
+import { deletePhrase, normalizeCategory } from "@/lib/trackers";
 import { parseGoal } from "@/lib/trackerDoc";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -47,7 +47,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+/** What deleting this tracker would actually cost — the numbers the confirmation is built from. */
+export async function GET(_req: Request, ctx: Ctx) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -55,21 +56,100 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Bad id" }, { status: 400 });
   }
+
+  const d = await db();
+  const trackerId = new ObjectId(id);
+  const tracker = await d
+    .collection("trackers")
+    .findOne({ _id: trackerId, userId });
+  if (!tracker) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const rows = await d
+    .collection("entries")
+    .find({ userId, trackerId }, { projection: { date: 1 } })
+    .toArray();
+  const dates = [...new Set(rows.map((r) => String(r.date)))].sort();
+
+  return NextResponse.json({
+    id,
+    name: String(tracker.name),
+    entries: rows.length,
+    days: dates.length,
+    first: dates[0] ?? null,
+    last: dates[dates.length - 1] ?? null,
+    phrase: dates.length > 0 ? deletePhrase(String(tracker.name)) : null,
+  });
+}
+
+/**
+ * Delete a tracker, and every day ever logged against it.
+ *
+ * This used to refuse outright as soon as there was any history, which left no
+ * way at all to get rid of a tracker you'd actually used — so it now goes
+ * through, but only on the same terms as deleting a date range: the caller has
+ * to send back the entry count they were shown, and type the phrase. A count
+ * that no longer matches means the data moved since they looked, and the
+ * answer is to look again rather than to delete blind.
+ *
+ * `DELETE /api/trackers/:id?entries=N&confirm=delete+<name>`
+ */
+export async function DELETE(req: Request, ctx: Ctx) {
+  const userId = await currentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+  if (!ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "Bad id" }, { status: 400 });
+  }
+
+  const params = new URL(req.url).searchParams;
   const d = await db();
   const trackerId = new ObjectId(id);
 
-  const logged = await d
+  const tracker = await d
+    .collection("trackers")
+    .findOne({ _id: trackerId, userId });
+  if (!tracker) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const entries = await d
     .collection("entries")
     .countDocuments({ userId, trackerId });
-  if (logged > 0) {
+
+  const claimed = Number(params.get("entries"));
+  if (!Number.isInteger(claimed) || claimed !== entries) {
     return NextResponse.json(
-      { error: "This tracker has history. Archive it instead." },
+      {
+        error:
+          "This tracker's history has changed since you checked it — take another look",
+        entries,
+      },
       { status: 409 }
     );
   }
+
+  if (entries > 0) {
+    const phrase = deletePhrase(String(tracker.name));
+    const confirm = String(params.get("confirm") ?? "").trim().toLowerCase();
+    if (confirm !== phrase) {
+      return NextResponse.json(
+        { error: `Type "${phrase}" to confirm`, phrase },
+        { status: 400 }
+      );
+    }
+  }
+
+  // History first: a tracker left standing with no entries is a harmless
+  // state, one whose entries outlive it is not.
+  const wiped = await d
+    .collection("entries")
+    .deleteMany({ userId, trackerId });
   const res = await d.collection("trackers").deleteOne({ _id: trackerId, userId });
   if (res.deletedCount === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, entries: wiped.deletedCount });
 }

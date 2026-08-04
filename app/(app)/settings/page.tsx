@@ -205,7 +205,7 @@ export default function SettingsPage() {
             ) : insights.length === 0 ? (
               <p className="mt-4 text-sm text-muted">
                 Not enough logged yet to say anything useful.{" "}
-                <Link href="/today" className="font-medium text-accent underline">
+                <Link href="/" className="font-medium text-accent underline">
                   Log a few days
                 </Link>{" "}
                 and this fills in.

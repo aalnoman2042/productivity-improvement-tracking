@@ -302,6 +302,15 @@ export function formatValue(value: number, type: TrackerType, unit: string): str
   return unit ? `${rounded} ${unit}` : String(rounded);
 }
 
+/**
+ * The phrase that has to be typed back before a tracker with history is
+ * deleted. Built from the name on both sides — the client shows it, the
+ * server checks it — so neither can drift from the other.
+ */
+export function deletePhrase(name: string): string {
+  return `delete ${name.trim().toLowerCase()}`;
+}
+
 /** Minutes between two HH:MM clock times, wrapping past midnight. */
 export function minutesBetween(start: string, end: string): number {
   const [sh, sm] = start.split(":").map(Number);

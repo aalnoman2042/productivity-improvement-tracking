@@ -6,9 +6,12 @@ import Logo from "@/components/Logo";
 import SyncStatus from "@/components/SyncStatus";
 import ThemeToggle from "@/components/ThemeToggle";
 
+// Logging is a daily act and reading the charts is a weekly one, so the log
+// is what the app opens on — including from the Home Screen icon.
 const LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/today", label: "Today" },
+  { href: "/", label: "Today" },
+  { href: "/dashboard", label: "Stats" },
+  { href: "/history", label: "History" },
   { href: "/trackers", label: "Trackers" },
 ];
 
