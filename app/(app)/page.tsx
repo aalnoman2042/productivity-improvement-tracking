@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import DeleteDays from "@/components/DeleteDays";
+import InstallPrompt from "@/components/InstallPrompt";
+import MotivationLine from "@/components/MotivationLine";
 import QuickLog from "@/components/QuickLog";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
@@ -365,6 +367,8 @@ export default function TodayPage() {
         </p>
       </div>
 
+      <InstallPrompt />
+
       {/* Which day */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -405,10 +409,13 @@ export default function TodayPage() {
       </div>
 
       {trackersQ.loading ? (
-        <div className="space-y-2" aria-hidden="true">
-          <div className="skeleton h-16 w-full rounded-lg" />
-          <div className="skeleton h-16 w-full rounded-lg" />
-          <div className="skeleton h-16 w-full rounded-lg" />
+        <div className="space-y-2">
+          <div aria-hidden="true" className="space-y-2">
+            <div className="skeleton h-16 w-full rounded-lg" />
+            <div className="skeleton h-16 w-full rounded-lg" />
+            <div className="skeleton h-16 w-full rounded-lg" />
+          </div>
+          <MotivationLine className="pt-3" />
         </div>
       ) : trackers.length === 0 ? (
         <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-secondary">

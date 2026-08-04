@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useCached } from "@/lib/useCached";
+import MotivationLine from "@/components/MotivationLine";
 import {
   WEEKDAY_INITIALS,
   addMonths,
@@ -189,7 +190,10 @@ export default function HistoryPage() {
       </div>
 
       {q.loading ? (
-        <div className="skeleton h-72 w-full rounded-lg" aria-hidden="true" />
+        <div className="space-y-3">
+          <div className="skeleton h-72 w-full rounded-lg" aria-hidden="true" />
+          <MotivationLine />
+        </div>
       ) : (
         <>
           <section className="rounded-lg border border-edge card p-3 shadow-sm sm:p-4">

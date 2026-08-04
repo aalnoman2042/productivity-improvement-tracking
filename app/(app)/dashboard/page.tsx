@@ -15,6 +15,8 @@ import {
 import { useCached } from "@/lib/useCached";
 import type { Stats, Summary } from "@/lib/stats";
 import { seriesColor } from "@/lib/palette";
+import Correlations from "@/components/Correlations";
+import MotivationLine from "@/components/MotivationLine";
 import { nightLabel, shiftLabel } from "@/lib/clock";
 import {
   DonutChart,
@@ -555,13 +557,16 @@ export default function DashboardPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4" aria-hidden="true">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="skeleton h-24 rounded-lg" />
-              ))}
+          <div className="space-y-4">
+            <div aria-hidden="true" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton h-24 rounded-lg" />
+                ))}
+              </div>
+              <div className="skeleton h-64 rounded-lg" />
             </div>
-            <div className="skeleton h-64 rounded-lg" />
+            <MotivationLine className="pt-1" />
           </div>
         )
       ) : active.length === 0 ? (
@@ -636,6 +641,8 @@ export default function DashboardPage() {
               }
             />
           </div>
+
+          <Correlations />
 
           {!stats.hasEntries && (
             <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-secondary">

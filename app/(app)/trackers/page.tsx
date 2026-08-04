@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
+import MotivationLine from "@/components/MotivationLine";
 import { cacheRemove } from "@/lib/sync";
 import { PERIODS, prettyDate } from "@/lib/dates";
 import {
@@ -622,9 +623,12 @@ export default function TrackersPage() {
       )}
 
       {trackersQ.loading ? (
-        <div className="space-y-2" aria-hidden="true">
-          <div className="skeleton h-16 w-full rounded-lg" />
-          <div className="skeleton h-16 w-full rounded-lg" />
+        <div className="space-y-2">
+          <div aria-hidden="true" className="space-y-2">
+            <div className="skeleton h-16 w-full rounded-lg" />
+            <div className="skeleton h-16 w-full rounded-lg" />
+          </div>
+          <MotivationLine className="pt-3" />
         </div>
       ) : query && shown === 0 ? (
         <div className="rounded-lg border border-dashed border-edge p-8 text-center">

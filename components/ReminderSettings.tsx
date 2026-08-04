@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import InstallPrompt from "@/components/InstallPrompt";
 import type { CronHealth } from "@/lib/cronLog";
 
 type Status = {
@@ -84,20 +85,12 @@ export default function ReminderSettings() {
   // Decided after mount: the server has no idea what this browser can do,
   // and guessing would mean a hydration mismatch.
   const [supported, setSupported] = useState<boolean | null>(null);
-  // iOS only allows push once the app has been added to the Home Screen.
-  const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
-
   useEffect(() => {
     setSupported(
       "serviceWorker" in navigator &&
         "PushManager" in window &&
         "Notification" in window
     );
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as { standalone?: boolean }).standalone === true;
-    setIosNeedsInstall(isIOS && !standalone);
   }, []);
 
   const load = useCallback(async () => {
@@ -282,12 +275,10 @@ export default function ReminderSettings() {
             </p>
           )}
 
-          {iosNeedsInstall && !on && (
-            <p className="mt-3 text-sm text-muted">
-              On iPhone, first add PIT to your Home Screen (Share → Add to Home
-              Screen) — iOS only allows notifications from there.
-            </p>
-          )}
+          {/* On iOS this isn't advice, it's a prerequisite — push is only
+              delivered to installed apps, so the toggle above cannot work
+              until it's done. */}
+          {!on && <InstallPrompt variant="block" />}
 
           {msg && (
             <p
