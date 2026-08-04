@@ -93,6 +93,24 @@ reminders aren't set up.
    works. On iPhone, add PIT to your Home Screen first — iOS only delivers
    notifications to installed web apps.
 
+   > **Set the variables *before* the build, not after.** Anything named
+   > `NEXT_PUBLIC_*` is baked into the browser bundle when the site is
+   > compiled, not read when it runs. Deploy first and add the key second and
+   > the Account page will keep saying push isn't set up until you redeploy —
+   > the server has the key, but the page in the browser doesn't.
+
+4. Confirm it's actually running. The Account page reports the schedule
+   itself: *"✓ Schedule last ran 6 hours ago, sending 1 reminder."* Nothing
+   there after the first night means the cron isn't firing — check the job
+   under Vercel → Project → **Cron Jobs**. You can also trigger a run by hand:
+
+   ```powershell
+   curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://your-site.vercel.app/api/cron/reminders
+   ```
+
+   It answers with what it did — `checked`, `notified`, `alreadyLogged`,
+   `skipped` — and running it twice in one night can't send twice.
+
 ### Setting the time
 
 `vercel.json` schedules the job in **UTC**, and it ships set to `0 18 * * *` —
