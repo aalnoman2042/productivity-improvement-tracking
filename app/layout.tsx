@@ -44,8 +44,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // `suppressHydrationWarning` is here because THEME_SCRIPT deliberately sets
+  // `data-theme` on <html> before React hydrates — the server's HTML and the
+  // live DOM are *meant* to differ on this one element, and that's the whole
+  // mechanism that stops the page flashing light before it goes dark. Without
+  // it React reports the difference as a hydration error on every load. It
+  // covers this element's own attributes only; nothing inside is affected.
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
