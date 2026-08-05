@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import TrackerInput from "@/components/TrackerInput";
 import { EMPTY, isLogged, type Draft } from "@/lib/draft";
+import type { Prefill } from "@/lib/prefill";
 import { categoryMeta, type Tracker, type TrackerType } from "@/lib/trackers";
 import { seriesColor } from "@/lib/palette";
 import { prettyDate } from "@/lib/dates";
@@ -27,6 +28,7 @@ export default function QuickLog({
   date,
   onClose,
   onTimerSaved,
+  prefills,
 }: {
   trackers: Tracker[];
   draft: Record<string, Draft>;
@@ -34,6 +36,8 @@ export default function QuickLog({
   date: string;
   onClose: () => void;
   onTimerSaved?: () => void | Promise<void>;
+  /** "Same as usual" offers, so most questions are one tap here too. */
+  prefills?: Record<string, Prefill>;
 }) {
   // Start on the first thing not yet filled in — coming back to finish a
   // half-done day shouldn't mean tapping past what's already there.
@@ -159,6 +163,7 @@ export default function QuickLog({
             date={date}
             size="large"
             onTimerSaved={onTimerSaved}
+            prefill={prefills?.[t.id]}
           />
         </div>
 

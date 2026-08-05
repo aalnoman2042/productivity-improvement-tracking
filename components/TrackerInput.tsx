@@ -1,7 +1,8 @@
 "use client";
 
 import Timer from "@/components/Timer";
-import { EMPTY, digits, type Draft } from "@/lib/draft";
+import { EMPTY, digits, isLogged, type Draft } from "@/lib/draft";
+import type { Prefill } from "@/lib/prefill";
 import {
   PRAYERS,
   PRAYER_KEYS,
@@ -29,6 +30,7 @@ export default function TrackerInput({
   date,
   onTimerSaved,
   size = "row",
+  prefill,
 }: {
   tracker: Tracker;
   draft: Draft | undefined;
@@ -37,11 +39,29 @@ export default function TrackerInput({
   /** The stopwatch writes straight to the server, so the page must re-read. */
   onTimerSaved?: () => void | Promise<void>;
   size?: InputSize;
+  /** The usual answer, offered as one tap while the row is still empty. */
+  prefill?: Prefill;
 }) {
   const t = tracker;
   const dr = draft ?? EMPTY;
   const type = t.type as TrackerType;
   const big = size === "large";
+
+  // The offer disappears the moment anything real is entered — it's a way to
+  // skip typing, not a value competing with what you typed.
+  const offer = prefill && !isLogged(type, dr) ? prefill : null;
+  const offerChip = offer ? (
+    <button
+      type="button"
+      onClick={() => set(t.id, offer.patch)}
+      className={`rounded-full border border-dashed border-edge text-muted transition-colors hover:border-accent hover:text-accent ${
+        big ? "px-3.5 py-2 text-sm" : "px-2.5 py-1 text-xs"
+      }`}
+      title={`Fill in: ${offer.label}`}
+    >
+      ↺ {offer.label}
+    </button>
+  ) : null;
 
   const field = `rounded-md border border-edge bg-transparent outline-none focus:border-accent ${
     big ? "px-3 py-3 text-lg text-center" : "px-2 py-1.5 text-right"
@@ -57,7 +77,12 @@ export default function TrackerInput({
 
   if (type === "duration") {
     return (
-      <div className={`flex items-center gap-1.5 ${big ? "justify-center" : ""}`}>
+      <div
+        className={`flex flex-wrap items-center gap-1.5 ${
+          big ? "justify-center" : "justify-end"
+        }`}
+      >
+        {offerChip}
         <Timer
           trackerId={t.id}
           date={date}
@@ -65,7 +90,7 @@ export default function TrackerInput({
         />
         <input
           inputMode="numeric"
-          placeholder="0"
+          placeholder={offer?.patch.h || "0"}
           value={dr.h}
           onChange={(e) => set(t.id, { h: digits(e.target.value, 2) })}
           className={`${field} ${big ? "w-16" : "w-12"}`}
@@ -74,7 +99,7 @@ export default function TrackerInput({
         <span className={big ? "text-base text-muted" : "text-sm text-muted"}>h</span>
         <input
           inputMode="numeric"
-          placeholder="0"
+          placeholder={offer?.patch.m || "0"}
           value={dr.m}
           onChange={(e) => set(t.id, { m: digits(e.target.value, 3) })}
           className={`${field} ${big ? "w-16" : "w-12"}`}
@@ -89,6 +114,7 @@ export default function TrackerInput({
     const mins = dr.start && dr.end ? minutesBetween(dr.start, dr.end) : 0;
     return (
       <div className={wrap}>
+        {offerChip}
         <label className="flex items-center gap-1 text-sm text-muted">
           Slept
           <input
@@ -207,7 +233,12 @@ export default function TrackerInput({
   if (type === "count") {
     const n = parseFloat(dr.num) || 0;
     return (
-      <div className={`flex items-center gap-1.5 ${big ? "justify-center" : ""}`}>
+      <div
+        className={`flex flex-wrap items-center gap-1.5 ${
+          big ? "justify-center" : "justify-end"
+        }`}
+      >
+        {offerChip}
         <button
           type="button"
           onClick={() => set(t.id, { num: String(Math.max(0, n - 1)) })}
@@ -220,7 +251,7 @@ export default function TrackerInput({
         </button>
         <input
           inputMode="numeric"
-          placeholder="0"
+          placeholder={offer?.patch.num || "0"}
           value={dr.num}
           onChange={(e) => set(t.id, { num: digits(e.target.value, 4) })}
           className={`${field} text-center ${big ? "w-20" : "w-14"}`}
@@ -287,10 +318,15 @@ export default function TrackerInput({
 
   // measure
   return (
-    <div className={`flex items-center gap-1.5 ${big ? "justify-center" : ""}`}>
+    <div
+      className={`flex flex-wrap items-center gap-1.5 ${
+        big ? "justify-center" : "justify-end"
+      }`}
+    >
+      {offerChip}
       <input
         inputMode="decimal"
-        placeholder="0"
+        placeholder={offer?.patch.num || "0"}
         value={dr.num}
         onChange={(e) =>
           set(t.id, { num: e.target.value.replace(/[^0-9.]/g, "").slice(0, 7) })

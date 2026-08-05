@@ -6,11 +6,13 @@ import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
 import MotivationLine from "@/components/MotivationLine";
 import QuickLog from "@/components/QuickLog";
+import TapGrid from "@/components/TapGrid";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
-import { useCached, useStored } from "@/lib/useCached";
+import { useCached } from "@/lib/useCached";
 import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
+import { buildPrefills, type RecentEntry } from "@/lib/prefill";
 import {
   EMPTY,
   buildDraft,
@@ -19,13 +21,7 @@ import {
   type Draft,
   type Entry,
 } from "@/lib/draft";
-import {
-  categoryMeta,
-  formatValue,
-  orderCategories,
-  type Tracker,
-  type TrackerType,
-} from "@/lib/trackers";
+import { formatValue, type Tracker, type TrackerType } from "@/lib/trackers";
 
 type SaveState = "idle" | "saving" | "saved" | "queued" | "error";
 
@@ -42,10 +38,12 @@ const AUTOSAVE_MS = 900;
  */
 const UNDO_MS = 10_000;
 
-const CLOSED_KEY = "closed-sections";
-
-/** Stable empty default, so it doesn't look like a new value every render. */
-const NONE_CLOSED: string[] = [];
+/**
+ * The kinds answered with a tap, and the kinds answered with typing. The page
+ * shows all the taps first as a dense grid — most of a day is settled there
+ * in seconds — and keeps full rows only for the few that need a keyboard.
+ */
+const TAP_TYPES: TrackerType[] = ["check", "streak", "scale", "prayer"];
 
 /**
  * Send the day's changes, and keep the offline copy in step.
@@ -99,17 +97,26 @@ export default function TodayPage() {
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [state, setState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
-  const [closed, setClosed] = useStored<string[]>(CLOSED_KEY, NONE_CLOSED);
   const [quick, setQuick] = useState(false);
 
   const today = toDateStr(new Date());
 
   const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
   const entriesQ = useCached<Entry[]>(`/api/entries?date=${date}`, `entries:${date}`);
+  // The week before this day, turned into "same as usual" offers per tracker.
+  const recentQ = useCached<RecentEntry[]>(
+    `/api/entries/recent?before=${date}`,
+    `recent:${date}`
+  );
 
   const trackers = useMemo(
     () => (trackersQ.data ?? []).filter((t) => !t.archived),
     [trackersQ.data]
+  );
+
+  const prefills = useMemo(
+    () => buildPrefills(trackers, recentQ.data ?? []),
+    [trackers, recentQ.data]
   );
 
   /* --------------------------- saving as you go -------------------------- */
@@ -321,27 +328,18 @@ export default function TodayPage() {
     schedule();
   }
 
-  function toggleSection(value: string) {
-    setClosed(
-      closed.includes(value)
-        ? closed.filter((v) => v !== value)
-        : [...closed, value]
-    );
-  }
-
   /* ------------------------------- grouping ------------------------------ */
 
-  const grouped = useMemo(
-    () =>
-      orderCategories(trackers.map((t) => t.category))
-        .map((value) => ({
-          value,
-          ...categoryMeta(value),
-          items: trackers.filter(
-            (t) => t.category.toLowerCase() === value.toLowerCase()
-          ),
-        }))
-        .filter((g) => g.items.length > 0),
+  // Taps first, typing second — the split that makes the page short.
+  const { tapTrackers, typedTrackers } = useMemo(
+    () => ({
+      tapTrackers: trackers.filter((t) =>
+        TAP_TYPES.includes(t.type as TrackerType)
+      ),
+      typedTrackers: trackers.filter(
+        (t) => !TAP_TYPES.includes(t.type as TrackerType)
+      ),
+    }),
     [trackers]
   );
 
@@ -501,69 +499,76 @@ export default function TodayPage() {
             )}
           </div>
 
-          {grouped.map((group) => {
-            const isClosed = closed.includes(group.value);
-            const done = doneInGroup(group.items);
-            return (
-              <section key={group.value}>
-                <button
-                  onClick={() => toggleSection(group.value)}
-                  className="mb-2 flex w-full items-center gap-2 text-sm font-semibold text-secondary"
-                  aria-expanded={!isClosed}
+          {/* Taps first: most of the day settled in a few seconds. */}
+          {tapTrackers.length > 0 && (
+            <section>
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
+                <span>⚡ Quick taps</span>
+                <span
+                  className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                    doneInGroup(tapTrackers) === tapTrackers.length
+                      ? "bg-green-700/10 text-green-700 dark:text-green-500"
+                      : "bg-surface-2 text-muted"
+                  }`}
                 >
-                  <span
-                    className={`text-xs text-muted transition-transform ${
-                      isClosed ? "" : "rotate-90"
-                    }`}
-                    aria-hidden="true"
+                  {doneInGroup(tapTrackers)}/{tapTrackers.length}
+                </span>
+              </div>
+              <TapGrid
+                trackers={tapTrackers}
+                draft={draft}
+                set={set}
+                date={date}
+              />
+            </section>
+          )}
+
+          {/* Then the few that need a keyboard — each with the usual answer
+              one tap away. */}
+          {typedTrackers.length > 0 && (
+            <section>
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
+                <span>⏱ Time &amp; numbers</span>
+                <span
+                  className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                    doneInGroup(typedTrackers) === typedTrackers.length
+                      ? "bg-green-700/10 text-green-700 dark:text-green-500"
+                      : "bg-surface-2 text-muted"
+                  }`}
+                >
+                  {doneInGroup(typedTrackers)}/{typedTrackers.length}
+                </span>
+              </div>
+              <ul className="stagger space-y-2">
+                {typedTrackers.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
                   >
-                    ▶
-                  </span>
-                  <span>
-                    {group.icon} {group.label}
-                  </span>
-                  <span
-                    className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
-                      done === group.items.length
-                        ? "bg-green-700/10 text-green-700 dark:text-green-500"
-                        : "bg-surface-2 text-muted"
-                    }`}
-                  >
-                    {done}/{group.items.length}
-                  </span>
-                </button>
-                {!isClosed && (
-                  <ul className="stagger space-y-2">
-                    {group.items.map((t) => (
-                      <li
-                        key={t.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
-                      >
-                        <span
-                          className="h-4 w-4 shrink-0 rounded-full"
-                          style={{ backgroundColor: seriesColor(t.color) }}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {t.name}
-                        </span>
-                        {/* Inputs sit beside the name on a wide screen and drop
-                            to their own full-width row on a phone. */}
-                        <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
-                          <TrackerInput
-                            tracker={t}
-                            draft={draft[t.id]}
-                            set={set}
-                            date={date}
-                            onTimerSaved={afterTimer}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
+                    <span
+                      className="h-4 w-4 shrink-0 rounded-full"
+                      style={{ backgroundColor: seriesColor(t.color) }}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {t.name}
+                    </span>
+                    {/* Inputs sit beside the name on a wide screen and drop
+                        to their own full-width row on a phone. */}
+                    <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
+                      <TrackerInput
+                        tracker={t}
+                        draft={draft[t.id]}
+                        set={set}
+                        date={date}
+                        onTimerSaved={afterTimer}
+                        prefill={prefills[t.id]}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Sits above the save bar so it's the first thing under your thumb
               in the seconds after a save you didn't mean. */}
@@ -628,6 +633,7 @@ export default function TodayPage() {
               draft={draft}
               set={set}
               date={date}
+              prefills={prefills}
               onClose={() => {
                 setQuick(false);
                 void saveNow();
