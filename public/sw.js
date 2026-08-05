@@ -2,15 +2,16 @@
  * Minimal service worker: makes the app installable, keeps it usable when the
  * connection drops, and receives the nightly reminder.
  *
- * The app shell is served from the cache first and refreshed in the
- * background, so opening PIT paints immediately instead of waiting on the
- * network for HTML and JavaScript it already has. Build assets under
- * /_next/static are content-hashed, so those can be cached outright.
+ * Pages go to the network first, cache as the offline fallback: `/` serves a
+ * different document signed in (the log) and signed out (the pitch), so a
+ * cached copy from the other state must never paint on a refresh. The build
+ * assets under /_next/static are content-hashed and served cache-first — they
+ * are most of the payload, which keeps an online open fast anyway.
  *
  * API calls are never cached here — the pages hold their own copy of the last
  * response and know when it's stale, which the service worker can't.
  */
-const CACHE = "pit-v5";
+const CACHE = "pit-v6";
 const OFFLINE_FALLBACK = "/";
 
 /** Hashed build output: the URL changes whenever the file does. */
@@ -63,6 +64,21 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return; // always live data
   if (isVersioned(url, request)) return;
 
+  // Navigations are network-first: the right page for the current sign-in
+  // state, every time. The cached copy — always the last page this device
+  // actually received — only steps in when the network can't answer.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetchAndCache(request).catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        const fallback = await caches.match(OFFLINE_FALLBACK);
+        return fallback || new Response("Offline", { status: 503 });
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {
@@ -73,13 +89,9 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
 
-      return fetchAndCache(request).catch(async () => {
-        if (request.mode === "navigate") {
-          const fallback = await caches.match(OFFLINE_FALLBACK);
-          if (fallback) return fallback;
-        }
-        return new Response("Offline", { status: 503 });
-      });
+      return fetchAndCache(request).catch(
+        () => new Response("Offline", { status: 503 })
+      );
     })
   );
 });

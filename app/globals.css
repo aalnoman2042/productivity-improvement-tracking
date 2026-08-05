@@ -301,3 +301,13 @@ button:active:not(:disabled) {
     transform: none;
   }
 }
+
+/* Install buttons and banners, hidden before React even loads. The server
+   can't know the page is running as an installed app, so its HTML always
+   contains them — without this, every refresh of the installed app flashes
+   an "Install" button until hydration catches up and removes it. */
+@media (display-mode: standalone) {
+  .hide-installed {
+    display: none !important;
+  }
+}

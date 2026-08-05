@@ -65,7 +65,7 @@ export default function InstallPrompt({
 
   if (variant === "block") {
     return (
-      <div className="mt-3 rounded-md border border-amber-600/40 bg-surface-2 p-3 text-sm">
+      <div className="hide-installed mt-3 rounded-md border border-amber-600/40 bg-surface-2 p-3 text-sm">
         <p className="font-medium text-amber-700 dark:text-amber-500">
           {needsManual
             ? "Add PIT to your Home Screen first"
@@ -99,7 +99,7 @@ export default function InstallPrompt({
   }
 
   return (
-    <div className="animate-rise-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-accent/40 card p-3 shadow-sm">
+    <div className="hide-installed animate-rise-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-accent/40 card p-3 shadow-sm">
       <span className="text-lg" aria-hidden="true">
         📲
       </span>

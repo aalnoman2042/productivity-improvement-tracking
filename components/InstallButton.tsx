@@ -105,7 +105,7 @@ export default function InstallButton({
 
   if (variant === "wide") {
     return (
-      <div className="w-full max-w-sm">
+      <div className="hide-installed w-full max-w-sm">
         <button
           onClick={click}
           disabled={busy}
@@ -129,7 +129,7 @@ export default function InstallButton({
   }
 
   return (
-    <div ref={wrap} className="relative shrink-0">
+    <div ref={wrap} className="hide-installed relative shrink-0">
       <button
         onClick={click}
         disabled={busy}
