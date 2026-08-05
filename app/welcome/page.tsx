@@ -40,8 +40,8 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   },
   {
     icon: "🔔",
-    title: "A nudge, not a nag",
-    text: "A nightly reminder on days you haven't logged, silence on days you have — and a Sunday-night week in review to look forward to.",
+    title: "The 11 o'clock question",
+    text: "Every night at 11, PIT asks how your day went — log it while it's fresh. Sunday nights bring a week in review to look forward to.",
   },
   {
     icon: "🔒",

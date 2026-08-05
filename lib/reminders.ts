@@ -12,8 +12,9 @@ export function localDateStr(now: Date, tzOffset: number): string {
 }
 
 /**
- * The day the reminder should nag about. Stepping back two hours matters:
- * a nudge landing at 00:00 is about the day that just ended, not the one
+ * The day the reminder should ask about. Stepping back two hours matters:
+ * an ask landing at 11 PM names the day that's wrapping up, and one that
+ * slips past midnight still names the day that just ended, not the one
  * that started sixty seconds ago.
  */
 export function dayToLog(now: Date, tzOffset: number): string {

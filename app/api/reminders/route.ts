@@ -33,7 +33,7 @@ export async function GET() {
  * Turn the nightly reminder on or off.
  * Body: { enabled, tzOffset } — tzOffset is minutes east of UTC (+360 for
  * UTC+6). It doesn't set the delivery time; it decides which day the
- * reminder is about, so a midnight nudge names the day that just ended.
+ * reminder is about, so the 11 PM ask names the day that's wrapping up.
  */
 export async function PATCH(req: Request) {
   const userId = await currentUserId();

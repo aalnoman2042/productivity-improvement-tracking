@@ -108,29 +108,29 @@ reminders aren't set up.
    curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://your-site.vercel.app/api/cron/reminders
    ```
 
-   It answers with what it did — `checked`, `notified`, `alreadyLogged`,
-   `skipped` — and running it twice in one night can't send twice.
+   It answers with what it did — `checked`, `notified`, `skipped` — and
+   running it twice in one night can't send twice.
 
 ### Setting the time
 
-`vercel.json` schedules the job in **UTC**, and it ships set to `0 18 * * *` —
-18:00 UTC, which is **midnight in UTC+6 (Bangladesh)**. If you're somewhere
-else, change the hour to `24 − your UTC offset`:
+`vercel.json` schedules the job in **UTC**, and it ships set to `0 17 * * *` —
+17:00 UTC, which is **11 PM in UTC+6 (Bangladesh)**. If you're somewhere
+else, change the hour to `23 − your UTC offset`:
 
 | Your timezone | Line in `vercel.json` |
 |---|---|
-| UTC+6 (Dhaka) | `"schedule": "0 18 * * *"` |
-| UTC+5:30 (India) | `"schedule": "30 18 * * *"` |
-| UTC+1 (London, summer) | `"schedule": "0 23 * * *"` |
-| UTC−5 (New York) | `"schedule": "0 5 * * *"` |
+| UTC+6 (Dhaka) | `"schedule": "0 17 * * *"` |
+| UTC+5:30 (India) | `"schedule": "30 17 * * *"` |
+| UTC+1 (London, summer) | `"schedule": "0 22 * * *"` |
+| UTC−5 (New York) | `"schedule": "0 4 * * *"` |
 
 Vercel's free Hobby plan allows one trigger per day, which is exactly what a
 nightly reminder needs. The job is safe to run more than once — it records
 which day it last nagged you about, so a retry can't produce a second
 notification.
 
-> The reminder is always about the **day that just ended**, and it's skipped
-> entirely on days you've already logged. Tapping it opens that day's log.
+> The reminder goes out **every night**, logged or not — the 11 PM ask is
+> the closing ritual of the day. Tapping it opens that day's log.
 
 ## 4. Use it from your phone
 

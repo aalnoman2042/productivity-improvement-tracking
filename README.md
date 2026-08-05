@@ -127,8 +127,9 @@ came from, and nothing is shown that the data doesn't support — see
 
 ## Nightly reminder
 
-With push notifications set up, PIT nudges you each night to fill in the day
-that just ended — and stays quiet on days you've already logged.
+With push notifications set up, PIT asks every night at 11 how your day went —
+*"The day is finished — how was it? Tell me, so I can track your life
+better."* Tapping it opens the day's log.
 
 ```powershell
 npm run vapid-keys   # once; paste the output into .env.local
@@ -140,7 +141,7 @@ notification opens that day's log. On iPhone, PIT must be added to the Home
 Screen first — iOS only delivers push to installed web apps.
 
 The schedule lives in `vercel.json` and fires once a day in UTC;
-[DEPLOY.md](./DEPLOY.md) explains how to set it to your local midnight.
+[DEPLOY.md](./DEPLOY.md) explains how to set it to 11 PM your time.
 
 ### The Sunday week in review
 

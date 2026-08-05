@@ -72,48 +72,35 @@ async function runReminders() {
     .toArray();
 
   let notified = 0;
-  let alreadyLogged = 0;
   let skipped = 0;
   let digests = 0;
 
   for (const user of users) {
     const date = dayToLog(now, Number(user.reminder?.tzOffset ?? 0));
 
-    // --- The nightly nudge -----------------------------------------------
+    // --- The nightly ask ---------------------------------------------------
+    // Goes out every night, logged or not — the 11 PM ask is the closing
+    // ritual of the day, not just a nag about an empty one.
     if (user.reminder?.lastSentFor === date) {
       skipped++;
     } else {
-      // No point nagging someone who already filled the day in.
-      const logged = await d
-        .collection("entries")
-        .countDocuments({ userId: user._id, date }, { limit: 1 });
-
-      let stamp = false;
-      if (logged > 0) {
-        alreadyLogged++;
-        stamp = true;
-      } else {
-        const { sent } = await sendToUser(user._id, {
-          title: "Log your day",
-          body: `${prettyDate(date)} is still empty — add your trackers.`,
-          url: `/?date=${date}`,
-          // One notification per day: a re-send replaces it rather than
-          // stacking a second one in the tray.
-          tag: `pit-reminder-${date}`,
-        });
-        if (sent > 0) {
-          notified++;
-          stamp = true;
-        } else {
-          // Reminders are on but no browser is subscribed — leave the day
-          // unstamped so a later run can still reach them.
-          skipped++;
-        }
-      }
-      if (stamp) {
+      const { sent } = await sendToUser(user._id, {
+        title: "The day is finished — how was it?",
+        body: `Tell me about ${prettyDate(date)}, so I can track your life better.`,
+        url: `/?date=${date}`,
+        // One notification per day: a re-send replaces it rather than
+        // stacking a second one in the tray.
+        tag: `pit-reminder-${date}`,
+      });
+      if (sent > 0) {
+        notified++;
         await d
           .collection("users")
           .updateOne({ _id: user._id }, { $set: { "reminder.lastSentFor": date } });
+      } else {
+        // Reminders are on but no browser is subscribed — leave the day
+        // unstamped so a later run can still reach them.
+        skipped++;
       }
     }
 
@@ -145,5 +132,5 @@ async function runReminders() {
     }
   }
 
-  return { checked: users.length, notified, alreadyLogged, skipped, digests };
+  return { checked: users.length, notified, skipped, digests };
 }
