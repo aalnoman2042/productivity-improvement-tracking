@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,13 +71,10 @@ export default function LoginPage() {
         />
 
         <label className="mb-1 block text-sm font-medium">Password</label>
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="current-password"
-          required
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent"
+          onChange={setPassword}
         />
 
         <div className="mt-2 text-right">

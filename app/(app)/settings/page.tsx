@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
+import PasswordInput from "@/components/PasswordInput";
 import ReminderSettings from "@/components/ReminderSettings";
 import { toDateStr } from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
@@ -278,25 +279,19 @@ export default function SettingsPage() {
               <label className="mb-1 block text-sm font-medium">
                 Current password
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="current-password"
-                required
                 value={current}
-                onChange={(e) => setCurrent(e.target.value)}
-                className={field}
+                onChange={setCurrent}
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">New password</label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
-                required
                 minLength={8}
                 value={next}
-                onChange={(e) => setNext(e.target.value)}
-                className={field}
+                onChange={setNext}
               />
               <p className="mt-1 text-xs text-muted">At least 8 characters.</p>
             </div>
@@ -304,14 +299,11 @@ export default function SettingsPage() {
               <label className="mb-1 block text-sm font-medium">
                 Confirm new password
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
-                required
                 minLength={8}
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className={field}
+                onChange={setConfirm}
               />
             </div>
             {pwMsg && <Note kind={pwMsg.kind}>{pwMsg.text}</Note>}

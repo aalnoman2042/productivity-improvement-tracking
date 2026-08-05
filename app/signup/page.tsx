@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -84,14 +85,12 @@ export default function SignupPage() {
         />
 
         <label className="mb-1 block text-sm font-medium">Password</label>
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
-          required
           minLength={8}
           value={form.password}
-          onChange={(e) => set("password", e.target.value)}
-          className={`${field} mb-1`}
+          onChange={(v) => set("password", v)}
+          className="mb-1"
         />
         <p className="mb-4 text-xs text-muted">At least 8 characters.</p>
 

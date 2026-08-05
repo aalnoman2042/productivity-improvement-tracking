@@ -4,9 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
-
-const field =
-  "w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent";
+import PasswordInput from "@/components/PasswordInput";
 
 function ResetForm() {
   const router = useRouter();
@@ -64,27 +62,21 @@ function ResetForm() {
   return (
     <form onSubmit={submit}>
       <label className="mb-1 block text-sm font-medium">New password</label>
-      <input
-        type="password"
+      <PasswordInput
         autoComplete="new-password"
         autoFocus
-        required
         minLength={8}
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className={field}
+        onChange={setPassword}
       />
       <p className="mt-1 mb-4 text-xs text-muted">At least 8 characters.</p>
 
       <label className="mb-1 block text-sm font-medium">Confirm password</label>
-      <input
-        type="password"
+      <PasswordInput
         autoComplete="new-password"
-        required
         minLength={8}
         value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
-        className={field}
+        onChange={setConfirm}
       />
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
