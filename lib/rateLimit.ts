@@ -25,7 +25,7 @@ export type Rule = { limit: number; windowMs: number };
 export const RULES = {
   login: { limit: 10, windowMs: 15 * 60_000 },
   loginEmail: { limit: 6, windowMs: 15 * 60_000 },
-  signup: { limit: 5, windowMs: 60 * 60_000 },
+  signup: { limit: 10, windowMs: 60 * 60_000 },
   forgot: { limit: 8, windowMs: 60 * 60_000 },
   forgotEmail: { limit: 3, windowMs: 60 * 60_000 },
   reset: { limit: 10, windowMs: 60 * 60_000 },

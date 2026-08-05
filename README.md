@@ -188,7 +188,7 @@ serverless instances instead of resetting whenever a new one warms up.
 | Route | Per address | Per account |
 |---|---|---|
 | `login` | 10 / 15 min | 6 / 15 min per email |
-| `signup` | 5 / hour | — |
+| `signup` | 10 / hour | — |
 | `forgot` | 8 / hour | 3 / hour per email |
 | `reset` | 10 / hour | — |
 | `password` | — | 10 / 15 min per user |
