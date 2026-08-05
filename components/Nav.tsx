@@ -11,7 +11,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 // is what the app opens on — including from the Home Screen icon. Status
 // took History's slot: "how am I doing?" is the daily question, and the
 // calendar is one tap away from Status for whoever wants the day-by-day.
-const LINKS = [
+// Exported so SwipeNav can walk the same tabs in the same order — a swipe
+// and a tap must never disagree about what "next" means.
+export const LINKS = [
   { href: "/", label: "Today" },
   { href: "/dashboard", label: "Stats" },
   { href: "/status", label: "Status" },

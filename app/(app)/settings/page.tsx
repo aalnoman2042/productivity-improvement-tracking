@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Footer from "@/components/Footer";
 import ImportBackup from "@/components/ImportBackup";
@@ -103,6 +104,28 @@ export default function SettingsPage() {
           other accounts.
         </p>
       </div>
+
+      {/* History left the bottom bar when Status took its slot, so it keeps
+          a doorway here as well as the one at the top of Status. */}
+      <Link
+        href="/history"
+        className="animate-rise-in flex items-center justify-between gap-3 rounded-lg border border-edge card p-4 shadow-sm hover:bg-surface-2"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="text-xl" aria-hidden="true">
+            📅
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold">History</span>
+            <span className="block text-sm text-secondary">
+              The month calendar — every day you logged, and every gap.
+            </span>
+          </span>
+        </span>
+        <span className="shrink-0 text-accent" aria-hidden="true">
+          →
+        </span>
+      </Link>
 
       {me === null ? (
         <p className="text-sm text-muted">Loading…</p>

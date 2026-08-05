@@ -98,6 +98,8 @@ export default function QuickLog({
       role="dialog"
       aria-modal="true"
       aria-label="Quick log"
+      // A swipe in here is a mis-tap on the big controls, not "change page".
+      data-no-swipe
       className="fixed inset-0 z-50 flex flex-col bg-surface"
     >
       {/* Progress and the way out */}
