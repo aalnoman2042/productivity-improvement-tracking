@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LINKS } from "@/components/Nav";
 
@@ -37,6 +37,24 @@ function scrollsSideways(el: Element | null): boolean {
 export default function SwipeNav() {
   const router = useRouter();
   const pathname = usePathname();
+  // Set when a swipe caused the navigation, so the landing page knows which
+  // side to slide in from. Tap navigation stays animation-free.
+  const cameFrom = useRef<"left" | "right" | null>(null);
+
+  // The lightweight animation: the old page nudges out (class added at
+  // swipe time), the new one slides in (class added when the path changes).
+  useEffect(() => {
+    const dir = cameFrom.current;
+    if (!dir) return;
+    cameFrom.current = null;
+    const el = document.querySelector(".app-main");
+    if (!el) return;
+    el.classList.remove("page-exit-left", "page-exit-right");
+    const cls = dir === "left" ? "page-enter-right" : "page-enter-left";
+    el.classList.add(cls);
+    const timer = setTimeout(() => el.classList.remove(cls), 260);
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
   useEffect(() => {
     const idx = ORDER.indexOf(pathname);
@@ -75,7 +93,13 @@ export default function SwipeNav() {
       if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // mostly a scroll
       // Content follows the finger: swiping left pulls in the tab to the right.
       const next = ORDER[idx + (dx < 0 ? 1 : -1)];
-      if (next) router.push(next);
+      if (!next) return;
+      const dir = dx < 0 ? "left" : "right";
+      cameFrom.current = dir;
+      document
+        .querySelector(".app-main")
+        ?.classList.add(dir === "left" ? "page-exit-left" : "page-exit-right");
+      router.push(next);
     };
 
     document.addEventListener("touchstart", onStart, { passive: true });

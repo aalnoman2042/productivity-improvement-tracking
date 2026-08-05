@@ -144,6 +144,43 @@ body {
 }
 
 /* =====================================================================
+   Swipe navigation — a nudge out, a slide in. Kept to transform+opacity
+   so it stays on the compositor, and off entirely for reduced motion.
+   ===================================================================== */
+.page-exit-left {
+  animation: page-exit-left 0.12s ease-in forwards;
+}
+.page-exit-right {
+  animation: page-exit-right 0.12s ease-in forwards;
+}
+.page-enter-right {
+  animation: page-enter-right 0.22s ease-out;
+}
+.page-enter-left {
+  animation: page-enter-left 0.22s ease-out;
+}
+@keyframes page-exit-left {
+  to { opacity: 0.35; transform: translateX(-14px); }
+}
+@keyframes page-exit-right {
+  to { opacity: 0.35; transform: translateX(14px); }
+}
+@keyframes page-enter-right {
+  from { opacity: 0.35; transform: translateX(20px); }
+}
+@keyframes page-enter-left {
+  from { opacity: 0.35; transform: translateX(-20px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-exit-left,
+  .page-exit-right,
+  .page-enter-right,
+  .page-enter-left {
+    animation: none;
+  }
+}
+
+/* =====================================================================
    Utilities
    ===================================================================== */
 .bg-brand-gradient {

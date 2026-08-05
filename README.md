@@ -72,6 +72,9 @@ which is what keeps it distinct from a day you never filled in.
 
 The app **opens on the log**, because logging is a daily act and reading the
 charts is a weekly one — the most frequent thing shouldn't be the deepest.
+Signed out, `/` lands on **`/welcome`** instead: the pitch, the screenshots,
+and the way in. On a phone, swiping left or right moves between the bottom
+tabs, with a light slide so the page follows the finger.
 
 - **Today** (`/`) — log a day; every tracker gets the input its type needs. It
   **saves as you type** (and when you leave the page), shows how much of the

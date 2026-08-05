@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession, COOKIE_NAME } from "@/lib/auth";
 
-const PUBLIC_PAGES = new Set(["/login", "/signup", "/forgot", "/reset"]);
+const PUBLIC_PAGES = new Set(["/welcome", "/login", "/signup", "/forgot", "/reset"]);
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -39,6 +39,11 @@ export default async function proxy(req: NextRequest) {
   if (!signedIn) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // The front door for strangers is the pitch, not a bare sign-in form —
+    // deep links (a day, the dashboard) still land on login and bounce back.
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/welcome", req.url));
     }
     return NextResponse.redirect(new URL("/login", req.url));
   }
