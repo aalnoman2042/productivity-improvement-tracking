@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
 import SyncStatus from "@/components/SyncStatus";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -55,6 +56,10 @@ export default function Nav() {
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
             <SyncStatus />
+            {/* Disappears once installed, so it costs the header nothing in
+                the long run — but until then it's reachable from every
+                screen, including the phone. */}
+            <InstallButton />
             <ThemeToggle />
             {/* On a phone this is the way to the account page, where signing
                 out is a full, clearly-labelled button. */}

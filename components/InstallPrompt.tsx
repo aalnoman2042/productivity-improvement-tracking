@@ -7,7 +7,7 @@ import { useStored } from "@/lib/useCached";
 const DISMISSED_KEY = "install-dismissed";
 
 /** The Share sheet, drawn rather than described — it's an icon, not a word. */
-function ShareIcon() {
+export function ShareIcon() {
   return (
     <svg
       viewBox="0 0 24 24"

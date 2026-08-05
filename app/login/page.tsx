@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
 
 export default function LoginPage() {
@@ -97,6 +98,11 @@ export default function LoginPage() {
           </Link>
         </p>
       </form>
+
+      {/* Below the card so it never competes with signing in — installing
+          doesn't need an account, and this is the natural first stop for
+          someone arriving on their phone. */}
+      <InstallButton variant="wide" />
     </main>
   );
 }
