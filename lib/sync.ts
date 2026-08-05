@@ -37,7 +37,109 @@ function writeQueue(jobs: Job[]) {
   } catch {
     /* storage full or blocked — nothing useful to do */
   }
+  // Mirror into IndexedDB — the one store the service worker can also read —
+  // and ask for a background sync, so the queue drains even if this tab is
+  // closed before the connection returns.
+  void mirrorQueue(jobs);
+  if (jobs.length > 0) void requestBackgroundFlush();
   announce();
+}
+
+/* --------------------- background sync (via the SW) -------------------- */
+
+/**
+ * The service worker can't read localStorage, so the queue is mirrored into
+ * IndexedDB for it: `jobs` is the queue as this page last knew it, `sent` is
+ * where the worker records what it managed to deliver. On the next flush the
+ * page folds `sent` back in, so a job is never sent twice on purpose — and a
+ * duplicate is harmless anyway, since replaying a day's values is idempotent.
+ *
+ * Browsers without Background Sync (iOS) skip all of this: the queue still
+ * drains whenever a tab is open, exactly as before.
+ */
+const IDB_NAME = "pit-sync";
+
+function openIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("no idb"));
+      return;
+    }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("jobs")) {
+        db.createObjectStore("jobs", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("sent")) {
+        db.createObjectStore("sent", { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function mirrorQueue(jobs: Job[]): Promise<void> {
+  try {
+    const db = await openIdb();
+    const tx = db.transaction("jobs", "readwrite");
+    const store = tx.objectStore("jobs");
+    store.clear();
+    for (const job of jobs) store.put(job);
+    await txDone(tx);
+    db.close();
+  } catch {
+    /* no IndexedDB — background flushing just won't happen */
+  }
+}
+
+async function requestBackgroundFlush(): Promise<void> {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const sync = (
+      reg as ServiceWorkerRegistration & {
+        sync?: { register(tag: string): Promise<void> };
+      }
+    )?.sync;
+    await sync?.register("pit-flush");
+  } catch {
+    /* unsupported or denied — the in-page flush still runs */
+  }
+}
+
+/**
+ * Fold in whatever the service worker delivered while no tab was open:
+ * drop those jobs from the local queue, then clear the worker's ledger.
+ */
+async function reconcileSent(): Promise<void> {
+  try {
+    const db = await openIdb();
+    const read = db.transaction("sent", "readonly");
+    const ids: string[] = await new Promise((resolve, reject) => {
+      const req = read.objectStore("sent").getAllKeys();
+      req.onsuccess = () => resolve(req.result.map(String));
+      req.onerror = () => reject(req.error);
+    });
+    if (ids.length > 0) {
+      const done = new Set(ids);
+      writeQueue(getQueue().filter((j) => !done.has(j.id)));
+      const clear = db.transaction("sent", "readwrite");
+      clear.objectStore("sent").clear();
+      await txDone(clear);
+    }
+    db.close();
+  } catch {
+    /* nothing to reconcile */
+  }
 }
 
 export function pendingCount(): number {
@@ -61,6 +163,26 @@ export function onSyncChange(handler: () => void): () => void {
   };
 }
 
+type DayEntry = { trackerId: string; [k: string]: unknown };
+type DayBody = { date?: unknown; entries?: unknown };
+
+/**
+ * Fold two queued saves of the same day into one. Saves are partial — each
+ * carries only the trackers that changed — so a plain "later replaces
+ * earlier" would drop rows the first save had and the second didn't. Merged
+ * by trackerId instead, later values winning.
+ */
+export function mergeDayEntries(earlier: unknown, later: unknown): DayEntry[] {
+  const byId = new Map<string, DayEntry>();
+  for (const list of [earlier, later]) {
+    if (!Array.isArray(list)) continue;
+    for (const e of list) {
+      if (e && typeof e.trackerId === "string") byId.set(e.trackerId, e);
+    }
+  }
+  return [...byId.values()];
+}
+
 function enqueue(path: string, body: unknown) {
   const jobs = getQueue();
   const job: Job = {
@@ -69,21 +191,25 @@ function enqueue(path: string, body: unknown) {
     body,
     at: Date.now(),
   };
-  // A later save of the same day replaces the earlier one — no point
-  // replaying a version you've already typed over.
-  const replaceable =
-    path === "/api/entries" &&
-    typeof (body as { date?: unknown })?.date === "string";
-  const next = replaceable
-    ? jobs.filter(
-        (j) =>
-          !(
-            j.path === "/api/entries" &&
-            (j.body as { date?: string })?.date ===
-              (body as { date?: string }).date
-          )
-      )
-    : jobs;
+  const mergeable =
+    path === "/api/entries" && typeof (body as DayBody)?.date === "string";
+  let next = jobs;
+  if (mergeable) {
+    const date = (body as DayBody).date;
+    const prior = jobs.find(
+      (j) => j.path === "/api/entries" && (j.body as DayBody)?.date === date
+    );
+    if (prior) {
+      job.body = {
+        date,
+        entries: mergeDayEntries(
+          (prior.body as DayBody).entries,
+          (body as DayBody).entries
+        ),
+      };
+      next = jobs.filter((j) => j !== prior);
+    }
+  }
   writeQueue([...next, job]);
 }
 
@@ -158,6 +284,9 @@ export async function flush(): Promise<{ sent: number; remaining: number }> {
   flushing = true;
   let sent = 0;
   try {
+    // First credit anything the service worker already delivered while no
+    // tab was open, so it isn't sent a second time here.
+    await reconcileSent();
     let jobs = getQueue();
     while (jobs.length > 0) {
       const job = jobs[0];

@@ -51,6 +51,8 @@ const VALIDATORS: Record<string, object> = {
       // Password reset: only the hash of the token is kept, never the token.
       resetTokenHash: { bsonType: ["string", "null"] },
       resetExpires: { bsonType: ["date", "null"] },
+      // Stamped into every session; changing the password orphans old tokens.
+      passwordChangedAt: { bsonType: ["date", "null"] },
       // Nightly "did you log today?" push. The cron decides *when* it fires;
       // tzOffset only decides *which day* the reminder is about.
       reminder: {

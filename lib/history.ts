@@ -9,6 +9,8 @@ export type MonthDay = {
   goalsTotal: number;
   /** Minutes across every duration tracker — the day's headline number. */
   minutes: number;
+  /** What was written that day, tracker by tracker. */
+  notes: { tracker: string; note: string }[];
 };
 
 export type MonthSummary = {

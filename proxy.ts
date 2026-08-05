@@ -16,6 +16,9 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(to);
   }
 
+  // Signature and expiry only — the password-stamp check needs the database,
+  // which the edge runtime doesn't have. Data routes re-check via
+  // `currentUserId`, so a revoked session gets a page shell and nothing else.
   const signedIn = Boolean(await readSession(req.cookies.get(COOKIE_NAME)?.value));
 
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();

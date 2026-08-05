@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
 import MotivationLine from "@/components/MotivationLine";
@@ -681,7 +682,14 @@ export default function TrackersPage() {
                       style={{ backgroundColor: seriesColor(t.color) }}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{t.name}</div>
+                      {/* The name opens the tracker's own page — its whole
+                          history, streak and notes — not the edit form. */}
+                      <Link
+                        href={`/tracker/${t.id}`}
+                        className="block truncate font-medium hover:text-accent hover:underline"
+                      >
+                        {t.name}
+                      </Link>
                       <div className="text-xs text-muted">
                         {typeMeta(t.type as TrackerType).label}
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}

@@ -10,22 +10,46 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(s);
 }
 
-export async function signSession(userId: string): Promise<string> {
-  return new SignJWT({ uid: userId })
+/**
+ * `passwordChangedAt` rides inside the token so a password change can cut off
+ * every session issued before it. A JWT can't be revoked, but it can be dated
+ * — and a date older than the password is a session that no longer speaks for
+ * the account.
+ */
+export async function signSession(
+  userId: string,
+  passwordChangedAt?: Date | null
+): Promise<string> {
+  return new SignJWT({
+    uid: userId,
+    pwd: passwordChangedAt ? Math.floor(passwordChangedAt.getTime() / 1000) : 0,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
     .sign(secret());
 }
 
-/** Returns the user id from a session token, or null if it isn't valid. */
+export type Session = {
+  uid: string;
+  /** When the account's password was set, in epoch seconds — 0 for "never changed". */
+  pwd: number;
+};
+
+/** Returns the session from a token, or null if it isn't valid. */
 export async function readSession(
   token: string | undefined
-): Promise<string | null> {
+): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return typeof payload.uid === "string" ? payload.uid : null;
+    if (typeof payload.uid !== "string") return null;
+    return {
+      uid: payload.uid,
+      // Sessions issued before this claim existed carry no stamp — they're
+      // valid for accounts that have never changed their password.
+      pwd: typeof payload.pwd === "number" ? payload.pwd : 0,
+    };
   } catch {
     return null;
   }

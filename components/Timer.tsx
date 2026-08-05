@@ -1,19 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { post } from "@/lib/sync";
 
 const KEY = "pit_timer";
+const CHANGE = "pit-timer-change";
 
 type Running = { trackerId: string; date: string; startedAt: number };
 
-function read(): Running | null {
+/**
+ * The running timer as an external store: localStorage is the source of
+ * truth (it survives refreshes and is shared across tabs), and the snapshot
+ * is memoised against the raw text so an unchanged value keeps its identity
+ * — which is what `useSyncExternalStore` needs to not re-render forever.
+ */
+let snap: { raw: string | null; value: Running | null } = {
+  raw: null,
+  value: null,
+};
+
+function readRunning(): Running | null {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Running) : null;
+    raw = localStorage.getItem(KEY);
   } catch {
     return null;
   }
+  if (raw !== snap.raw) {
+    let value: Running | null = null;
+    try {
+      value = raw ? (JSON.parse(raw) as Running) : null;
+    } catch {
+      value = null;
+    }
+    snap = { raw, value };
+  }
+  return snap.value;
+}
+
+const noRunning = () => null;
+
+function subscribeRunning(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(CHANGE, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(CHANGE, onChange);
+  };
 }
 
 function clock(ms: number): string {
@@ -39,20 +72,9 @@ export default function Timer({
   date: string;
   onSaved: () => void;
 }) {
-  const [running, setRunning] = useState<Running | null>(null);
+  const running = useSyncExternalStore(subscribeRunning, readRunning, noRunning);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setRunning(read());
-    const sync = () => setRunning(read());
-    window.addEventListener("storage", sync);
-    window.addEventListener("pit-timer-change", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("pit-timer-change", sync);
-    };
-  }, []);
 
   const mine = running?.trackerId === trackerId;
 
@@ -63,13 +85,12 @@ export default function Timer({
   }, [mine]);
 
   function broadcast() {
-    window.dispatchEvent(new Event("pit-timer-change"));
+    window.dispatchEvent(new Event(CHANGE));
   }
 
   function start() {
     const next: Running = { trackerId, date, startedAt: Date.now() };
     localStorage.setItem(KEY, JSON.stringify(next));
-    setRunning(next);
     setNow(Date.now());
     broadcast();
   }
@@ -80,7 +101,6 @@ export default function Timer({
     const elapsedMs = Date.now() - running.startedAt;
     const minutes = Math.max(1, Math.round(elapsedMs / 60000));
     localStorage.removeItem(KEY);
-    setRunning(null);
     broadcast();
     try {
       // Queues itself if you're offline — the minutes are never lost.

@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       .collection("entries")
       .find(
         { userId, date: { $gte: start, $lte: end } },
-        { projection: { trackerId: 1, date: 1, value: 1 } }
+        { projection: { trackerId: 1, date: 1, value: 1, note: 1 } }
       )
       .toArray(),
   ]);
@@ -49,7 +49,13 @@ export async function GET(req: Request) {
   // Only daily goals; a weekly one can't be judged from a single square.
   const dailyGoals = active.filter((t) => t.goal?.period === "day");
 
-  const perDay = new Map<string, { logged: Set<string>; minutes: number; values: Map<string, number> }>();
+  type DaySlot = {
+    logged: Set<string>;
+    minutes: number;
+    values: Map<string, number>;
+    notes: { tracker: string; note: string }[];
+  };
+  const perDay = new Map<string, DaySlot>();
   for (const r of rows) {
     const id = String(r.trackerId);
     const tracker = byId.get(id);
@@ -58,11 +64,17 @@ export async function GET(req: Request) {
     if (!tracker) continue;
     const date = String(r.date);
     const value = Number(r.value);
-    const slot =
-      perDay.get(date) ?? { logged: new Set<string>(), minutes: 0, values: new Map() };
+    const slot: DaySlot =
+      perDay.get(date) ??
+      { logged: new Set(), minutes: 0, values: new Map(), notes: [] };
     slot.logged.add(id);
     slot.values.set(id, value);
     if (tracker.type === "duration") slot.minutes += value;
+    // Notes ride along so the calendar can mark the days that have one and
+    // list them below — written words shouldn't be write-only.
+    if (typeof r.note === "string" && r.note) {
+      slot.notes.push({ tracker: tracker.name, note: r.note });
+    }
     perDay.set(date, slot);
   }
 
@@ -89,6 +101,7 @@ export async function GET(req: Request) {
       goalsMet,
       goalsTotal: logged > 0 ? dailyGoals.length : 0,
       minutes: slot?.minutes ?? 0,
+      notes: slot?.notes ?? [],
     });
 
     run = logged > 0 ? run + 1 : 0;

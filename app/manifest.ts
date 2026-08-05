@@ -28,5 +28,30 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: "Dashboard", short_name: "Stats", url: "/dashboard" },
       { name: "History", short_name: "History", url: "/history" },
     ],
+    // Regenerate with `node scripts/make-screenshots.mjs`. These upgrade
+    // Chrome's install prompt from a bare dialog to the store-style sheet.
+    screenshots: [
+      {
+        src: "/screenshot-log.png",
+        sizes: "1080x1920",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "Log your whole day in taps",
+      },
+      {
+        src: "/screenshot-stats.png",
+        sizes: "1080x1920",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "Watch the trends",
+      },
+      {
+        src: "/screenshot-wide.png",
+        sizes: "1920x1080",
+        type: "image/png",
+        form_factor: "wide",
+        label: "Your week, side by side",
+      },
+    ],
   };
 }

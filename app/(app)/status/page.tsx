@@ -332,7 +332,12 @@ export default function StatusPage() {
                           style={{ backgroundColor: t.color }}
                           aria-hidden="true"
                         />
-                        <span className="truncate font-medium">{t.name}</span>
+                        <Link
+                          href={`/tracker/${t.id}`}
+                          className="truncate font-medium hover:text-accent hover:underline"
+                        >
+                          {t.name}
+                        </Link>
                       </span>
                       <span className="shrink-0 tabular-nums text-secondary">
                         {s.days === 0

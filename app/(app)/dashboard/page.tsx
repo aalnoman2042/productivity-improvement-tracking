@@ -342,7 +342,11 @@ export default function DashboardPage() {
             className="h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: seriesColor(t.color) }}
           />
-          <h3 className="text-sm font-semibold">{t.name}</h3>
+          <h3 className="text-sm font-semibold">
+            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+              {t.name}
+            </Link>
+          </h3>
         </div>
 
         <div className="flex items-baseline gap-2">
@@ -405,7 +409,9 @@ export default function DashboardPage() {
               className="h-3 w-3 rounded-full"
               style={{ backgroundColor: seriesColor(t.color) }}
             />
-            {t.name}
+            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+              {t.name}
+            </Link>
           </h3>
           <p className="py-10 text-center text-sm text-muted">
             Nothing logged in this period
@@ -431,7 +437,11 @@ export default function DashboardPage() {
             className="h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: seriesColor(t.color) }}
           />
-          <h3 className="text-sm font-semibold">{t.name}</h3>
+          <h3 className="text-sm font-semibold">
+            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+              {t.name}
+            </Link>
+          </h3>
           <span className="ml-auto">
             <Delta
               changePct={s.changePct}

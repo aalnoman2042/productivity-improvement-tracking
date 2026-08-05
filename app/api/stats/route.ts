@@ -5,6 +5,7 @@ import { currentUserId } from "@/lib/session";
 import { toTracker } from "@/lib/trackerDoc";
 import { typeMeta, type Goal, type TrackerType } from "@/lib/trackers";
 import { toNight } from "@/lib/clock";
+import { streakInfo } from "@/lib/streak";
 import type { ClockSummary, StreakInfo } from "@/lib/stats";
 import {
   PERIOD_BUCKET,
@@ -12,49 +13,12 @@ import {
   bucketLabel,
   bucketOf,
   bucketsForRange,
-  daysBetween,
   isValidDateStr,
   periodRange,
   type Period,
 } from "@/lib/dates";
 
 const VALID_PERIODS: Period[] = ["week", "15d", "month", "6mo", "year"];
-
-/**
- * Clean-streak trackers count days since the last slip, not consecutive
- * check-ins — a day you simply didn't open the app shouldn't reset a
- * three-month run.
- */
-function streakInfo(
-  first: string | null,
-  slipDates: string[],
-  today: string
-): StreakInfo {
-  if (!first) {
-    return { current: 0, best: 0, slips: 0, lastSlip: null, since: null };
-  }
-
-  const slips = [...new Set(slipDates)].filter((d) => d <= today).sort();
-  // The day before the first entry: every run is measured from a boundary,
-  // and this is the boundary the first run starts from.
-  const boundaries = [addDays(first, -1), ...slips];
-
-  let best = 0;
-  for (let i = 0; i < boundaries.length - 1; i++) {
-    best = Math.max(best, daysBetween(boundaries[i], boundaries[i + 1]) - 1);
-  }
-
-  const last = boundaries[boundaries.length - 1];
-  const current = Math.max(0, daysBetween(last, today));
-
-  return {
-    current,
-    best: Math.max(best, current),
-    slips: slips.length,
-    lastSlip: slips.length > 0 ? slips[slips.length - 1] : null,
-    since: first,
-  };
-}
 
 function meetsGoal(value: number, goal: NonNullable<Goal>): boolean {
   return goal.direction === "min" ? value >= goal.target : value <= goal.target;

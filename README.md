@@ -103,6 +103,10 @@ charts is a weekly one — the most frequent thing shouldn't be the deepest.
   every tracker's numbers. Reached from the Account page. **Share** renders
   the summary to a PNG for the phone's share sheet — an image says nothing
   to anyone the user didn't send it to.
+- **Tracker detail** (`/tracker/[id]`) — one habit's whole story: month-by-month
+  totals, the last three months day by day, streak and milestone badges, and
+  every note ever written on it, searchable. Tracker names link here from
+  Trackers, Stats and Status.
 - **Account** (`/settings`) — a read on your last 30 days (see below), profile,
   password, the nightly reminder, and your data as a CSV or JSON download.
 
@@ -273,12 +277,33 @@ So logging namaz on your phone shows up on the laptop dashboard within about a
 minute, or the moment you click back into it. Repeat requests within ten
 seconds are folded into one, and a hidden tab makes none at all.
 
+## Tests
+
+```powershell
+npm test
+```
+
+Vitest, over the pure logic where a mistake is silent: the night-axis maths
+(`lib/clock.ts`), streak counting (`lib/streak.ts`), draft↔entry conversion
+(`lib/draft.ts`), the digest's sentences (`lib/digest.ts`), milestones, and
+the offline queue's merge behaviour (`lib/sync.ts`).
+
 ## Stack
 
 Next.js (App Router) · TypeScript · Tailwind v4 · Recharts · MongoDB ·
 sessions as signed JWT cookies (`jose`) with passwords hashed using Node's
 `scrypt`; every route is guarded in `proxy.ts` and every query is scoped by
-`userId`.
+`userId`. Changing your password stamps `passwordChangedAt` into new tokens
+and `currentUserId` rejects older ones — so a password change signs out every
+other device. The app is light-themed for everyone by default; the toggle in
+the header switches to dark per device.
+
+Saves are **partial**: the daily log sends only the trackers you changed and
+the server upserts per entry, so two devices editing different rows of the
+same day can't overwrite each other — and queued offline saves of the same
+day merge by tracker rather than replacing. On browsers with Background Sync,
+the offline queue is mirrored into IndexedDB and the service worker drains it
+even after the tab is closed.
 
 ## Deploy online
 

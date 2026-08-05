@@ -79,43 +79,9 @@
   --series-8: #e66767;
 }
 
-/* Follow the device when the user hasn't picked a theme explicitly. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    color-scheme: dark;
-
-    --background: #0d0d0d;
-    --foreground: #ffffff;
-    --surface: #1a1a19;
-    --surface-2: #201f1e;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
-    --chart-grid: #2c2c2a;
-    --chart-axis: #383835;
-    --edge: #2f2f2d;
-
-    --accent: #3987e5;
-    --accent-hover: #5598e7;
-    --accent-soft: #16273d;
-
-    --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
-    --grad-card: linear-gradient(180deg, #1c1c1b 0%, #171716 100%);
-
-    --wash-1: rgba(57, 135, 229, 0.16);
-    --wash-2: rgba(144, 133, 233, 0.13);
-    --wash-3: rgba(25, 158, 112, 0.1);
-    --wash-base: #0d0d0d;
-
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
-  }
-}
+/* No prefers-color-scheme block: the app is light for everyone until they
+   pick dark themselves with the toggle. A phone set to dark mode shouldn't
+   decide what a tracker looks like before its owner has. */
 
 @theme inline {
   --color-background: var(--background);

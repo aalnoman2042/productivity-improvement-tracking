@@ -47,22 +47,32 @@ const CLOSED_KEY = "closed-sections";
 /** Stable empty default, so it doesn't look like a new value every render. */
 const NONE_CLOSED: string[] = [];
 
-/** Send a whole day, and keep the offline copy in step. */
+/**
+ * Send the day's changes, and keep the offline copy in step.
+ *
+ * Only the trackers in `only` are sent (everything, when it's empty — the
+ * explicit Save button and whole-day actions want that). Sending just what
+ * changed is what lets two devices edit *different rows* of the same day
+ * without silently overwriting each other: the server upserts per entry, so
+ * a phone that only touched Sleep can't erase the laptop's Study.
+ */
 async function persist(
   date: string,
   trackers: Tracker[],
-  draft: Record<string, Draft>
+  draft: Record<string, Draft>,
+  only: Set<string>
 ): Promise<PostResult> {
-  const entries = trackers.map((t) => ({
+  const all = trackers.map((t) => ({
     trackerId: t.id,
     ...draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY),
   }));
-  const result = await post("/api/entries", { date, entries });
+  const sending =
+    only.size > 0 ? all.filter((e) => only.has(e.trackerId)) : all;
+  const result = await post("/api/entries", { date, entries: sending });
+  // The cache holds the whole day as it stands on screen, sent or not.
   cacheSet(
     `entries:${date}`,
-    entries
-      .filter((e) => e.value > 0 || e.meta)
-      .map((e) => ({ ...e, note: null }))
+    all.filter((e) => e.value > 0 || e.meta).map((e) => ({ ...e, note: null }))
   );
   return result;
 }
@@ -75,7 +85,17 @@ const chipCls = (on: boolean) =>
   }`;
 
 export default function TodayPage() {
-  const [date, setDate] = useState(() => toDateStr(new Date()));
+  // `?date=YYYY-MM-DD` opens straight on that day — it's how the nightly
+  // reminder lands you on the day it's nagging about. Read in the initial
+  // state so the first fetch already asks for the right day; the server
+  // prerender can't see the query string, which is what the
+  // `suppressHydrationWarning` on the date input below is about.
+  const [date, setDate] = useState(() => {
+    const today = toDateStr(new Date());
+    if (typeof window === "undefined") return today;
+    const asked = new URLSearchParams(window.location.search).get("date");
+    return isValidDateStr(asked) && asked <= today ? asked : today;
+  });
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [state, setState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
@@ -105,6 +125,9 @@ export default function TodayPage() {
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
   const scheduleRef = useRef<() => void>(() => {});
+  // Which trackers changed since the last successful save — what a partial
+  // save sends. Empty means "send everything" (the explicit Save button).
+  const changedRef = useRef<Set<string>>(new Set());
 
   // The day as it stood before the current run of edits. Captured on the first
   // change after a save, so one undo takes back the whole burst rather than a
@@ -125,12 +148,14 @@ export default function TodayPage() {
     if (ts.length === 0) return;
 
     const before = beforeRef.current;
+    const changed = changedRef.current;
     dirtyRef.current = false;
     beforeRef.current = null;
+    changedRef.current = new Set();
     savingRef.current = true;
     setState("saving");
     try {
-      const result = await persist(d, ts, dr);
+      const result = await persist(d, ts, dr, changed);
       setState(result === "queued" ? "queued" : "saved");
       setError("");
       // Only offer the way back if this actually changed something, and only
@@ -141,6 +166,7 @@ export default function TodayPage() {
     } catch (err) {
       dirtyRef.current = true; // it never landed — try again on the next edit
       beforeRef.current = before; // and the way back still points at the right day
+      for (const id of changed) changedRef.current.add(id); // still unsent
       setState("error");
       setError(err instanceof Error ? err.message : "Could not save");
     } finally {
@@ -181,14 +207,6 @@ export default function TodayPage() {
   }, [saveNow]);
 
   /* ----------------------------- loading a day --------------------------- */
-
-  // `?date=YYYY-MM-DD` opens straight on that day — it's how the nightly
-  // reminder lands you on the day it's nagging about. Applied after mount
-  // so the server and the first client render still agree.
-  useEffect(() => {
-    const asked = new URLSearchParams(window.location.search).get("date");
-    if (isValidDateStr(asked) && asked <= toDateStr(new Date())) setDate(asked);
-  }, []);
 
   const appliedRef = useRef<Entry[] | null>(null);
 
@@ -231,9 +249,15 @@ export default function TodayPage() {
 
   function set(id: string, patch: Partial<Draft>) {
     markDirty();
+    changedRef.current.add(id);
     setDraft((d) => ({ ...d, [id]: { ...(d[id] ?? EMPTY), ...patch } }));
     setState("idle");
     schedule();
+  }
+
+  /** Whole-day actions (undo, copy, the Save button) touch every tracker. */
+  function markAllChanged() {
+    for (const t of latest.current.trackers) changedRef.current.add(t.id);
   }
 
   /**
@@ -250,6 +274,7 @@ export default function TodayPage() {
     }
     beforeRef.current = latest.current.draft;
     dirtyRef.current = true;
+    markAllChanged();
     setDraft(undo.draft);
     setUndo(null);
     setState("idle");
@@ -273,6 +298,7 @@ export default function TodayPage() {
     setError("");
     appliedRef.current = null;
     dirtyRef.current = false;
+    changedRef.current = new Set();
     setDate(next);
   }
 
@@ -288,6 +314,7 @@ export default function TodayPage() {
     }
     // Overwriting a whole day in one tap is exactly what undo is for.
     markDirty();
+    markAllChanged();
     setDraft(buildDraft(trackers, data));
     setError("");
     setState("idle");
@@ -384,6 +411,7 @@ export default function TodayPage() {
             value={date}
             max={today}
             onChange={(e) => e.target.value && changeDate(e.target.value)}
+            suppressHydrationWarning
             className="min-w-0 flex-1 rounded-md border border-edge card px-3 py-2 text-center shadow-sm outline-none focus:border-accent"
           />
           <button
@@ -466,6 +494,11 @@ export default function TodayPage() {
                 style={{ width: `${pct}%` }}
               />
             </div>
+            {pct === 100 && (
+              <p className="animate-rise-in mt-2 text-sm font-medium text-green-700 dark:text-green-500">
+                🎉 Every tracker filled in — the whole day is on record.
+              </p>
+            )}
           </div>
 
           {grouped.map((group) => {
@@ -570,6 +603,7 @@ export default function TodayPage() {
             <button
               onClick={() => {
                 markDirty();
+                markAllChanged();
                 void saveNow();
               }}
               disabled={state === "saving"}

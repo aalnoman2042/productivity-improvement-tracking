@@ -84,6 +84,85 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+/* ------------------------ background sync ----------------------------- */
+
+/**
+ * The page mirrors its offline queue into IndexedDB (`pit-sync`/`jobs`) and
+ * registers a "pit-flush" sync, because localStorage — where the queue really
+ * lives — is invisible from here. When the browser decides the connection is
+ * back, this replays the mirrored jobs and records what landed in `sent`;
+ * the page folds that ledger back into its own queue on next open.
+ *
+ * Throwing on failure is deliberate: a rejected waitUntil is what tells the
+ * browser to fire the sync again later.
+ */
+function openSyncDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("pit-sync", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("jobs")) {
+        db.createObjectStore("jobs", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("sent")) {
+        db.createObjectStore("sent", { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbAll(db, store) {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, "readonly").objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbWrite(db, store, act) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    act(tx.objectStore(store));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function flushQueuedJobs() {
+  const db = await openSyncDb();
+  const jobs = (await idbAll(db, "jobs")).sort((a, b) => a.at - b.at);
+  for (const job of jobs) {
+    let res;
+    try {
+      res = await fetch(job.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job.body),
+        credentials: "same-origin",
+      });
+    } catch (err) {
+      db.close();
+      throw err; // still offline — the browser will retry the sync
+    }
+    if (res.ok || (res.status >= 400 && res.status < 500)) {
+      // Delivered, or something the server will never take — either way it
+      // leaves the queue. 4xx matches the in-page flush's behaviour.
+      await idbWrite(db, "jobs", (s) => s.delete(job.id));
+      await idbWrite(db, "sent", (s) => s.put({ id: job.id, at: Date.now() }));
+    } else {
+      db.close();
+      throw new Error("server " + res.status); // 5xx — retry later
+    }
+  }
+  db.close();
+}
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "pit-flush") event.waitUntil(flushQueuedJobs());
+});
+
 /* ------------------------- nightly reminder --------------------------- */
 
 self.addEventListener("push", (event) => {

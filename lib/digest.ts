@@ -1,7 +1,9 @@
 import type { Db, Document, WithId } from "mongodb";
 import { ObjectId } from "mongodb";
-import { addDays, daysBetween } from "./dates";
+import { addDays } from "./dates";
 import { nightLabel, shiftLabel, toNight } from "./clock";
+import { crossedRecently } from "./milestones";
+import { streakInfo } from "./streak";
 import { PRAYERS, formatValue } from "./trackers";
 import { toTracker } from "./trackerDoc";
 
@@ -42,7 +44,7 @@ function avgBed(entries: Entry[]): { bed: number; nights: number } | null {
 }
 
 /** "Sleep 7h 5m a night, bedtime 22 min earlier than last week." */
-function sleepLine(current: Entry[], previous: Entry[]): string | null {
+export function sleepLine(current: Entry[], previous: Entry[]): string | null {
   if (current.length === 0) return null;
   const avg =
     current.reduce((sum, e) => sum + Number(e.value), 0) / current.length;
@@ -63,7 +65,7 @@ function sleepLine(current: Entry[], previous: Entry[]): string | null {
 }
 
 /** "Namaz 4.1/5 — Fajr missed most (4 of 6 days)." */
-function prayerLine(name: string, current: Entry[]): string | null {
+export function prayerLine(name: string, current: Entry[]): string | null {
   if (current.length === 0) return null;
   const days = current.length;
   const avg = current.reduce((sum, e) => sum + Number(e.value), 0) / days;
@@ -101,22 +103,24 @@ function prayerLine(name: string, current: Entry[]): string | null {
 
 /**
  * "No fap: 12 days clean." Streaks run over all time, so this needs the
- * tracker's whole history, not the week — same maths as the stats route:
- * days since the last slip, where the day before the first entry counts as
- * the starting boundary.
+ * tracker's whole history, not the week — `streakInfo` is the same maths
+ * the stats route uses. A milestone crossed this week gets the fanfare it
+ * earned: crossing 30 days and hearing nothing wastes the crossing.
  */
-function streakLine(
+export function streakLine(
   name: string,
   first: string | null,
   slipDates: string[],
   today: string
 ): string | null {
   if (!first) return null;
-  const slips = [...new Set(slipDates)].filter((s) => s <= today).sort();
-  const last = slips.length > 0 ? slips[slips.length - 1] : addDays(first, -1);
-  const current = Math.max(0, daysBetween(last, today));
+  const { current } = streakInfo(first, slipDates, today);
 
   if (current === 0) return `${name}: the streak reset — back to day one.`;
+  const crossed = crossedRecently(current);
+  if (crossed !== null) {
+    return `🎉 ${name}: past ${crossed} days clean — ${current} and counting.`;
+  }
   return `${name}: ${current} day${current === 1 ? "" : "s"} clean.`;
 }
 

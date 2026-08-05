@@ -42,16 +42,23 @@ export async function POST(req: Request) {
     );
   }
 
+  const changedAt = new Date();
   await d.collection("users").updateOne(
     { _id: user._id },
     {
-      $set: { passwordHash: hashPassword(password) },
+      // Someone resetting a password is often someone worried about who else
+      // can get in — the stamp signs out every session issued before now.
+      $set: { passwordHash: hashPassword(password), passwordChangedAt: changedAt },
       $unset: { resetTokenHash: "", resetExpires: "" },
     }
   );
 
   // Signed in straight away, so there's no second step.
   const res = NextResponse.json({ ok: true, name: user.name });
-  res.cookies.set(COOKIE_NAME, await signSession(String(user._id)), cookieOptions);
+  res.cookies.set(
+    COOKIE_NAME,
+    await signSession(String(user._id), changedAt),
+    cookieOptions
+  );
   return res;
 }

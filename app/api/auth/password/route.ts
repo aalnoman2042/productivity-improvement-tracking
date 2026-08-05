@@ -45,10 +45,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const changedAt = new Date();
   await d.collection("users").updateOne(
     { _id: userId },
     {
-      $set: { passwordHash: hashPassword(next) },
+      // The stamp is what signs every other device out: their tokens carry
+      // the old one and stop matching.
+      $set: { passwordHash: hashPassword(next), passwordChangedAt: changedAt },
       // Any pending reset link is void once the password changes.
       $unset: { resetTokenHash: "", resetExpires: "" },
     }
@@ -56,6 +59,10 @@ export async function POST(req: Request) {
 
   // Issue a fresh session so the current device stays signed in.
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE_NAME, await signSession(String(userId)), cookieOptions);
+  res.cookies.set(
+    COOKIE_NAME,
+    await signSession(String(userId), changedAt),
+    cookieOptions
+  );
   return res;
 }

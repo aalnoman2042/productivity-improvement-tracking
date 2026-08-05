@@ -77,6 +77,14 @@ function Day({
       >
         {num}
       </span>
+      {/* A written note is worth a mark of its own — it's the day you had
+          something to say. */}
+      {(day?.notes?.length ?? 0) > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500"
+        />
+      )}
     </Link>
   );
 }
@@ -245,6 +253,39 @@ export default function HistoryPage() {
               {missed === 1 ? "day is" : "days are"} still blank this month.
               Tapping one opens it ready to fill in.
             </p>
+          )}
+
+          {/* What you wrote this month, readable again instead of buried in
+              the days it was typed on. */}
+          {inPast.some((d) => (d.notes?.length ?? 0) > 0) && (
+            <section className="rounded-lg border border-edge card p-4 shadow-sm">
+              <h2 className="font-semibold">
+                📝 Notes this month
+              </h2>
+              <ul className="mt-3 space-y-2">
+                {inPast
+                  .filter((d) => (d.notes?.length ?? 0) > 0)
+                  .reverse()
+                  .map((d) => (
+                    <li key={d.date} className="rounded-md border border-edge bg-surface-2 p-3">
+                      <Link
+                        href={`/?date=${d.date}`}
+                        className="text-xs font-medium text-accent hover:underline"
+                      >
+                        {prettyDate(d.date)}
+                      </Link>
+                      <ul className="mt-1 space-y-1">
+                        {d.notes.map((n, i) => (
+                          <li key={i} className="text-sm">
+                            <span className="text-muted">{n.tracker}:</span>{" "}
+                            {n.note}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+              </ul>
+            </section>
           )}
         </>
       )}

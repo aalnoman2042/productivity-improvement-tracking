@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import InstallPrompt from "@/components/InstallPrompt";
 import type { CronHealth } from "@/lib/cronLog";
 
@@ -76,22 +76,30 @@ function urlBase64ToUint8Array(base64: string) {
 
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
+/**
+ * What this browser can do never changes within a page view, so it's a
+ * static external value: no subscription, and the server snapshot is null —
+ * guessing there would only earn a hydration mismatch.
+ */
+const subscribeNever = () => () => {};
+const readSupport = () =>
+  "serviceWorker" in navigator &&
+  "PushManager" in window &&
+  "Notification" in window;
+const supportUnknown = () => null;
+
 export default function ReminderSettings() {
   const [status, setStatus] = useState<Status | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
 
-  // Decided after mount: the server has no idea what this browser can do,
-  // and guessing would mean a hydration mismatch.
-  const [supported, setSupported] = useState<boolean | null>(null);
-  useEffect(() => {
-    setSupported(
-      "serviceWorker" in navigator &&
-        "PushManager" in window &&
-        "Notification" in window
-    );
-  }, []);
+  // Decided after mount: the server has no idea what this browser can do.
+  const supported = useSyncExternalStore(
+    subscribeNever,
+    readSupport,
+    supportUnknown
+  );
 
   const load = useCallback(async () => {
     const res = await fetch("/api/reminders");
@@ -105,7 +113,9 @@ export default function ReminderSettings() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Deferred a microtask: every setState in `load` happens after a network
+    // round trip anyway, and the boundary makes that plain to the lint rule.
+    void Promise.resolve().then(load);
   }, [load]);
 
   async function enable() {

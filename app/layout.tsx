@@ -35,9 +35,8 @@ export const viewport: Viewport = {
  * it the page would flash light before switching to dark.
  */
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('pit_theme');
-if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}
-var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);
-if(d){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#0d0d0d');}
+if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');
+var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#0d0d0d');}
 }catch(e){}})();`;
 
 export default function RootLayout({

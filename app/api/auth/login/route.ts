@@ -30,7 +30,10 @@ export async function POST(req: Request) {
   );
   if (!user || !verifyPassword(password, user.passwordHash)) return bad;
 
-  const token = await signSession(String(user._id));
+  const token = await signSession(
+    String(user._id),
+    user.passwordChangedAt instanceof Date ? user.passwordChangedAt : null
+  );
   const out = NextResponse.json({ ok: true, name: user.name });
   out.cookies.set(COOKIE_NAME, token, cookieOptions);
   return out;
