@@ -89,34 +89,35 @@ charts is a weekly one — the most frequent thing shouldn't be the deepest.
 - **Stats** (`/dashboard`) — period selector (week / 15 days / month / 6 months
   / year), stat tiles, time donut + trend, sleep charts, then one card per
   habit grouped by category.
-- **History** (`/history`) — a month at a time. Each day is a square: a ring
-  means you logged it, the fill says how it went against your goals. Two
-  channels rather than one, because a blank day and a bad day are different
-  things and collapsing them hides exactly the gaps you're looking for. Tap any
-  day to open it ready to fill in.
+- **History** (`/history`) — a month at a time, opened from the Status page.
+  Each day is a square: a ring means you logged it, the fill says how it went
+  against your goals. Two channels rather than one, because a blank day and a
+  bad day are different things and collapsing them hides exactly the gaps
+  you're looking for. Tap any day to open it ready to fill in.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
   ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
   a clean streak). Adding a pack twice skips what you already have. Past eight
   trackers a search box appears, matching on name, category or kind.
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
-  every tracker's numbers. In the main nav, phone and desktop. **Share**
-  renders the summary to a PNG for the phone's share sheet — an image says
-  nothing to anyone the user didn't send it to.
+  every tracker's numbers. It holds History's old slot in the nav — "how am
+  I doing?" is the daily question — and links to the calendar for the
+  day-by-day. **Share** renders the summary to a PNG for the phone's share
+  sheet — an image says nothing to anyone the user didn't send it to.
 - **Tracker detail** (`/tracker/[id]`) — one habit's whole story: month-by-month
   totals, the last three months day by day, streak and milestone badges, and
   every note ever written on it, searchable. Tracker names link here from
   Trackers, Stats and Status.
-- **Account** (`/settings`) — a read on your last 30 days (see below), profile,
-  password, the nightly reminder, and your data as a CSV or JSON download.
+- **Account** (`/settings`) — profile, password, the nightly reminder, and
+  your data: CSV/JSON download and backup import.
 
 `/today` still redirects to `/`, query string intact, so notifications sitting
 unread in a tray from before the move still land on the right day.
 
 ## Lifestyle warnings
 
-The Account page turns the last 30 days into plain statements, worst first:
-short sleep, missed prayers, a streak that keeps resetting, goals you're not
+The Status page turns the period into plain statements, worst first: short
+sleep, missed prayers, a streak that keeps resetting, goals you're not
 hitting, trackers you've stopped filling in. Every one carries the number it
 came from, and nothing is shown that the data doesn't support — see
 [`lib/insights.ts`](./lib/insights.ts).

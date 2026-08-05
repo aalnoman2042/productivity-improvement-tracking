@@ -169,7 +169,11 @@ export default function StatusPage() {
         <h1 className="text-2xl font-bold tracking-tight">Status</h1>
         <p className="mt-1 text-sm text-secondary">
           Where you stand right now — what you&apos;re hitting, what you&apos;re
-          missing, and what to fix first.
+          missing, and what to fix first. For the day-by-day calendar, open{" "}
+          <Link href="/history" className="font-medium text-accent underline">
+            📅 History
+          </Link>
+          .
         </p>
       </div>
 
