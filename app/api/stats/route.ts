@@ -180,34 +180,21 @@ export async function GET(req: Request) {
   const granularity = PERIOD_BUCKET[period];
   const d = await db();
 
-  const [trackerDocs, allEntries, loggedDates] = await Promise.all([
-    d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
-    d
-      .collection("entries")
-      .find(
-        { userId, date: { $gte: prevStart, $lte: end } },
-        // Up to two years of rows on the year view — ship only the four
-        // fields the roll-ups read, not notes and timestamps.
-        { projection: { trackerId: 1, date: 1, value: 1, meta: 1, _id: 0 } }
-      )
-      .toArray(),
-    d.collection("entries").distinct("date", {
-      userId,
-      date: { $gte: addDays(today, -400), $lte: today },
-    }),
-  ]);
-
-  const trackers = trackerDocs.map(toTracker);
+  const trackersQ = d
+    .collection("trackers")
+    .find({ userId })
+    .sort({ order: 1 })
+    .toArray();
 
   // Clean streaks run for as long as they run — a week's worth of entries
   // says nothing about a four-month streak — so they get their own all-time
-  // roll-up. One small grouped read, and only when such a tracker exists.
-  const streakIds = trackerDocs
-    .filter((t) => t.type === "streak")
-    .map((t) => t._id);
-  const streaks = new Map<string, StreakInfo>();
-  if (streakIds.length > 0) {
-    const rows = await d
+  // roll-up. It needs the tracker list to know which ids to read, so it
+  // chains off that (tiny) query and overlaps with the big entries read
+  // below, instead of costing a round trip after everything else.
+  const streaksQ = trackersQ.then((docs) => {
+    const streakIds = docs.filter((t) => t.type === "streak").map((t) => t._id);
+    if (streakIds.length === 0) return [];
+    return d
       .collection("entries")
       .aggregate<{ _id: unknown; first: string; slips: string[] }>([
         { $match: { userId, trackerId: { $in: streakIds } } },
@@ -224,12 +211,45 @@ export async function GET(req: Request) {
         },
       ])
       .toArray();
-    for (const row of rows) {
-      streaks.set(
-        String(row._id),
-        streakInfo(row.first ?? null, row.slips ?? [], today)
-      );
-    }
+  });
+
+  const [trackerDocs, allEntries, loggedDates, streakRows] = await Promise.all([
+    trackersQ,
+    d
+      .collection("entries")
+      .find(
+        { userId, date: { $gte: prevStart, $lte: end } },
+        // Up to two years of rows on the year view — ship only the fields
+        // the roll-ups read: not notes or timestamps, and of `meta` just the
+        // sleep times and quality, not prayer parts or streak status.
+        {
+          projection: {
+            trackerId: 1,
+            date: 1,
+            value: 1,
+            "meta.start": 1,
+            "meta.end": 1,
+            "meta.quality": 1,
+            _id: 0,
+          },
+        }
+      )
+      .toArray(),
+    d.collection("entries").distinct("date", {
+      userId,
+      date: { $gte: addDays(today, -400), $lte: today },
+    }),
+    streaksQ,
+  ]);
+
+  const trackers = trackerDocs.map(toTracker);
+
+  const streaks = new Map<string, StreakInfo>();
+  for (const row of streakRows) {
+    streaks.set(
+      String(row._id),
+      streakInfo(row.first ?? null, row.slips ?? [], today)
+    );
   }
 
   const current = allEntries.filter((e) => String(e.date) >= start);

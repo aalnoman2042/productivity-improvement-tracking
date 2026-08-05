@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import Link from "next/link";
 import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
 import {
@@ -130,6 +130,328 @@ function Facts({ items }: { items: { label: string; value: string }[] }) {
   );
 }
 
+/* ------------------------------- cards --------------------------------- */
+
+/*
+ * Chart-data helpers for the cards below. They take `stats` as an argument
+ * (instead of closing over the page's state) so the cards can live at module
+ * scope — see the note above `TrackerCard`.
+ */
+
+function pointsFor(stats: Stats, t: Tracker): Point[] {
+  const aggregate = typeMeta(t.type as TrackerType).aggregate;
+  return stats.buckets.map((b) => {
+    const sum = b.values[t.id] ?? 0;
+    const n = b.counts[t.id] ?? 0;
+    if (aggregate === "avg") {
+      return { label: b.label, value: n > 0 ? sum / n : null };
+    }
+    return { label: b.label, value: sum };
+  });
+}
+
+function goalLineFor(stats: Stats, t: Tracker): number | null {
+  const goal: Goal = t.goal;
+  if (!goal || goal.period !== "day") return null;
+  const aggregate = typeMeta(t.type as TrackerType).aggregate;
+  if (aggregate === "avg") return goal.target;
+  return stats.granularity === "day" ? goal.target : null;
+}
+
+/** More of this is good unless the goal says "at most". */
+function goodDirection(t: Tracker): "up" | "down" | "unknown" {
+  if (t.goal) return t.goal.direction === "max" ? "down" : "up";
+  return t.type === "measure" ? "unknown" : "up";
+}
+
+function clockPointsFor(stats: Stats, t: Tracker): ClockPoint[] {
+  return stats.buckets.map((b) => {
+    const c = b.clock?.[t.id];
+    return {
+      label: b.label,
+      range: c ? ([c.bed, c.wake] as [number, number]) : null,
+      nights: c?.nights ?? 0,
+    };
+  });
+}
+
+/*
+ * The cards are module-scope components wrapped in `memo`, and that placement
+ * is load-bearing: defined inside the page they'd get a new identity every
+ * render, so React would unmount and remount every card — redrawing each
+ * chart SVG — each time the background poll toggled a flag. Out here they
+ * reconcile in place, and since the client cache hands back the *same* stats
+ * object when a refresh finds nothing new, `memo` skips them entirely.
+ */
+
+/**
+ * Hours slept says how much; this says *when*. Same data, but the question
+ * "am I getting to bed earlier?" needs the clock, not a total.
+ */
+const SleepClockCard = memo(function SleepClockCard({
+  t,
+  stats,
+  compareTo,
+}: {
+  t: Tracker;
+  stats: Stats;
+  compareTo: string;
+}) {
+  const clock = stats.summary[t.id]?.clock ?? null;
+  const shift =
+    clock && clock.prevBed != null
+      ? shiftLabel(clock.bed, clock.prevBed)
+      : null;
+  const earlier = clock && clock.prevBed != null && clock.bed < clock.prevBed;
+
+  return (
+    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="h-3 w-3 shrink-0 rounded-full"
+          style={{ backgroundColor: seriesColor(t.color) }}
+        />
+        <h3 className="text-sm font-semibold">Bedtime &amp; wake-up</h3>
+        {shift && (
+          <span
+            className={`ml-auto text-xs font-medium ${
+              shift === "about the same"
+                ? "text-muted"
+                : earlier
+                  ? "text-green-700 dark:text-green-500"
+                  : "text-red-600 dark:text-red-400"
+            }`}
+            title={`Average bedtime vs ${compareTo}`}
+          >
+            {shift === "about the same"
+              ? `same bedtime as ${compareTo}`
+              : `to bed ${shift}`}
+          </span>
+        )}
+      </div>
+
+      {clock ? (
+        <>
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <span className="text-2xl font-bold tabular-nums">
+              {nightLabel(clock.bed)}
+            </span>
+            <span className="text-xs text-muted">
+              average bedtime across {clock.nights} night
+              {clock.nights === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <SleepClockChart
+            data={clockPointsFor(stats, t)}
+            color={t.color}
+            avgBed={clock.bed}
+            height={150}
+          />
+
+          <Facts
+            items={[
+              { label: "Usually up at", value: nightLabel(clock.wake) },
+              { label: "Earliest night", value: nightLabel(clock.earliestBed) },
+              { label: "Latest night", value: nightLabel(clock.latestBed) },
+            ]}
+          />
+          {clock.latestBedDate && clock.latestBed > clock.earliestBed && (
+            <p className="mt-2 text-xs text-muted">
+              Your latest night was {prettyDate(clock.latestBedDate)}.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="py-10 text-center text-sm text-muted">
+          Fill in the &ldquo;slept&rdquo; and &ldquo;woke&rdquo; times on{" "}
+          <Link href="/" className="text-accent underline">
+            the daily log
+          </Link>{" "}
+          and your nights show up here.
+        </p>
+      )}
+    </section>
+  );
+});
+
+/** A clean streak is about the run, not the period — so it says so. */
+const StreakCard = memo(function StreakCard({
+  t,
+  s,
+  stats,
+}: {
+  t: Tracker;
+  s: Summary;
+  stats: Stats;
+}) {
+  const run = s.streak;
+  const days = run?.current ?? 0;
+  return (
+    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="h-3 w-3 shrink-0 rounded-full"
+          style={{ backgroundColor: seriesColor(t.color) }}
+        />
+        <h3 className="text-sm font-semibold">
+          <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+            {t.name}
+          </Link>
+        </h3>
+      </div>
+
+      <div className="flex items-baseline gap-2">
+        <span className="text-4xl font-bold tabular-nums">{days}</span>
+        <span className="text-sm text-secondary">
+          day{days === 1 ? "" : "s"} clean
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        {run?.lastSlip
+          ? `Last slip ${prettyDate(run.lastSlip)}`
+          : run?.since
+            ? `No slips since you started on ${prettyDate(run.since)}`
+            : "Log a day to start the count"}
+      </p>
+
+      <Facts
+        items={[
+          { label: "Best run", value: `${run?.best ?? 0}d` },
+          { label: "Slips (all time)", value: String(run?.slips ?? 0) },
+          {
+            label: "Clean this period",
+            value: `${s.sum}/${stats.days}`,
+          },
+        ]}
+      />
+
+      <SeriesChart
+        data={pointsFor(stats, t)}
+        color={t.color}
+        kind="bar"
+        title={t.name}
+        format={(v) => formatValue(v, "streak", t.unit)}
+        tickFormat={(v) => String(Math.round(v))}
+        height={110}
+      />
+    </section>
+  );
+});
+
+/** One tracker, one chart, with its own numbers underneath. */
+const TrackerCard = memo(function TrackerCard({
+  t,
+  stats,
+  compareTo,
+}: {
+  t: Tracker;
+  stats: Stats;
+  compareTo: string;
+}) {
+  const s = stats.summary[t.id];
+  const type = t.type as TrackerType;
+  const isTime = type === "duration" || type === "sleep";
+  const aggregate = typeMeta(type).aggregate;
+  const kind: "bar" | "line" =
+    type === "measure" || type === "scale" ? "line" : "bar";
+  const fmt = (v: number) => formatValue(v, type, t.unit);
+
+  // The streak card stands on its own — it means something even in a week
+  // where nothing was logged, because the run carries on regardless.
+  if (type === "streak" && s) return <StreakCard t={t} s={s} stats={stats} />;
+
+  if (!s || s.days === 0) {
+    return (
+      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <span
+            className="h-3 w-3 rounded-full"
+            style={{ backgroundColor: seriesColor(t.color) }}
+          />
+          <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+            {t.name}
+          </Link>
+        </h3>
+        <p className="py-10 text-center text-sm text-muted">
+          Nothing logged in this period
+        </p>
+      </section>
+    );
+  }
+
+  const headline =
+    type === "check"
+      ? `${s.sum} of ${stats.days} days`
+      : aggregate === "avg"
+        ? fmt(s.avgPerLoggedDay)
+        : fmt(s.sum);
+
+  const domain: [number, number] | undefined =
+    type === "scale" ? [0, 5] : type === "prayer" ? [0, 5] : undefined;
+
+  return (
+    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="h-3 w-3 shrink-0 rounded-full"
+          style={{ backgroundColor: seriesColor(t.color) }}
+        />
+        <h3 className="text-sm font-semibold">
+          <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
+            {t.name}
+          </Link>
+        </h3>
+        <span className="ml-auto">
+          <Delta
+            changePct={s.changePct}
+            goodDirection={goodDirection(t)}
+            compareTo={compareTo}
+          />
+        </span>
+      </div>
+
+      <div className="mb-2 flex items-baseline gap-2">
+        <span className="text-2xl font-bold tabular-nums">{headline}</span>
+        <span className="text-xs text-muted">
+          {aggregate === "avg" ? "average" : "total"}
+        </span>
+      </div>
+
+      <SeriesChart
+        data={pointsFor(stats, t)}
+        color={t.color}
+        kind={kind}
+        title={t.name}
+        format={fmt}
+        tickFormat={
+          isTime ? shortTime : (v) => String(Math.round(v * 10) / 10)
+        }
+        goal={goalLineFor(stats, t)}
+        goalLabel="goal"
+        domain={domain}
+        height={150}
+      />
+
+      <Facts
+        items={[
+          {
+            label: aggregate === "avg" ? "Best" : "Per active day",
+            value: fmt(aggregate === "avg" ? s.best : s.avgPerLoggedDay),
+          },
+          {
+            label: "Best day",
+            value: s.bestDate ? prettyDate(s.bestDate) : "—",
+          },
+          { label: "Days active", value: `${s.days}/${stats.days}` },
+        ]}
+      />
+
+      {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
+    </section>
+  );
+});
+
 /* ------------------------------ the page ------------------------------- */
 
 export default function DashboardPage() {
@@ -147,63 +469,43 @@ export default function DashboardPage() {
     () => (stats?.trackers ?? []).filter((t) => !t.archived),
     [stats]
   );
-  const durationTrackers = active.filter((t) => t.type === "duration");
-  const sleepTrackers = active.filter((t) => t.type === "sleep");
-  const habitTrackers = active.filter(
-    (t) => !["duration", "sleep"].includes(t.type)
-  );
 
-  // Habits are easier to read grouped the way they're grouped everywhere else.
-  const habitGroups = useMemo(
+  // Split once per stats payload, not once per render: these arrays are props
+  // for memoised charts and cards, so a stable identity is what lets a render
+  // that changed nothing skip them.
+  const { durationTrackers, sleepTrackers, habitGroups } = useMemo(() => {
+    const durationTrackers = active.filter((t) => t.type === "duration");
+    const sleepTrackers = active.filter((t) => t.type === "sleep");
+    const habitTrackers = active.filter(
+      (t) => !["duration", "sleep"].includes(t.type)
+    );
+    // Habits are easier to read grouped the way they're grouped everywhere
+    // else.
+    const habitGroups = orderCategories(habitTrackers.map((t) => t.category))
+      .map((value) => ({
+        value,
+        ...categoryMeta(value),
+        items: habitTrackers.filter(
+          (t) => t.category.toLowerCase() === value.toLowerCase()
+        ),
+      }))
+      .filter((g) => g.items.length > 0);
+    return { durationTrackers, sleepTrackers, habitGroups };
+  }, [active]);
+
+  const timeSlices: Slice[] = useMemo(
     () =>
-      orderCategories(habitTrackers.map((t) => t.category))
-        .map((value) => ({
-          value,
-          ...categoryMeta(value),
-          items: habitTrackers.filter(
-            (t) => t.category.toLowerCase() === value.toLowerCase()
-          ),
+      durationTrackers
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          color: t.color,
+          minutes: stats?.summary[t.id]?.sum ?? 0,
         }))
-        .filter((g) => g.items.length > 0),
-    [habitTrackers]
+        .filter((s) => s.minutes > 0)
+        .sort((a, b) => b.minutes - a.minutes),
+    [durationTrackers, stats]
   );
-
-  function pointsFor(t: Tracker): Point[] {
-    if (!stats) return [];
-    const aggregate = typeMeta(t.type as TrackerType).aggregate;
-    return stats.buckets.map((b) => {
-      const sum = b.values[t.id] ?? 0;
-      const n = b.counts[t.id] ?? 0;
-      if (aggregate === "avg") {
-        return { label: b.label, value: n > 0 ? sum / n : null };
-      }
-      return { label: b.label, value: sum };
-    });
-  }
-
-  function goalLineFor(t: Tracker): number | null {
-    const goal: Goal = t.goal;
-    if (!goal || goal.period !== "day") return null;
-    const aggregate = typeMeta(t.type as TrackerType).aggregate;
-    if (aggregate === "avg") return goal.target;
-    return stats?.granularity === "day" ? goal.target : null;
-  }
-
-  /** More of this is good unless the goal says "at most". */
-  function goodDirection(t: Tracker): "up" | "down" | "unknown" {
-    if (t.goal) return t.goal.direction === "max" ? "down" : "up";
-    return t.type === "measure" ? "unknown" : "up";
-  }
-
-  const timeSlices: Slice[] = durationTrackers
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      color: t.color,
-      minutes: stats?.summary[t.id]?.sum ?? 0,
-    }))
-    .filter((s) => s.minutes > 0)
-    .sort((a, b) => b.minutes - a.minutes);
 
   const totalTime = timeSlices.reduce((s, x) => s + x.minutes, 0);
   const prevTotalTime = durationTrackers.reduce(
@@ -235,262 +537,6 @@ export default function DashboardPage() {
     periodHours > 0
       ? Math.round((accountedMinutes / (periodHours * 60)) * 100)
       : 0;
-
-  function clockPointsFor(t: Tracker): ClockPoint[] {
-    if (!stats) return [];
-    return stats.buckets.map((b) => {
-      const c = b.clock?.[t.id];
-      return {
-        label: b.label,
-        range: c ? ([c.bed, c.wake] as [number, number]) : null,
-        nights: c?.nights ?? 0,
-      };
-    });
-  }
-
-  /**
-   * Hours slept says how much; this says *when*. Same data, but the question
-   * "am I getting to bed earlier?" needs the clock, not a total.
-   */
-  function SleepClockCard({ t }: { t: Tracker }) {
-    const clock = stats?.summary[t.id]?.clock ?? null;
-    const shift =
-      clock && clock.prevBed != null
-        ? shiftLabel(clock.bed, clock.prevBed)
-        : null;
-    const earlier = clock && clock.prevBed != null && clock.bed < clock.prevBed;
-
-    return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className="h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: seriesColor(t.color) }}
-          />
-          <h3 className="text-sm font-semibold">Bedtime &amp; wake-up</h3>
-          {shift && (
-            <span
-              className={`ml-auto text-xs font-medium ${
-                shift === "about the same"
-                  ? "text-muted"
-                  : earlier
-                    ? "text-green-700 dark:text-green-500"
-                    : "text-red-600 dark:text-red-400"
-              }`}
-              title={`Average bedtime vs ${compareTo}`}
-            >
-              {shift === "about the same"
-                ? `same bedtime as ${compareTo}`
-                : `to bed ${shift}`}
-            </span>
-          )}
-        </div>
-
-        {clock ? (
-          <>
-            <div className="mb-2 flex flex-wrap items-baseline gap-2">
-              <span className="text-2xl font-bold tabular-nums">
-                {nightLabel(clock.bed)}
-              </span>
-              <span className="text-xs text-muted">
-                average bedtime across {clock.nights} night
-                {clock.nights === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <SleepClockChart
-              data={clockPointsFor(t)}
-              color={t.color}
-              avgBed={clock.bed}
-              height={150}
-            />
-
-            <Facts
-              items={[
-                { label: "Usually up at", value: nightLabel(clock.wake) },
-                { label: "Earliest night", value: nightLabel(clock.earliestBed) },
-                { label: "Latest night", value: nightLabel(clock.latestBed) },
-              ]}
-            />
-            {clock.latestBedDate && clock.latestBed > clock.earliestBed && (
-              <p className="mt-2 text-xs text-muted">
-                Your latest night was {prettyDate(clock.latestBedDate)}.
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="py-10 text-center text-sm text-muted">
-            Fill in the &ldquo;slept&rdquo; and &ldquo;woke&rdquo; times on{" "}
-            <Link href="/" className="text-accent underline">
-              the daily log
-            </Link>{" "}
-            and your nights show up here.
-          </p>
-        )}
-      </section>
-    );
-  }
-
-  /** A clean streak is about the run, not the period — so it says so. */
-  function StreakCard({ t, s }: { t: Tracker; s: Summary }) {
-    const run = s.streak;
-    const days = run?.current ?? 0;
-    return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className="h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: seriesColor(t.color) }}
-          />
-          <h3 className="text-sm font-semibold">
-            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
-              {t.name}
-            </Link>
-          </h3>
-        </div>
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold tabular-nums">{days}</span>
-          <span className="text-sm text-secondary">
-            day{days === 1 ? "" : "s"} clean
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-muted">
-          {run?.lastSlip
-            ? `Last slip ${prettyDate(run.lastSlip)}`
-            : run?.since
-              ? `No slips since you started on ${prettyDate(run.since)}`
-              : "Log a day to start the count"}
-        </p>
-
-        <Facts
-          items={[
-            { label: "Best run", value: `${run?.best ?? 0}d` },
-            { label: "Slips (all time)", value: String(run?.slips ?? 0) },
-            {
-              label: "Clean this period",
-              value: `${s.sum}/${stats?.days ?? 0}`,
-            },
-          ]}
-        />
-
-        <SeriesChart
-          data={pointsFor(t)}
-          color={t.color}
-          kind="bar"
-          title={t.name}
-          format={(v) => formatValue(v, "streak", t.unit)}
-          tickFormat={(v) => String(Math.round(v))}
-          height={110}
-        />
-      </section>
-    );
-  }
-
-  /** One tracker, one chart, with its own numbers underneath. */
-  function TrackerCard({ t }: { t: Tracker }) {
-    const s = stats?.summary[t.id];
-    const type = t.type as TrackerType;
-    const isTime = type === "duration" || type === "sleep";
-    const aggregate = typeMeta(type).aggregate;
-    const kind: "bar" | "line" =
-      type === "measure" || type === "scale" ? "line" : "bar";
-    const fmt = (v: number) => formatValue(v, type, t.unit);
-
-    // The streak card stands on its own — it means something even in a week
-    // where nothing was logged, because the run carries on regardless.
-    if (type === "streak" && s) return <StreakCard t={t} s={s} />;
-
-    if (!s || s.days === 0) {
-      return (
-        <section className="rounded-lg border border-edge card p-4 shadow-sm">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <span
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: seriesColor(t.color) }}
-            />
-            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
-              {t.name}
-            </Link>
-          </h3>
-          <p className="py-10 text-center text-sm text-muted">
-            Nothing logged in this period
-          </p>
-        </section>
-      );
-    }
-
-    const headline =
-      type === "check"
-        ? `${s.sum} of ${stats?.days} days`
-        : aggregate === "avg"
-          ? fmt(s.avgPerLoggedDay)
-          : fmt(s.sum);
-
-    const domain: [number, number] | undefined =
-      type === "scale" ? [0, 5] : type === "prayer" ? [0, 5] : undefined;
-
-    return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className="h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: seriesColor(t.color) }}
-          />
-          <h3 className="text-sm font-semibold">
-            <Link href={`/tracker/${t.id}`} className="hover:text-accent hover:underline">
-              {t.name}
-            </Link>
-          </h3>
-          <span className="ml-auto">
-            <Delta
-              changePct={s.changePct}
-              goodDirection={goodDirection(t)}
-              compareTo={compareTo}
-            />
-          </span>
-        </div>
-
-        <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums">{headline}</span>
-          <span className="text-xs text-muted">
-            {aggregate === "avg" ? "average" : "total"}
-          </span>
-        </div>
-
-        <SeriesChart
-          data={pointsFor(t)}
-          color={t.color}
-          kind={kind}
-          title={t.name}
-          format={fmt}
-          tickFormat={
-            isTime ? shortTime : (v) => String(Math.round(v * 10) / 10)
-          }
-          goal={goalLineFor(t)}
-          goalLabel="goal"
-          domain={domain}
-          height={150}
-        />
-
-        <Facts
-          items={[
-            {
-              label: aggregate === "avg" ? "Best" : "Per active day",
-              value: fmt(aggregate === "avg" ? s.best : s.avgPerLoggedDay),
-            },
-            {
-              label: "Best day",
-              value: s.bestDate ? prettyDate(s.bestDate) : "—",
-            },
-            { label: "Days active", value: `${s.days}/${stats?.days}` },
-          ]}
-        />
-
-        {s.goal && <GoalBar met={s.goal.met} total={s.goal.total} />}
-      </section>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -700,7 +746,7 @@ export default function DashboardPage() {
               </p>
               <div className="stagger grid gap-4 md:grid-cols-2">
                 {durationTrackers.map((t) => (
-                  <TrackerCard key={t.id} t={t} />
+                  <TrackerCard key={t.id} t={t} stats={stats} compareTo={compareTo} />
                 ))}
               </div>
             </section>
@@ -721,7 +767,7 @@ export default function DashboardPage() {
                 return (
                   <div key={t.id} className="stagger grid gap-4 md:grid-cols-2">
                     <div>
-                      <TrackerCard t={t} />
+                      <TrackerCard t={t} stats={stats} compareTo={compareTo} />
                       {quality.n > 0 && (
                         <p className="mt-1 px-1 text-xs text-secondary">
                           Average quality{" "}
@@ -732,7 +778,7 @@ export default function DashboardPage() {
                         </p>
                       )}
                     </div>
-                    <SleepClockCard t={t} />
+                    <SleepClockCard t={t} stats={stats} compareTo={compareTo} />
                   </div>
                 );
               })}
@@ -750,7 +796,7 @@ export default function DashboardPage() {
                   </h3>
                   <div className="stagger grid gap-4 md:grid-cols-2">
                     {group.items.map((t) => (
-                      <TrackerCard key={t.id} t={t} />
+                      <TrackerCard key={t.id} t={t} stats={stats} compareTo={compareTo} />
                     ))}
                   </div>
                 </div>
