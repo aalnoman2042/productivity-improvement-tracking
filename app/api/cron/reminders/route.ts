@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { pushConfigured, sendToUser } from "@/lib/push";
-import { parseDateStr, prettyDate } from "@/lib/dates";
+import { addDays, parseDateStr, prettyDate } from "@/lib/dates";
 import { dayToLog } from "@/lib/reminders";
 import { buildDigest } from "@/lib/digest";
 import { REMINDER_JOB, recordRun } from "@/lib/cronLog";
@@ -117,18 +117,20 @@ async function runReminders() {
       }
     }
 
-    // --- The Sunday week-in-review ---------------------------------------
-    // When the day that just ended is a Sunday, the Mon–Sun week is over.
-    // Same idempotence as the nudge: the week is stamped only once a device
-    // has actually taken the push, so a retry can reach a phone that was
-    // offline the first time.
-    if (parseDateStr(date).getDay() === 0 && user.reminder?.lastDigestFor !== date) {
-      const digest = await buildDigest(d, user._id, date);
+    // --- The week-in-review ----------------------------------------------
+    // Covers the most recent completed Mon–Sun week. Normally that means
+    // Sunday night, but a phone that was off then still gets it on Monday
+    // or Tuesday — the week is stamped only once a device has actually
+    // taken the push. Past Tuesday the week is stale and quietly dropped.
+    const dow = parseDateStr(date).getDay(); // Sunday = 0
+    const weekEnd = dow === 0 ? date : addDays(date, -dow);
+    if (dow <= 2 && user.reminder?.lastDigestFor !== weekEnd) {
+      const digest = await buildDigest(d, user._id, weekEnd);
       if (digest) {
         const { sent } = await sendToUser(user._id, {
           ...digest,
-          url: "/dashboard",
-          tag: `pit-digest-${date}`,
+          url: "/status",
+          tag: `pit-digest-${weekEnd}`,
         });
         if (sent > 0) {
           digests++;
@@ -136,7 +138,7 @@ async function runReminders() {
             .collection("users")
             .updateOne(
               { _id: user._id },
-              { $set: { "reminder.lastDigestFor": date } }
+              { $set: { "reminder.lastDigestFor": weekEnd } }
             );
         }
       }

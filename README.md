@@ -100,7 +100,9 @@ charts is a weekly one — the most frequent thing shouldn't be the deepest.
   trackers a search box appears, matching on name, category or kind.
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
-  every tracker's numbers. Reached from the Account page.
+  every tracker's numbers. Reached from the Account page. **Share** renders
+  the summary to a PNG for the phone's share sheet — an image says nothing
+  to anyone the user didn't send it to.
 - **Account** (`/settings`) — a read on your last 30 days (see below), profile,
   password, the nightly reminder, and your data as a CSV or JSON download.
 
@@ -139,7 +141,11 @@ Sunday — *"Your week: 6/7 days logged · Sleep 7h 5m a night, bedtime 22 min
 earlier than last week · Namaz 4.1/5 — Fajr missed most."* Every line is a
 number read off what was logged (see [`lib/digest.ts`](./lib/digest.ts)); a
 week with nothing in it sends nothing. It's stamped per week the same way the
-nudge is stamped per day, so a retry can't send it twice.
+nudge is stamped per day, so a retry can't send it twice — and a phone that
+was off on Sunday still gets it on Monday or Tuesday, after which the week is
+stale and quietly dropped. Tapping it opens the Status page, and **Send my
+week in review** in the reminder settings shows you yours (last 7 days)
+without waiting for Sunday.
 
 ## Your data
 

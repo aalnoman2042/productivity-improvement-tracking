@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { toDateStr, type Period } from "@/lib/dates";
+import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
+import { prettyDate, toDateStr, type Period } from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
 import type { Stats, Summary } from "@/lib/stats";
 import { formatValue, typeMeta, type Tracker, type TrackerType } from "@/lib/trackers";
@@ -143,6 +144,25 @@ export default function StatusPage() {
   const goalsMet = goals.reduce((n, g) => n + g.met, 0);
   const goalsTotal = goals.reduce((n, g) => n + g.total, 0);
 
+  const shareData = useMemo<StatusShareData | null>(() => {
+    if (!stats || !stats.hasEntries) return null;
+    return {
+      rangeLabel: `Last ${stats.days} days`,
+      dateLabel: prettyDate(today),
+      daysLogged: stats.daysLogged,
+      days: stats.days,
+      streak: stats.streak,
+      goalsPct:
+        goalsTotal > 0 ? `${Math.round((goalsMet / goalsTotal) * 100)}%` : "—",
+      improve: toImprove.map((i) => ({
+        title: i.title,
+        level: i.level === "bad" ? ("bad" as const) : ("warn" as const),
+      })),
+      wins: wins.map((g) => `${g.tracker.name} — ${g.met}/${g.total}`),
+      fails: fails.map((g) => `${g.tracker.name} — ${g.met}/${g.total}`),
+    };
+  }, [stats, today, goalsMet, goalsTotal, toImprove, wins, fails]);
+
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <div>
@@ -153,8 +173,8 @@ export default function StatusPage() {
         </p>
       </div>
 
-      {/* Range picker */}
-      <div className="flex gap-1.5">
+      {/* Range picker, and the way to show someone */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {RANGES.map((r) => (
           <button
             key={r.value}
@@ -168,6 +188,7 @@ export default function StatusPage() {
             {r.label}
           </button>
         ))}
+        <ShareStatus data={shareData} />
       </div>
 
       {statsQ.loading && !stats ? (

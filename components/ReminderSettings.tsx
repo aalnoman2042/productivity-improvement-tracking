@@ -212,6 +212,22 @@ export default function ReminderSettings() {
     );
   }
 
+  async function sendDigest() {
+    setBusy(true);
+    setMsg(null);
+    const res = await fetch("/api/reminders/digest", { method: "POST" });
+    const data = await res.json().catch(() => null);
+    setBusy(false);
+    setMsg(
+      res.ok
+        ? {
+            kind: "ok",
+            text: "Sent — your last 7 days, as the Sunday push will look",
+          }
+        : { kind: "bad", text: data?.error ?? "Could not send" }
+    );
+  }
+
   const on = Boolean(status?.enabled && subscribed);
 
   return (
@@ -253,13 +269,22 @@ export default function ReminderSettings() {
               {busy ? "Working…" : on ? "Turn off on this device" : "Turn on reminders"}
             </button>
             {on && (
-              <button
-                onClick={sendTest}
-                disabled={busy}
-                className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
-              >
-                Send a test
-              </button>
+              <>
+                <button
+                  onClick={sendTest}
+                  disabled={busy}
+                  className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
+                >
+                  Send a test
+                </button>
+                <button
+                  onClick={sendDigest}
+                  disabled={busy}
+                  className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
+                >
+                  Send my week in review
+                </button>
+              </>
             )}
           </div>
 
