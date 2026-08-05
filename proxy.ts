@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession, COOKIE_NAME } from "@/lib/auth";
 
-const PUBLIC_PAGES = new Set(["/welcome", "/login", "/signup", "/forgot", "/reset"]);
+const PUBLIC_PAGES = new Set(["/login", "/signup", "/forgot", "/reset"]);
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -14,6 +14,13 @@ export default async function proxy(req: NextRequest) {
     const to = new URL("/", req.url);
     to.search = req.nextUrl.search;
     return NextResponse.redirect(to);
+  }
+
+  // The pitch used to live at /welcome and is now the home page itself. The
+  // old address forwards to the root, where signed-out visitors get the
+  // pitch (rewritten below) and signed-in ones get the log.
+  if (pathname === "/welcome") {
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
   // Signature and expiry only — the password-stamp check needs the database,
@@ -41,9 +48,10 @@ export default async function proxy(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     // The front door for strangers is the pitch, not a bare sign-in form —
-    // deep links (a day, the dashboard) still land on login and bounce back.
+    // served at the root itself, no redirect. Deep links (a day, the
+    // dashboard) still land on login and bounce back.
     if (pathname === "/") {
-      return NextResponse.redirect(new URL("/welcome", req.url));
+      return NextResponse.rewrite(new URL("/welcome", req.url));
     }
     return NextResponse.redirect(new URL("/login", req.url));
   }

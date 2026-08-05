@@ -5,9 +5,10 @@ import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
 
 /**
- * The front door for someone who isn't signed in. Signed-out visits to `/`
- * land here (see proxy.ts); signed-in ones go straight to the log — the
- * pitch is for people who don't have the habit yet.
+ * The front door for someone who isn't signed in — the home page itself.
+ * Signed-out visits to `/` are rewritten here (see proxy.ts), so the pitch
+ * shows at the root URL; signed-in ones get the log at the same address —
+ * the pitch is for people who don't have the habit yet.
  */
 
 export const metadata: Metadata = {
