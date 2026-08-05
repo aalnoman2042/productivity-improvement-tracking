@@ -24,11 +24,21 @@ function DownloadIcon() {
   );
 }
 
-/** The Share-sheet route, spelled out for the browsers that have no button. */
-function Steps() {
+/** The install route, spelled out for the browsers that have no prompt. */
+function Steps({ ios }: { ios: boolean }) {
+  if (ios) {
+    return (
+      <>
+        In Safari, tap <ShareIcon /> <strong>Share</strong>, then{" "}
+        <strong>Add to Home Screen</strong>.
+      </>
+    );
+  }
+  // Anything else without a prompt: the wording differs per browser, but the
+  // route is always the browser's own menu.
   return (
     <>
-      In Safari, tap <ShareIcon /> <strong>Share</strong>, then{" "}
+      Open your browser&apos;s menu and choose <strong>Install app</strong> or{" "}
       <strong>Add to Home Screen</strong>.
     </>
   );
@@ -44,8 +54,8 @@ function Steps() {
  * `variant="wide"` is the full-width one under the sign-in form, for the
  * common case of installing before there's even an account to log into.
  *
- * Renders nothing when already installed or when the browser can neither
- * prompt nor be talked through it.
+ * Renders for every browser that isn't already running installed: a real
+ * prompt where one exists, instructions everywhere else.
  */
 export default function InstallButton({
   variant = "nav",
@@ -75,7 +85,11 @@ export default function InstallButton({
     };
   }, [showHow, variant]);
 
-  if (installed || (!canPrompt && !needsManual)) return null;
+  // Only being installed hides the button. It used to also hide when the
+  // browser was neither Chrome-like (no prompt) nor detectably iOS — but a
+  // detection miss then meant no button at all on the one platform that
+  // needs the instructions most. Now detection only changes the wording.
+  if (installed) return null;
 
   const click = async () => {
     if (!canPrompt) {
@@ -105,7 +119,7 @@ export default function InstallButton({
           {canPrompt ? (
             <>Opens instantly from your home screen and works offline.</>
           ) : showHow ? (
-            <Steps />
+            <Steps ios={needsManual} />
           ) : (
             <>Add PIT to your home screen — tap for how.</>
           )}
@@ -131,7 +145,7 @@ export default function InstallButton({
         <div className="animate-fade-in absolute top-full right-0 z-30 mt-2 w-64 rounded-lg border border-edge card p-3 text-sm shadow-lg">
           <p className="font-medium">Add PIT to your Home Screen</p>
           <p className="mt-1 text-secondary">
-            <Steps />
+            <Steps ios={needsManual} />
           </p>
           <button
             onClick={() => setShowHow(false)}

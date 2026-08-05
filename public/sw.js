@@ -10,7 +10,7 @@
  * API calls are never cached here — the pages hold their own copy of the last
  * response and know when it's stale, which the service worker can't.
  */
-const CACHE = "pit-v4";
+const CACHE = "pit-v5";
 const OFFLINE_FALLBACK = "/";
 
 /** Hashed build output: the URL changes whenever the file does. */
