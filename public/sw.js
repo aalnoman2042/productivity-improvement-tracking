@@ -14,6 +14,13 @@
 const CACHE = "pit-v6";
 const OFFLINE_FALLBACK = "/";
 
+/**
+ * How long a navigation waits on the network before the cached copy steps
+ * in. Long enough for any healthy connection to answer; short enough that a
+ * connection that's up but going nowhere shows the app, not a white screen.
+ */
+const NAV_TIMEOUT_MS = 3500;
+
 /** Hashed build output: the URL changes whenever the file does. */
 const isImmutable = (url) => url.pathname.startsWith("/_next/static/");
 
@@ -66,15 +73,28 @@ self.addEventListener("fetch", (event) => {
 
   // Navigations are network-first: the right page for the current sign-in
   // state, every time. The cached copy — always the last page this device
-  // actually received — only steps in when the network can't answer.
+  // actually received — steps in when the network fails or dawdles past the
+  // timeout; either way the fetch keeps running so the cache stays fresh.
   if (request.mode === "navigate") {
+    const fromNet = fetchAndCache(request);
+    event.waitUntil(fromNet.catch(() => null));
     event.respondWith(
-      fetchAndCache(request).catch(async () => {
+      (async () => {
+        const winner = await Promise.race([
+          fromNet.catch(() => null),
+          new Promise((resolve) =>
+            setTimeout(() => resolve("timeout"), NAV_TIMEOUT_MS)
+          ),
+        ]);
+        if (winner && winner !== "timeout") return winner;
         const cached = await caches.match(request);
         if (cached) return cached;
-        const fallback = await caches.match(OFFLINE_FALLBACK);
-        return fallback || new Response("Offline", { status: 503 });
-      })
+        // Nothing cached to fall back on — give the network its full time.
+        return fromNet.catch(async () => {
+          const fallback = await caches.match(OFFLINE_FALLBACK);
+          return fallback || new Response("Offline", { status: 503 });
+        });
+      })()
     );
     return;
   }

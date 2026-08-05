@@ -107,6 +107,9 @@ export default function WelcomePage() {
             width={1080}
             height={1920}
             priority
+            // Drawn 16rem wide; without this the browser is told 100vw and a
+            // phone downloads a rendition four times larger than it shows.
+            sizes="16rem"
             className="h-auto w-full"
           />
         </div>
@@ -116,6 +119,7 @@ export default function WelcomePage() {
             alt="The stats page: time logged, goals met, and charts for study and sleep"
             width={1080}
             height={1920}
+            sizes="16rem"
             className="h-auto w-full"
           />
         </div>

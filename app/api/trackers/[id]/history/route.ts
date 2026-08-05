@@ -27,7 +27,10 @@ export async function GET(_req: Request, ctx: Ctx) {
     d.collection("trackers").findOne({ _id: trackerId, userId }),
     d
       .collection("entries")
-      .find({ userId, trackerId })
+      .find(
+        { userId, trackerId },
+        { projection: { date: 1, value: 1, note: 1, meta: 1, _id: 0 } }
+      )
       .sort({ date: 1 })
       .toArray(),
   ]);

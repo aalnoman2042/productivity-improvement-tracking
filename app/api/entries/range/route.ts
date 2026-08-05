@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     .collection("entries")
     .find(
       { userId, date: { $gte: range.from, $lte: range.to } },
-      { projection: { date: 1 } }
+      { projection: { date: 1, _id: 0 } }
     )
     .toArray();
 

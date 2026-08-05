@@ -16,7 +16,13 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const rows = await d.collection("entries").find({ userId, date }).toArray();
+  const rows = await d
+    .collection("entries")
+    .find(
+      { userId, date },
+      { projection: { trackerId: 1, value: 1, note: 1, meta: 1, _id: 0 } }
+    )
+    .toArray();
   return NextResponse.json(
     rows.map((r) => ({
       trackerId: String(r.trackerId),

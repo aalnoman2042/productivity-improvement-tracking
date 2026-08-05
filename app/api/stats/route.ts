@@ -184,7 +184,12 @@ export async function GET(req: Request) {
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     d
       .collection("entries")
-      .find({ userId, date: { $gte: prevStart, $lte: end } })
+      .find(
+        { userId, date: { $gte: prevStart, $lte: end } },
+        // Up to two years of rows on the year view — ship only the four
+        // fields the roll-ups read, not notes and timestamps.
+        { projection: { trackerId: 1, date: 1, value: 1, meta: 1, _id: 0 } }
+      )
       .toArray(),
     d.collection("entries").distinct("date", {
       userId,
