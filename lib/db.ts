@@ -61,6 +61,8 @@ const VALIDATORS: Record<string, object> = {
           tzOffset: { bsonType: "number", minimum: -840, maximum: 840 },
           // The last day-to-log we nagged about, so a re-run can't double-send.
           lastSentFor: { bsonType: ["string", "null"] },
+          // The Sunday whose week-in-review has been sent, same idea.
+          lastDigestFor: { bsonType: ["string", "null"] },
         },
       },
     },
@@ -178,6 +180,7 @@ const VALIDATORS: Record<string, object> = {
       notified: { bsonType: ["number", "null"] },
       alreadyLogged: { bsonType: ["number", "null"] },
       skipped: { bsonType: ["number", "null"] },
+      digests: { bsonType: ["number", "null"] },
       error: { bsonType: ["string", "null"] },
     },
   },

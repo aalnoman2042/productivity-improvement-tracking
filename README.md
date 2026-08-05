@@ -98,8 +98,11 @@ charts is a weekly one — the most frequent thing shouldn't be the deepest.
   ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
   a clean streak). Adding a pack twice skips what you already have. Past eight
   trackers a search box appears, matching on name, category or kind.
+- **Status** (`/status`) — where you stand over a week, two weeks or a month:
+  days logged, goals hit, what's falling short and what to fix first, then
+  every tracker's numbers. Reached from the Account page.
 - **Account** (`/settings`) — a read on your last 30 days (see below), profile,
-  password, and the nightly reminder.
+  password, the nightly reminder, and your data as a CSV or JSON download.
 
 `/today` still redirects to `/`, query string intact, so notifications sitting
 unread in a tray from before the move still land on the right day.
@@ -128,6 +131,24 @@ Screen first — iOS only delivers push to installed web apps.
 
 The schedule lives in `vercel.json` and fires once a day in UTC;
 [DEPLOY.md](./DEPLOY.md) explains how to set it to your local midnight.
+
+### The Sunday week in review
+
+The same nightly run also sends a digest when the day that just ended is a
+Sunday — *"Your week: 6/7 days logged · Sleep 7h 5m a night, bedtime 22 min
+earlier than last week · Namaz 4.1/5 — Fajr missed most."* Every line is a
+number read off what was logged (see [`lib/digest.ts`](./lib/digest.ts)); a
+week with nothing in it sends nothing. It's stamped per week the same way the
+nudge is stamped per day, so a retry can't send it twice.
+
+## Your data
+
+**Download CSV / Download JSON** on the Account page export everything you've
+logged — archived trackers and their history included. CSV is one row per
+entry with sleep times, prayers and streak status broken out into columns,
+made for Excel and Google Sheets. JSON is the full backup: trackers with
+their goals, entries with their meta, in a shape close enough to the database
+that nothing is lost in translation.
 
 ### Knowing it still runs
 

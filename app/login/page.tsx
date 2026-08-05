@@ -40,6 +40,10 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+      {/* The reason this app exists, said before the form asks anything. */}
+      <p className="animate-fade-in text-center text-sm font-semibold tracking-wide text-secondary">
+        Giving up is not in your blood.
+      </p>
       <form
         onSubmit={submit}
         className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md"

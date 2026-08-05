@@ -219,7 +219,9 @@ export default function ReminderSettings() {
       <h2 className="font-semibold">Nightly reminder</h2>
       <p className="mt-1 text-sm text-secondary">
         At midnight your time, PIT nudges you to fill in the day that just
-        ended — and stays quiet on days you&apos;ve already logged.
+        ended — and stays quiet on days you&apos;ve already logged. On Sunday
+        nights it also sends your week in review: days logged, sleep, namaz
+        and your streak.
       </p>
 
       {supported === null ? (

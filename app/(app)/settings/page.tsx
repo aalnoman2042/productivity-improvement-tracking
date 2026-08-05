@@ -140,6 +140,29 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* The one-tap answer to "how am I doing?" — kept above the forms
+          because it's the thing worth opening daily. */}
+      <Link
+        href="/status"
+        className="animate-rise-in flex items-center justify-between gap-3 rounded-lg border border-accent/40 card p-4 shadow-sm hover:bg-surface-2"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="text-xl" aria-hidden="true">
+            📊
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold">Your status</span>
+            <span className="block text-sm text-secondary">
+              Wins, misses and what to fix first — over a week, two weeks or a
+              month.
+            </span>
+          </span>
+        </span>
+        <span className="shrink-0 text-accent" aria-hidden="true">
+          →
+        </span>
+      </Link>
+
       {me === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : (
@@ -300,6 +323,29 @@ export default function SettingsPage() {
               {savingPw ? "Changing…" : "Change password"}
             </button>
           </form>
+
+          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+            <h2 className="font-semibold">Your data</h2>
+            <p className="mt-1 text-sm text-secondary">
+              Everything you&apos;ve logged, in a file that&apos;s yours to
+              keep. CSV opens in Excel or Google Sheets, one row per entry;
+              JSON is a complete backup of your trackers and history.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a
+                href="/api/export?format=csv"
+                className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+              >
+                Download CSV
+              </a>
+              <a
+                href="/api/export?format=json"
+                className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
+              >
+                Download JSON
+              </a>
+            </div>
+          </section>
 
           <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">Sign out</h2>

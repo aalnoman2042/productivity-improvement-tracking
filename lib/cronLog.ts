@@ -24,11 +24,13 @@ export type CronRun = {
   notified: number | null;
   alreadyLogged: number | null;
   skipped: number | null;
+  /** Sunday runs only: how many week-in-review pushes went out. */
+  digests: number | null;
   error: string | null;
 };
 
 export type RunCounts = Partial<
-  Pick<CronRun, "checked" | "notified" | "alreadyLogged" | "skipped">
+  Pick<CronRun, "checked" | "notified" | "alreadyLogged" | "skipped" | "digests">
 >;
 
 /**
@@ -53,6 +55,7 @@ export async function recordRun(
       notified: result.notified ?? null,
       alreadyLogged: result.alreadyLogged ?? null,
       skipped: result.skipped ?? null,
+      digests: result.digests ?? null,
       error: result.error ?? null,
     });
   } catch (err) {

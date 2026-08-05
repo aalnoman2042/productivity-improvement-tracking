@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { pushConfigured, sendToUser } from "@/lib/push";
-import { prettyDate } from "@/lib/dates";
+import { parseDateStr, prettyDate } from "@/lib/dates";
 import { dayToLog } from "@/lib/reminders";
+import { buildDigest } from "@/lib/digest";
 import { REMINDER_JOB, recordRun } from "@/lib/cronLog";
 
 // Nothing here may be prerendered or cached — it must read the database at
@@ -73,45 +74,74 @@ async function runReminders() {
   let notified = 0;
   let alreadyLogged = 0;
   let skipped = 0;
+  let digests = 0;
 
   for (const user of users) {
     const date = dayToLog(now, Number(user.reminder?.tzOffset ?? 0));
 
+    // --- The nightly nudge -----------------------------------------------
     if (user.reminder?.lastSentFor === date) {
       skipped++;
-      continue;
-    }
-
-    // No point nagging someone who already filled the day in.
-    const logged = await d
-      .collection("entries")
-      .countDocuments({ userId: user._id, date }, { limit: 1 });
-
-    if (logged > 0) {
-      alreadyLogged++;
     } else {
-      const { sent } = await sendToUser(user._id, {
-        title: "Log your day",
-        body: `${prettyDate(date)} is still empty — add your trackers.`,
-        url: `/?date=${date}`,
-        // One notification per day: a re-send replaces it rather than
-        // stacking a second one in the tray.
-        tag: `pit-reminder-${date}`,
-      });
-      if (sent > 0) {
-        notified++;
+      // No point nagging someone who already filled the day in.
+      const logged = await d
+        .collection("entries")
+        .countDocuments({ userId: user._id, date }, { limit: 1 });
+
+      let stamp = false;
+      if (logged > 0) {
+        alreadyLogged++;
+        stamp = true;
       } else {
-        // Reminders are on but no browser is subscribed — leave the day
-        // unstamped so a later run can still reach them.
-        skipped++;
-        continue;
+        const { sent } = await sendToUser(user._id, {
+          title: "Log your day",
+          body: `${prettyDate(date)} is still empty — add your trackers.`,
+          url: `/?date=${date}`,
+          // One notification per day: a re-send replaces it rather than
+          // stacking a second one in the tray.
+          tag: `pit-reminder-${date}`,
+        });
+        if (sent > 0) {
+          notified++;
+          stamp = true;
+        } else {
+          // Reminders are on but no browser is subscribed — leave the day
+          // unstamped so a later run can still reach them.
+          skipped++;
+        }
+      }
+      if (stamp) {
+        await d
+          .collection("users")
+          .updateOne({ _id: user._id }, { $set: { "reminder.lastSentFor": date } });
       }
     }
 
-    await d
-      .collection("users")
-      .updateOne({ _id: user._id }, { $set: { "reminder.lastSentFor": date } });
+    // --- The Sunday week-in-review ---------------------------------------
+    // When the day that just ended is a Sunday, the Mon–Sun week is over.
+    // Same idempotence as the nudge: the week is stamped only once a device
+    // has actually taken the push, so a retry can reach a phone that was
+    // offline the first time.
+    if (parseDateStr(date).getDay() === 0 && user.reminder?.lastDigestFor !== date) {
+      const digest = await buildDigest(d, user._id, date);
+      if (digest) {
+        const { sent } = await sendToUser(user._id, {
+          ...digest,
+          url: "/dashboard",
+          tag: `pit-digest-${date}`,
+        });
+        if (sent > 0) {
+          digests++;
+          await d
+            .collection("users")
+            .updateOne(
+              { _id: user._id },
+              { $set: { "reminder.lastDigestFor": date } }
+            );
+        }
+      }
+    }
   }
 
-  return { checked: users.length, notified, alreadyLogged, skipped };
+  return { checked: users.length, notified, alreadyLogged, skipped, digests };
 }
