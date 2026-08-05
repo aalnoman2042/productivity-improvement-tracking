@@ -327,6 +327,26 @@ export function cacheSet(key: string, value: unknown) {
   window.dispatchEvent(new Event(CACHE_EVENT));
 }
 
+/**
+ * Drop every cached read at once. For the moments the server's data changes
+ * out from under the cache wholesale — restoring a backup — where patching
+ * keys one by one would inevitably miss some.
+ */
+export function cacheClearAll() {
+  if (!isBrowser()) return;
+  try {
+    const doomed: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) doomed.push(k);
+    }
+    for (const k of doomed) localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(CACHE_EVENT));
+}
+
 export function cacheRemove(key: string) {
   if (!isBrowser()) return;
   try {

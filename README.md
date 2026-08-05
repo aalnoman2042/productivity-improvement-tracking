@@ -100,9 +100,9 @@ charts is a weekly one — the most frequent thing shouldn't be the deepest.
   trackers a search box appears, matching on name, category or kind.
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
-  every tracker's numbers. Reached from the Account page. **Share** renders
-  the summary to a PNG for the phone's share sheet — an image says nothing
-  to anyone the user didn't send it to.
+  every tracker's numbers. In the main nav, phone and desktop. **Share**
+  renders the summary to a PNG for the phone's share sheet — an image says
+  nothing to anyone the user didn't send it to.
 - **Tracker detail** (`/tracker/[id]`) — one habit's whole story: month-by-month
   totals, the last three months day by day, streak and milestone badges, and
   every note ever written on it, searchable. Tracker names link here from
@@ -159,6 +159,13 @@ entry with sleep times, prayers and streak status broken out into columns,
 made for Excel and Google Sheets. JSON is the full backup: trackers with
 their goals, entries with their meta, in a shape close enough to the database
 that nothing is lost in translation.
+
+**Import a backup** (same section) loads a JSON export back in. It's a merge,
+never a wipe: trackers are matched by name and type (created when there's no
+match), days in the file overwrite the same days here, and nothing not in the
+file is touched — so it works both as disaster recovery into an empty account
+and as filling gaps in a live one. Every imported row passes the same
+validation as a day typed by hand.
 
 ### Knowing it still runs
 

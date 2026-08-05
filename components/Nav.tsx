@@ -8,10 +8,13 @@ import SyncStatus from "@/components/SyncStatus";
 import ThemeToggle from "@/components/ThemeToggle";
 
 // Logging is a daily act and reading the charts is a weekly one, so the log
-// is what the app opens on — including from the Home Screen icon.
+// is what the app opens on — including from the Home Screen icon. Status
+// sits right after Stats: it's the "how am I doing?" answer, and burying it
+// two taps deep under Account was wasting it.
 const LINKS = [
   { href: "/", label: "Today" },
   { href: "/dashboard", label: "Stats" },
+  { href: "/status", label: "Status" },
   { href: "/history", label: "History" },
   { href: "/trackers", label: "Trackers" },
 ];
@@ -85,13 +88,14 @@ export default function Nav() {
         </div>
       </header>
 
-      {/* Bottom nav (mobile) */}
+      {/* Bottom nav (mobile) — five tabs now, so the type steps down a size
+          to keep the longest label on one line on a small phone. */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 flex border-t border-edge bg-surface/95 shadow-[0_-1px_3px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:hidden">
         {LINKS.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className={`flex-1 border-t-2 py-3 text-center text-sm font-medium ${
+            className={`min-w-0 flex-1 truncate border-t-2 px-0.5 py-3 text-center text-xs font-medium ${
               pathname === l.href
                 ? "border-accent text-accent"
                 : "border-transparent text-muted"

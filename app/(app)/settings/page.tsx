@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
+import ImportBackup from "@/components/ImportBackup";
 import PasswordInput from "@/components/PasswordInput";
 import ReminderSettings from "@/components/ReminderSettings";
 import { toDateStr } from "@/lib/dates";
@@ -337,6 +338,7 @@ export default function SettingsPage() {
                 Download JSON
               </a>
             </div>
+            <ImportBackup />
           </section>
 
           <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
