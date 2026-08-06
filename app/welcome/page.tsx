@@ -164,7 +164,15 @@ export default function WelcomePage() {
             </Link>
           </div>
           <p className="mt-8 text-xs text-muted">
-            PIT — Productivity Improvement Tracker · Built by Rohan
+            PIT — Productivity Improvement Tracker · Built by{" "}
+            <a
+              href="https://abdullah-al-noman.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-2 hover:underline"
+            >
+              Rohan
+            </a>
           </p>
         </div>
       </section>

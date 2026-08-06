@@ -280,7 +280,16 @@ export default function SettingsPage() {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-secondary">Built by</dt>
-                <dd className="font-medium">Rohan</dd>
+                <dd className="font-medium">
+                  <a
+                    href="https://abdullah-al-noman.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline-offset-2 hover:underline"
+                  >
+                    Rohan
+                  </a>
+                </dd>
               </div>
             </dl>
           </section>
