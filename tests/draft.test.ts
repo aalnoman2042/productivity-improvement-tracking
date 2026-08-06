@@ -1,5 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY, draftToEntry, isLogged, toDraft } from "../lib/draft";
+import {
+  DAY_MINUTES,
+  EMPTY,
+  dayTimeTotal,
+  draftToEntry,
+  isLogged,
+  toDraft,
+} from "../lib/draft";
+import type { Tracker } from "../lib/trackers";
+
+describe("dayTimeTotal", () => {
+  const t = (id: string, type: Tracker["type"]): Tracker => ({
+    id,
+    name: id,
+    type,
+    unit: "",
+    color: "#2a78d6",
+    category: "other",
+    goal: null,
+    archived: false,
+    order: 0,
+  });
+
+  it("adds time spent and sleep, ignoring everything else", () => {
+    const trackers = [t("work", "duration"), t("sleep", "sleep"), t("water", "count")];
+    const draft = {
+      work: { ...EMPTY, h: "10", m: "0" },
+      sleep: { ...EMPTY, start: "23:00", end: "07:00" }, // 8h
+      water: { ...EMPTY, num: "900" }, // not time — not counted
+    };
+    expect(dayTimeTotal(trackers, draft)).toBe(18 * 60);
+  });
+
+  it("a physically impossible day crosses DAY_MINUTES", () => {
+    const trackers = [t("work", "duration"), t("sleep", "sleep")];
+    const draft = {
+      work: { ...EMPTY, h: "18", m: "0" },
+      sleep: { ...EMPTY, start: "23:00", end: "07:00" },
+    };
+    expect(dayTimeTotal(trackers, draft)).toBeGreaterThan(DAY_MINUTES);
+  });
+});
 
 describe("draftToEntry", () => {
   it("turns hours and minutes into minutes", () => {

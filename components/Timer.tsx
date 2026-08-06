@@ -110,8 +110,11 @@ export default function Timer({
         minutes,
       });
       onSaved();
-    } catch {
-      /* the queue will retry */
+    } catch (err) {
+      // Network trouble queues itself and never lands here — this is the
+      // server refusing outright (e.g. the day is already at 24 hours),
+      // and losing the minutes silently would be worse than an ugly box.
+      if (err instanceof Error && err.message) window.alert(err.message);
     } finally {
       setBusy(false);
     }

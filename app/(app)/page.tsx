@@ -14,8 +14,10 @@ import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import { buildPrefills, type RecentEntry } from "@/lib/prefill";
 import {
+  DAY_MINUTES,
   EMPTY,
   buildDraft,
+  dayTimeTotal,
   draftToEntry,
   isLogged,
   type Draft,
@@ -159,6 +161,17 @@ export default function TodayPage() {
     if (!dirtyRef.current || savingRef.current) return;
     const { date: d, trackers: ts, draft: dr } = latest.current;
     if (ts.length === 0) return;
+
+    // A day only has 24 hours, strictly — refuse to send one that doesn't.
+    // The day stays dirty, so trimming a number saves it as usual.
+    const timeTotal = dayTimeTotal(ts, dr);
+    if (timeTotal > DAY_MINUTES) {
+      setState("error");
+      setError(
+        `A day only has 24 hours — this one adds up to ${formatValue(timeTotal, "duration", "min")} of time. Trim something and it'll save.`
+      );
+      return;
+    }
 
     const before = beforeRef.current;
     const changed = changedRef.current;
@@ -381,6 +394,13 @@ export default function TodayPage() {
         ),
     [trackers, draft]
   );
+
+  // Time spent plus sleep — the total that strictly can't pass 24 hours.
+  const dayTimeMinutes = useMemo(
+    () => dayTimeTotal(trackers, draft),
+    [trackers, draft]
+  );
+  const overDay = dayTimeMinutes > DAY_MINUTES;
 
   const doneInGroup = (items: Tracker[]) =>
     items.filter((t) => isLogged(t.type as TrackerType, draft[t.id] ?? EMPTY))
@@ -606,10 +626,19 @@ export default function TodayPage() {
           <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
             <span className="text-sm text-secondary">
               Time logged:{" "}
-              <strong className="tabular-nums">
+              <strong
+                className={`tabular-nums ${overDay ? "text-red-600" : ""}`}
+              >
                 {formatValue(dayTotalMinutes, "duration", "min")}
               </strong>
             </span>
+            {overDay && (
+              <span className="text-sm font-medium text-red-600">
+                ⚠ With sleep that&apos;s{" "}
+                {formatValue(dayTimeMinutes, "duration", "min")} — a day only
+                has 24 hours.
+              </span>
+            )}
             {statusLine && (
               <span className={`animate-fade-in text-sm font-medium ${statusLine.tone}`}>
                 {statusLine.text}

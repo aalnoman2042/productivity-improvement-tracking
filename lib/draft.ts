@@ -136,3 +136,25 @@ export function buildDraft(
 export function digits(raw: string, max: number): string {
   return raw.replace(/[^0-9]/g, "").slice(0, max);
 }
+
+/** Minutes in a day — the hard ceiling on a day's time log. */
+export const DAY_MINUTES = 24 * 60;
+
+/**
+ * The day's time-measured total: everything counted in minutes — time spent
+ * and sleep — added up. This is the number that strictly cannot pass 24
+ * hours; the server refuses a day that does, and the page refuses to send
+ * one.
+ */
+export function dayTimeTotal(
+  trackers: Tracker[],
+  draft: Record<string, Draft>
+): number {
+  return trackers
+    .filter((t) => t.type === "duration" || t.type === "sleep")
+    .reduce(
+      (s, t) =>
+        s + draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY).value,
+      0
+    );
+}

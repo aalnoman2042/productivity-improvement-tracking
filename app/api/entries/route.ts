@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { isValidDateStr } from "@/lib/dates";
+import { formatMinutes, isValidDateStr } from "@/lib/dates";
+import { DAY_MINUTES } from "@/lib/draft";
 import { parseMeta } from "@/lib/entryMeta";
 
 export async function GET(req: Request) {
@@ -93,6 +94,49 @@ export async function POST(req: Request) {
   }
 
   const d = await dbReady();
+
+  // A day only has 24 hours — strictly. Judge the day as it would stand
+  // after this save: incoming time values win over stored ones, and every
+  // minute-counted tracker (time spent and sleep) shares the same budget.
+  const timeDocs = await d
+    .collection("trackers")
+    .find(
+      { userId, type: { $in: ["duration", "sleep"] } },
+      { projection: { _id: 1 } }
+    )
+    .toArray();
+  const timeIds = new Set(timeDocs.map((t) => String(t._id)));
+  const incoming = new Map<string, number>();
+  for (const e of entries) {
+    if (timeIds.has(String(e.trackerId))) {
+      incoming.set(String(e.trackerId), Number(e.value));
+    }
+  }
+  if (incoming.size > 0) {
+    const stored = await d
+      .collection("entries")
+      .find(
+        { userId, date, trackerId: { $in: timeDocs.map((t) => t._id) } },
+        { projection: { trackerId: 1, value: 1 } }
+      )
+      .toArray();
+    const storedByTracker = new Map(
+      stored.map((r) => [String(r.trackerId), Number(r.value)])
+    );
+    let total = 0;
+    for (const id of timeIds) {
+      total += incoming.get(id) ?? storedByTracker.get(id) ?? 0;
+    }
+    if (total > DAY_MINUTES) {
+      return NextResponse.json(
+        {
+          error: `A day only has 24 hours — this would put ${date} at ${formatMinutes(total)} of logged time`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   if (ops.length > 0) await d.collection("entries").bulkWrite(ops);
   return NextResponse.json({ ok: true });
 }

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { isValidDateStr } from "@/lib/dates";
+import { formatMinutes, isValidDateStr } from "@/lib/dates";
+import { DAY_MINUTES } from "@/lib/draft";
 
 /**
  * Add minutes to a day's total — used when the stopwatch stops, so several
@@ -31,6 +32,40 @@ export async function POST(req: Request) {
   }
 
   const d = await db();
+
+  // The stopwatch's minutes land in the same 24-hour budget as everything
+  // else — check what the day would total before adding them.
+  const tracker = await d
+    .collection("trackers")
+    .findOne({ _id: new ObjectId(trackerId), userId }, { projection: { _id: 1 } });
+  if (!tracker) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const timeDocs = await d
+    .collection("trackers")
+    .find(
+      { userId, type: { $in: ["duration", "sleep"] } },
+      { projection: { _id: 1 } }
+    )
+    .toArray();
+  const rows = await d
+    .collection("entries")
+    .find(
+      { userId, date, trackerId: { $in: timeDocs.map((t) => t._id) } },
+      { projection: { value: 1 } }
+    )
+    .toArray();
+  const total =
+    rows.reduce((s, r) => s + Number(r.value), 0) + Math.round(minutes);
+  if (total > DAY_MINUTES) {
+    return NextResponse.json(
+      {
+        error: `A day only has 24 hours — that would put ${date} at ${formatMinutes(total)} of logged time`,
+      },
+      { status: 400 }
+    );
+  }
+
   const now = new Date();
   const res = await d.collection("entries").findOneAndUpdate(
     { userId, trackerId: new ObjectId(trackerId), date },
