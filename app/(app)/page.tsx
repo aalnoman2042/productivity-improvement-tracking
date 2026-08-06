@@ -21,7 +21,13 @@ import {
   type Draft,
   type Entry,
 } from "@/lib/draft";
-import { formatValue, type Tracker, type TrackerType } from "@/lib/trackers";
+import {
+  categoryMeta,
+  formatValue,
+  orderCategories,
+  type Tracker,
+  type TrackerType,
+} from "@/lib/trackers";
 
 type SaveState = "idle" | "saving" | "saved" | "queued" | "error";
 
@@ -330,16 +336,30 @@ export default function TodayPage() {
 
   /* ------------------------------- grouping ------------------------------ */
 
-  // Taps first, typing second — the split that makes the page short.
-  const { tapTrackers, typedTrackers } = useMemo(
-    () => ({
-      tapTrackers: trackers.filter((t) =>
-        TAP_TYPES.includes(t.type as TrackerType)
-      ),
-      typedTrackers: trackers.filter(
-        (t) => !TAP_TYPES.includes(t.type as TrackerType)
-      ),
-    }),
+  // One section per category, in the same order as the Trackers page, so the
+  // day reads the way the list was set up — Faith on top, then the rest.
+  // Inside a section the one-tap kinds still come first as a dense grid, and
+  // the rows that need a keyboard follow.
+  const groups = useMemo(
+    () =>
+      orderCategories(trackers.map((t) => t.category))
+        .map((value) => {
+          const items = trackers.filter(
+            (t) => t.category.toLowerCase() === value.toLowerCase()
+          );
+          return {
+            value,
+            ...categoryMeta(value),
+            items,
+            taps: items.filter((t) =>
+              TAP_TYPES.includes(t.type as TrackerType)
+            ),
+            typed: items.filter(
+              (t) => !TAP_TYPES.includes(t.type as TrackerType)
+            ),
+          };
+        })
+        .filter((g) => g.items.length > 0),
     [trackers]
   );
 
@@ -499,76 +519,66 @@ export default function TodayPage() {
             )}
           </div>
 
-          {/* Taps first: most of the day settled in a few seconds. */}
-          {tapTrackers.length > 0 && (
-            <section>
+          {/* One section per category. Taps still come first inside each,
+              so most of a section is settled in a few seconds. */}
+          {groups.map((group) => (
+            <section key={group.value}>
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
-                <span>⚡ Quick taps</span>
+                <span>
+                  {group.icon} {group.label}
+                </span>
                 <span
                   className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
-                    doneInGroup(tapTrackers) === tapTrackers.length
+                    doneInGroup(group.items) === group.items.length
                       ? "bg-green-700/10 text-green-700 dark:text-green-500"
                       : "bg-surface-2 text-muted"
                   }`}
                 >
-                  {doneInGroup(tapTrackers)}/{tapTrackers.length}
+                  {doneInGroup(group.items)}/{group.items.length}
                 </span>
               </div>
-              <TapGrid
-                trackers={tapTrackers}
-                draft={draft}
-                set={set}
-                date={date}
-              />
-            </section>
-          )}
-
-          {/* Then the few that need a keyboard — each with the usual answer
-              one tap away. */}
-          {typedTrackers.length > 0 && (
-            <section>
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
-                <span>⏱ Time &amp; numbers</span>
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
-                    doneInGroup(typedTrackers) === typedTrackers.length
-                      ? "bg-green-700/10 text-green-700 dark:text-green-500"
-                      : "bg-surface-2 text-muted"
-                  }`}
-                >
-                  {doneInGroup(typedTrackers)}/{typedTrackers.length}
-                </span>
+              <div className="space-y-2">
+                {group.taps.length > 0 && (
+                  <TapGrid
+                    trackers={group.taps}
+                    draft={draft}
+                    set={set}
+                    date={date}
+                  />
+                )}
+                {group.typed.length > 0 && (
+                  <ul className="stagger space-y-2">
+                    {group.typed.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
+                      >
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full"
+                          style={{ backgroundColor: seriesColor(t.color) }}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {t.name}
+                        </span>
+                        {/* Inputs sit beside the name on a wide screen and
+                            drop to their own full-width row on a phone. */}
+                        <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
+                          <TrackerInput
+                            tracker={t}
+                            draft={draft[t.id]}
+                            set={set}
+                            date={date}
+                            onTimerSaved={afterTimer}
+                            prefill={prefills[t.id]}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <ul className="stagger space-y-2">
-                {typedTrackers.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
-                  >
-                    <span
-                      className="h-4 w-4 shrink-0 rounded-full"
-                      style={{ backgroundColor: seriesColor(t.color) }}
-                    />
-                    <span className="min-w-0 flex-1 truncate font-medium">
-                      {t.name}
-                    </span>
-                    {/* Inputs sit beside the name on a wide screen and drop
-                        to their own full-width row on a phone. */}
-                    <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
-                      <TrackerInput
-                        tracker={t}
-                        draft={draft[t.id]}
-                        set={set}
-                        date={date}
-                        onTimerSaved={afterTimer}
-                        prefill={prefills[t.id]}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
             </section>
-          )}
+          ))}
 
           {/* Sits above the save bar so it's the first thing under your thumb
               in the seconds after a save you didn't mean. */}

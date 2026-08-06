@@ -135,6 +135,24 @@ const VALIDATORS: Record<string, object> = {
       updatedAt: { bsonType: "date" },
     },
   },
+  // "This tracker, every day, for N days." A challenge owns no entries —
+  // it just watches a tracker over a date window, so deleting one costs
+  // nothing but the challenge itself.
+  challenges: {
+    bsonType: "object",
+    required: ["userId", "name", "trackerId", "startDate", "days", "direction", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      name: { bsonType: "string", maxLength: 60 },
+      trackerId: { bsonType: "objectId" },
+      startDate: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      days: { bsonType: "number", minimum: 1, maximum: 365 },
+      // The daily bar for numeric trackers; null means "just log it".
+      target: { bsonType: ["number", "null"], minimum: 0 },
+      direction: { enum: ["min", "max"] },
+      createdAt: { bsonType: "date" },
+    },
+  },
   // One row per browser that agreed to receive reminders — a phone and a
   // laptop are separate rows, so both get the nudge.
   pushSubs: {
@@ -211,6 +229,7 @@ async function ensureSchema(d: Db): Promise<void> {
       .collection("entries")
       .createIndex({ userId: 1, trackerId: 1, date: 1 }, { unique: true }),
     d.collection("entries").createIndex({ userId: 1, date: 1 }),
+    d.collection("challenges").createIndex({ userId: 1, createdAt: -1 }),
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
     d.collection("pushSubs").createIndex({ userId: 1 }),

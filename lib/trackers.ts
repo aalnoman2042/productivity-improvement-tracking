@@ -107,6 +107,7 @@ export const CATEGORIES: { value: Category; label: string; icon: string }[] = [
   { value: "discipline", label: "Discipline", icon: "🛡️" },
   { value: "food", label: "Food", icon: "🍽️" },
   { value: "health", label: "Health", icon: "❤️" },
+  { value: "challenge", label: "Challenge", icon: "🏆" },
   { value: "other", label: "Other", icon: "⭐" },
 ];
 
