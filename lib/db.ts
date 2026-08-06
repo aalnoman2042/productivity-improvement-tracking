@@ -100,6 +100,9 @@ const VALIDATORS: Record<string, object> = {
           direction: { enum: ["min", "max"] },
         },
       },
+      // Good habits are built up, bad ones cut down — growth on a bad one
+      // reads as falling behind. Absent on old rows, which read as "good".
+      habit: { enum: ["good", "bad", null] },
       archived: { bsonType: "bool" },
       order: { bsonType: "number" },
       createdAt: { bsonType: "date" },

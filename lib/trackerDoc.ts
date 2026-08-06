@@ -1,5 +1,5 @@
 import type { Document, WithId } from "mongodb";
-import type { Goal } from "./trackers";
+import type { Goal, Habit } from "./trackers";
 
 /**
  * Converting a stored tracker to the shape the client sees, and validating a
@@ -19,9 +19,16 @@ export function toTracker(doc: WithId<Document>) {
     color: doc.color as string,
     category: doc.category as string,
     goal: (doc.goal ?? null) as Goal,
+    // Trackers from before the field read as "good" — how they always behaved.
+    habit: (doc.habit === "bad" ? "bad" : "good") as Habit,
     archived: Boolean(doc.archived),
     order: Number(doc.order ?? 0),
   };
+}
+
+/** Validate an incoming habit flag; anything unclear is "good". */
+export function parseHabit(raw: unknown): Habit {
+  return raw === "bad" ? "bad" : "good";
 }
 
 /** Validate an incoming goal object; returns null for "no goal". */

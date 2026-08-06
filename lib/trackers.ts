@@ -17,6 +17,14 @@ export type Goal = {
   direction: "min" | "max";
 } | null;
 
+/**
+ * Which way the numbers count. "good" is a habit being built (study, water —
+ * more is winning); "bad" is one being cut (junk food, smoking — growth means
+ * falling behind, and Status says so). Older trackers without the field read
+ * as "good", which is exactly how they behaved before it existed.
+ */
+export type Habit = "good" | "bad";
+
 export type Tracker = {
   id: string;
   name: string;
@@ -25,6 +33,7 @@ export type Tracker = {
   color: string;
   category: Category;
   goal: Goal;
+  habit?: Habit;
   archived: boolean;
   order: number;
 };
@@ -167,6 +176,7 @@ export type Template = {
   category: Category;
   color: string;
   goal: Goal;
+  habit?: Habit;
 };
 
 /** Ready-made trackers, added a whole pack at a time from the Trackers page. */
@@ -228,6 +238,7 @@ export const TEMPLATE_PACKS: {
         category: "food",
         color: "#e34948",
         goal: { target: 2, period: "week", direction: "max" },
+        habit: "bad",
       },
       {
         name: "Diet quality",

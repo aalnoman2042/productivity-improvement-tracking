@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
-import { parseGoal } from "@/lib/trackerDoc";
+import { parseGoal, parseHabit } from "@/lib/trackerDoc";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -32,6 +32,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (typeof body.archived === "boolean") set.archived = body.archived;
   if ("goal" in body) set.goal = parseGoal(body.goal);
+  if ("habit" in body) set.habit = parseHabit(body.habit);
 
   if (Object.keys(set).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

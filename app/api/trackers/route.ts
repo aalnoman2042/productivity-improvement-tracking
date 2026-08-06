@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { toTracker, parseGoal } from "@/lib/trackerDoc";
+import { toTracker, parseGoal, parseHabit } from "@/lib/trackerDoc";
 import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
 
 export async function GET() {
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
         color: t.color,
         category: t.category,
         goal: t.goal,
+        habit: t.habit ?? "good",
         archived: false,
         order: mine.length + i,
         createdAt: new Date(),
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
     color,
     category,
     goal: parseGoal(body?.goal),
+    habit: parseHabit(body?.habit),
     archived: false,
     order,
     createdAt: new Date(),

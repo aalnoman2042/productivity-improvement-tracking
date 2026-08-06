@@ -2,9 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import ReportCard from "@/components/ReportCard";
 import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
+import { buildAdvice } from "@/lib/advice";
 import { prettyDate, toDateStr, type Period } from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
+import { BUNDLED } from "@/lib/motivation";
+import { reportLines, type ReportCard as Report } from "@/lib/report";
 import type { Stats, Summary } from "@/lib/stats";
 import { formatValue, typeMeta, type Tracker, type TrackerType } from "@/lib/trackers";
 import { useCached } from "@/lib/useCached";
@@ -134,6 +138,31 @@ export default function StatusPage() {
   );
   const stats = statsQ.data;
 
+  // The all-time report card feeds two things here: the card at the bottom,
+  // and the line at the top — fetched once, shared by both.
+  const reportQ = useCached<Report>(`/api/report?today=${today}`, "report");
+  const report = reportQ.data;
+
+  // One motivation line at the top — from your own record when there is
+  // one, from the shared quote pool until then. "Random" here is a hash of
+  // the date and the record rather than Math.random(): rendering stays
+  // pure, the line holds still all day, and tomorrow brings a different one.
+  const motivation = useMemo(() => {
+    if (!report) return null;
+    const personal = reportLines(report);
+    const pool =
+      personal.length > 0
+        ? personal
+        : BUNDLED.map((l) => (l.author ? `${l.text} — ${l.author}` : l.text));
+    if (pool.length === 0) return null;
+    let h = report.totalEntries;
+    for (const ch of today) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return pool[h % pool.length];
+  }, [report, today]);
+
+  // The three biggest wins available right now, as instructions.
+  const advice = useMemo(() => buildAdvice(stats).slice(0, 3), [stats]);
+
   const insights = useMemo(() => buildInsights(stats), [stats]);
   const toImprove = insights.filter((i) => i.level !== "good");
   const goingWell = insights.filter((i) => i.level === "good");
@@ -176,6 +205,13 @@ export default function StatusPage() {
           .
         </p>
       </div>
+
+      {/* A word on the way in — your own numbers when there are any. */}
+      {report && motivation && (
+        <p className="animate-fade-in rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm font-medium">
+          ✨ {motivation}
+        </p>
+      )}
 
       {/* Range picker, and the way to show someone */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -233,6 +269,40 @@ export default function StatusPage() {
               hint={goalsTotal > 0 ? `${goalsMet} of ${goalsTotal}` : "no goals set"}
             />
           </div>
+
+          {/* The advice — not what's happening, but what to do about it,
+              biggest win first. Quiet when there's nothing to fix. */}
+          {advice.length > 0 && (
+            <section className="rounded-lg border border-accent/40 card p-4 shadow-sm">
+              <h2 className="font-semibold">🎯 Focus first</h2>
+              <p className="mt-1 text-sm text-secondary">
+                The biggest wins available right now, in order.
+              </p>
+              <ol className="mt-3 space-y-4">
+                {advice.map((a, i) => (
+                  <li key={a.focus} className="flex gap-3">
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        a.level === "bad"
+                          ? "bg-red-600/10 text-red-600"
+                          : "bg-accent/10 text-accent"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{a.focus}</p>
+                      <p className="mt-0.5 text-sm text-secondary">{a.why}</p>
+                      <p className="mt-1 text-sm text-secondary">
+                        <span className="font-medium text-accent">Fix: </span>
+                        {a.how}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
           {/* What to fix first — the point of the page, so it leads. */}
           <section className="rounded-lg border border-edge card p-4 shadow-sm">
@@ -358,6 +428,10 @@ export default function StatusPage() {
           </section>
         </>
       )}
+
+      {/* The ranges above answer "how is this week going?" — this one is the
+          whole account graded, so it sits outside the range picker. */}
+      <ReportCard report={report} />
     </div>
   );
 }

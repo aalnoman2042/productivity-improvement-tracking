@@ -19,7 +19,7 @@ const hours = (minutes: number) => formatValue(minutes, "duration", "min");
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Sleep is the one that quietly drags everything else down. */
-function sleepInsight(s: Summary): Insight | null {
+function sleepInsight(t: Tracker, s: Summary): Insight | null {
   if (s.days === 0) return null;
   const avg = s.avgPerLoggedDay;
   const nights = `${s.days} night${s.days === 1 ? "" : "s"}`;
@@ -35,6 +35,22 @@ function sleepInsight(s: Summary): Insight | null {
       level: "warn",
       title: `Sleep is a little short at ${hours(avg)}`,
       detail: `Across ${nights}. Another 30–60 minutes a night would put you in the healthy range.`,
+    };
+  }
+  // Sleep has a ceiling too: well past your own goal (or past 9h with no
+  // goal set) isn't "healthy, keep it there" — it's usually a late bedtime
+  // stealing the morning.
+  const target =
+    t.goal && t.goal.period === "day" && t.goal.direction === "min"
+      ? t.goal.target
+      : 540;
+  if (avg - target >= 60) {
+    return {
+      level: "warn",
+      title: `Sleep is overshooting — ${hours(avg)} a night`,
+      detail: `${
+        t.goal ? `Your goal is ${hours(target)}` : "A full night tops out near 9h"
+      } and you're ${hours(avg - target)} past it, across ${nights}. Long sleep is usually a bedtime problem wearing a morning disguise.`,
     };
   }
   return {
@@ -231,7 +247,7 @@ export function buildInsights(stats: Stats | null): Insight[] {
     // The type-specific readings say more than a goal percentage would, so
     // where one applies it speaks for that tracker instead of the goal rule.
     if (type === "sleep") {
-      const i = sleepInsight(s);
+      const i = sleepInsight(t, s);
       if (i) out.push(i);
       // How long and how late are separate problems with separate fixes.
       const bed = bedtimeInsight(s);

@@ -19,6 +19,7 @@ import {
   typeMeta,
   type Category,
   type Goal,
+  type Habit,
   type Tracker,
   type TrackerType,
 } from "@/lib/trackers";
@@ -41,6 +42,7 @@ type Form = {
   category: Category;
   unit: string;
   color: string;
+  habit: Habit;
   goalOn: boolean;
   goalTarget: string;
   goalPeriod: "day" | "week";
@@ -53,6 +55,7 @@ const BLANK: Form = {
   category: "study",
   unit: "min",
   color: SERIES_PALETTE[0].light,
+  habit: "good",
   goalOn: false,
   goalTarget: "",
   goalPeriod: "day",
@@ -140,6 +143,7 @@ export default function TrackersPage() {
       category: t.category as Category,
       unit: t.unit,
       color: t.color,
+      habit: t.habit ?? "good",
       ...goalToForm(t),
     } as Form);
     setEditingId(t.id);
@@ -159,6 +163,7 @@ export default function TrackersPage() {
       category: form.category,
       unit: form.unit,
       color: form.color,
+      habit: form.habit,
       goal: goalFromForm(form),
     };
     const res = await fetch(
@@ -499,6 +504,47 @@ export default function TrackersPage() {
               />
             </div>
           </div>
+
+          {/* Streaks are avoidance by definition and prayers are plainly
+              good, so neither needs to be asked. */}
+          {form.type !== "streak" && form.type !== "prayer" && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Which way does it count?
+              </label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setF("habit", "good")}
+                  className={`rounded-md border p-2.5 text-left ${
+                    form.habit === "good"
+                      ? "border-green-700 bg-green-700/5"
+                      : "border-edge hover:bg-surface-2"
+                  }`}
+                >
+                  <div className="text-sm font-medium">🌱 Good habit</div>
+                  <div className="mt-0.5 text-xs text-muted">
+                    Building it up — more is the win. Study, workout, water.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setF("habit", "bad")}
+                  className={`rounded-md border p-2.5 text-left ${
+                    form.habit === "bad"
+                      ? "border-red-600 bg-red-600/5"
+                      : "border-edge hover:bg-surface-2"
+                  }`}
+                >
+                  <div className="text-sm font-medium">🚫 Bad habit</div>
+                  <div className="mt-0.5 text-xs text-muted">
+                    Cutting it down — less is the win. If it grows, Status
+                    will call it out.
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium">Color</label>
