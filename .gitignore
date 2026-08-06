@@ -44,3 +44,6 @@ next-env.d.ts
 
 # agent-facing project brief, local only
 *.secret.md
+
+# local Claude Code config (hooks reference the secret brief)
+.claude/
