@@ -80,6 +80,10 @@ export default function LifeNow() {
               ? `The coach's read of your data${stored.today ? `, as of ${prettyDate(stored.today)}` : ""}.`
               : "An honest AI read of your whole record — what's working, what's slipping, what to fix first."}
           </p>
+          <p className="mt-1 text-xs text-muted">
+            We use a personal AI model to monitor your lifestyle — it only ever
+            sees your numbers and tracker names, never your notes.
+          </p>
         </div>
         <button
           onClick={analyze}
