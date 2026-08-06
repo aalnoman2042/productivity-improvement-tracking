@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import LifeNow from "@/components/LifeNow";
 import ReportCard from "@/components/ReportCard";
 import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
 import { buildAdvice } from "@/lib/advice";
@@ -9,6 +10,7 @@ import { prettyDate, toDateStr, type Period } from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
 import { BUNDLED } from "@/lib/motivation";
 import { reportLines, type ReportCard as Report } from "@/lib/report";
+import { scoresFromStats } from "@/lib/score";
 import type { Stats, Summary } from "@/lib/stats";
 import { formatValue, typeMeta, type Tracker, type TrackerType } from "@/lib/trackers";
 import { useCached } from "@/lib/useCached";
@@ -167,6 +169,21 @@ export default function StatusPage() {
   const toImprove = insights.filter((i) => i.level !== "good");
   const goingWell = insights.filter((i) => i.level === "good");
 
+  // One number per day: today's, the range's average, and its best.
+  const dayScores = useMemo(() => {
+    const all = stats ? scoresFromStats(stats) : [];
+    const scored = all.filter((s): s is { date: string; score: number } => s.score !== null);
+    const last = all.length > 0 ? all[all.length - 1].score : null;
+    return {
+      today: last,
+      avg:
+        scored.length > 0
+          ? Math.round(scored.reduce((s, x) => s + x.score, 0) / scored.length)
+          : null,
+      best: scored.length > 0 ? Math.max(...scored.map((s) => s.score)) : null,
+    };
+  }, [stats]);
+
   const goals = useMemo(() => (stats ? goalRows(stats) : []), [stats]);
   const wins = goals.filter((g) => g.rate >= 0.6);
   const fails = goals.filter((g) => g.rate < 0.6);
@@ -213,6 +230,9 @@ export default function StatusPage() {
         </p>
       )}
 
+      {/* The coach reads everything, so it sits above the range picker. */}
+      <LifeNow />
+
       {/* Range picker, and the way to show someone */}
       <div className="flex flex-wrap items-center gap-1.5">
         {RANGES.map((r) => (
@@ -248,7 +268,16 @@ export default function StatusPage() {
       ) : (
         <>
           {/* The headline numbers */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Tile
+              label="Day score"
+              value={dayScores.today !== null ? String(dayScores.today) : "—"}
+              hint={
+                dayScores.avg !== null
+                  ? `avg ${dayScores.avg} · best ${dayScores.best}`
+                  : "today, out of 100"
+              }
+            />
             <Tile
               label="Days logged"
               value={`${stats.daysLogged}/${stats.days}`}

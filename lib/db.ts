@@ -156,6 +156,20 @@ const VALIDATORS: Record<string, object> = {
       createdAt: { bsonType: "date" },
     },
   },
+  // "Life right now" analyses written by the AI coach — one row per run,
+  // newest is what the Status page shows. Text only; the numbers it was
+  // built from live in the entries themselves.
+  aiReviews: {
+    bsonType: "object",
+    required: ["userId", "text", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      text: { bsonType: "string", maxLength: 10000 },
+      today: { bsonType: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      model: { bsonType: ["string", "null"] },
+      createdAt: { bsonType: "date" },
+    },
+  },
   // One row per browser that agreed to receive reminders — a phone and a
   // laptop are separate rows, so both get the nudge.
   pushSubs: {
@@ -233,6 +247,7 @@ async function ensureSchema(d: Db): Promise<void> {
       .createIndex({ userId: 1, trackerId: 1, date: 1 }, { unique: true }),
     d.collection("entries").createIndex({ userId: 1, date: 1 }),
     d.collection("challenges").createIndex({ userId: 1, createdAt: -1 }),
+    d.collection("aiReviews").createIndex({ userId: 1, createdAt: -1 }),
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
     d.collection("pushSubs").createIndex({ userId: 1 }),

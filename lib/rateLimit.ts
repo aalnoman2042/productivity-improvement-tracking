@@ -30,6 +30,9 @@ export const RULES = {
   forgotEmail: { limit: 3, windowMs: 60 * 60_000 },
   reset: { limit: 10, windowMs: 60 * 60_000 },
   password: { limit: 10, windowMs: 15 * 60_000 },
+  // The AI analysis calls a free external API — the cap protects its quota,
+  // not the login box. Counted per user, not per address.
+  coach: { limit: 10, windowMs: 60 * 60_000 },
 } satisfies Record<string, Rule>;
 
 export type Action = keyof typeof RULES;
