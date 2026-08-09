@@ -33,7 +33,10 @@ export default function SignupPage() {
         body: JSON.stringify(form),
       });
       if (res.ok) {
-        router.replace("/trackers");
+        // Straight into the tour, which hands over to Trackers at the end or
+        // the moment it's skipped. A brand-new account has nothing to show,
+        // so an unexplained empty list is a worse first screen than this.
+        router.replace("/start");
         router.refresh();
       } else {
         const data = await res.json().catch(() => null);

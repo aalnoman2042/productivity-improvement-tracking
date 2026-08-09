@@ -292,6 +292,16 @@ export default function SettingsPage() {
                 </dd>
               </div>
             </dl>
+
+            {/* The signup tour, on demand — it's the only explanation of how
+                the pieces fit together, and it shouldn't be a one-time thing
+                you had to read while impatient to get started. */}
+            <Link
+              href="/start"
+              className="mt-4 inline-flex rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            >
+              How PIT works
+            </Link>
           </section>
 
           <Footer className="pb-2" />
