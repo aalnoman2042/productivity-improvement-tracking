@@ -245,8 +245,10 @@ export default function ReminderSettings() {
       <h2 className="font-semibold">Nightly reminder</h2>
       <p className="mt-1 text-sm text-secondary">
         Every night at 11, PIT asks how your day went — so you can put it on
-        record while it&apos;s still fresh. On Sunday nights it also sends your
-        week in review: days logged, sleep, namaz and your streak.
+        record while it&apos;s still fresh. When something is riding on the
+        day it says so instead: a challenge on its last day, a milestone you
+        just crossed, a logging run about to break. On Sunday nights it also
+        sends your week in review: days logged, sleep, namaz and your streak.
       </p>
 
       {supported === null ? (

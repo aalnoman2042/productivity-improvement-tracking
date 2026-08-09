@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { type Db, type ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { pushConfigured, sendToUser } from "@/lib/push";
-import { addDays, parseDateStr, prettyDate } from "@/lib/dates";
+import { addDays, parseDateStr } from "@/lib/dates";
 import { dayToLog } from "@/lib/reminders";
 import { buildDigest } from "@/lib/digest";
+import { challengeProgress } from "@/lib/challenges";
+import { streakInfo } from "@/lib/streak";
+import { loggingRun, nightlyMessage, type StakeInput } from "@/lib/stakes";
 import { REMINDER_JOB, recordRun } from "@/lib/cronLog";
 
 // Nothing here may be prerendered or cached — it must read the database at
@@ -62,6 +66,108 @@ export async function GET(req: Request) {
   }
 }
 
+/**
+ * What is actually at stake for one person tonight.
+ *
+ * Three small reads, handed straight to `nightlyMessage` — nothing here
+ * decides anything, it only fetches. The entry window reaches back far enough
+ * for the logging run *and* to the start of the longest challenge still
+ * running, because a 60-day challenge has to be judged over all 60.
+ */
+async function gatherStake(
+  d: Db,
+  userId: ObjectId,
+  date: string
+): Promise<StakeInput> {
+  const [trackerDocs, challengeDocs] = await Promise.all([
+    d
+      .collection("trackers")
+      .find({ userId }, { projection: { name: 1, type: 1 } })
+      .toArray(),
+    d.collection("challenges").find({ userId }).toArray(),
+  ]);
+
+  let since = addDays(date, -34);
+  for (const c of challengeDocs) {
+    const start = String(c.startDate);
+    if (start < since) since = start;
+  }
+
+  const streakIds = trackerDocs.filter((t) => t.type === "streak").map((t) => t._id);
+
+  const [windowRows, streakRows] = await Promise.all([
+    d
+      .collection("entries")
+      .find(
+        { userId, date: { $gte: since, $lte: date } },
+        { projection: { trackerId: 1, date: 1, value: 1, _id: 0 } }
+      )
+      .toArray(),
+    // A clean streak is measured from its last slip, and that can be any date
+    // at all — so these come whole rather than windowed. One row per day.
+    streakIds.length > 0
+      ? d
+          .collection("entries")
+          .find(
+            { userId, trackerId: { $in: streakIds }, date: { $lte: date } },
+            { projection: { trackerId: 1, date: 1, value: 1, _id: 0 } }
+          )
+          .toArray()
+      : Promise.resolve([]),
+  ]);
+
+  const loggedDates = new Set(windowRows.map((e) => String(e.date)));
+
+  const streaks = trackerDocs
+    .filter((t) => t.type === "streak")
+    .map((t) => {
+      const rows = streakRows.filter(
+        (e) => String(e.trackerId) === String(t._id)
+      );
+      const dates = rows.map((e) => String(e.date)).sort();
+      const info = streakInfo(
+        dates[0] ?? null,
+        rows.filter((e) => Number(e.value) <= 0).map((e) => String(e.date)),
+        date
+      );
+      return { name: String(t.name), current: info.current };
+    });
+
+  const challenges = challengeDocs.map((c) => {
+    const values: Record<string, number> = {};
+    for (const e of windowRows) {
+      if (String(e.trackerId) === String(c.trackerId)) {
+        values[String(e.date)] = Number(e.value);
+      }
+    }
+    const p = challengeProgress(
+      {
+        startDate: String(c.startDate),
+        days: Number(c.days),
+        target: c.target == null ? null : Number(c.target),
+        direction: c.direction === "max" ? "max" : "min",
+        values,
+      },
+      date
+    );
+    return {
+      name: String(c.name),
+      status: p.status,
+      dayNumber: p.dayNumber,
+      days: Number(c.days),
+      todayMet: p.todayMet,
+    };
+  });
+
+  return {
+    date,
+    loggedToday: loggedDates.has(date),
+    loggingStreak: loggingRun(loggedDates, date),
+    streaks,
+    challenges,
+  };
+}
+
 /** The run itself, lifted out so the wrapper above can log whatever it does. */
 async function runReminders() {
   const now = new Date();
@@ -74,26 +180,32 @@ async function runReminders() {
   let notified = 0;
   let skipped = 0;
   let digests = 0;
+  // How many of tonight's asks had something specific to say.
+  let stakes = 0;
 
   for (const user of users) {
     const date = dayToLog(now, Number(user.reminder?.tzOffset ?? 0));
 
     // --- The nightly ask ---------------------------------------------------
     // Goes out every night, logged or not — the 11 PM ask is the closing
-    // ritual of the day, not just a nag about an empty one.
+    // ritual of the day, not just a nag about an empty one. What it *says*
+    // depends on the night: a milestone crossed, a challenge on its last day,
+    // a logging run about to break, or the ordinary question.
     if (user.reminder?.lastSentFor === date) {
       skipped++;
     } else {
+      const stake = nightlyMessage(await gatherStake(d, user._id, date));
       const { sent } = await sendToUser(user._id, {
-        title: "The day is finished — how was it?",
-        body: `Tell me about ${prettyDate(date)}, so I can track your life better.`,
-        url: `/?date=${date}`,
+        title: stake.title,
+        body: stake.body,
+        url: stake.url,
         // One notification per day: a re-send replaces it rather than
         // stacking a second one in the tray.
         tag: `pit-reminder-${date}`,
       });
       if (sent > 0) {
         notified++;
+        if (stake.kind !== "plain") stakes++;
         await d
           .collection("users")
           .updateOne({ _id: user._id }, { $set: { "reminder.lastSentFor": date } });
@@ -132,5 +244,5 @@ async function runReminders() {
     }
   }
 
-  return { checked: users.length, notified, skipped, digests };
+  return { checked: users.length, notified, stakes, skipped, digests };
 }

@@ -22,7 +22,8 @@ export type CronRun = {
   tookMs: number | null;
   checked: number | null;
   notified: number | null;
-  alreadyLogged: number | null;
+  /** Asks that had something specific to say — a milestone, a challenge, a run. */
+  stakes: number | null;
   skipped: number | null;
   /** Sunday runs only: how many week-in-review pushes went out. */
   digests: number | null;
@@ -30,7 +31,7 @@ export type CronRun = {
 };
 
 export type RunCounts = Partial<
-  Pick<CronRun, "checked" | "notified" | "alreadyLogged" | "skipped" | "digests">
+  Pick<CronRun, "checked" | "notified" | "stakes" | "skipped" | "digests">
 >;
 
 /**
@@ -53,7 +54,7 @@ export async function recordRun(
       tookMs: finishedAt.getTime() - startedAt.getTime(),
       checked: result.checked ?? null,
       notified: result.notified ?? null,
-      alreadyLogged: result.alreadyLogged ?? null,
+      stakes: result.stakes ?? null,
       skipped: result.skipped ?? null,
       digests: result.digests ?? null,
       error: result.error ?? null,

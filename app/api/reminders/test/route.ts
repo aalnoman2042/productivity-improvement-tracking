@@ -35,7 +35,7 @@ export async function POST() {
   const today = localDateStr(new Date(), Number(user?.reminder?.tzOffset ?? 0));
   const { sent } = await sendToUser(userId, {
     title: "PIT reminder — this is a test",
-    body: `The real one arrives at midnight. Tap to log ${prettyDate(today)}.`,
+    body: `The real one arrives at 11 PM. Tap to log ${prettyDate(today)}.`,
     url: `/?date=${today}`,
     tag: "pit-test",
   });

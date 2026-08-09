@@ -218,7 +218,7 @@ const VALIDATORS: Record<string, object> = {
       tookMs: { bsonType: ["number", "null"] },
       checked: { bsonType: ["number", "null"] },
       notified: { bsonType: ["number", "null"] },
-      alreadyLogged: { bsonType: ["number", "null"] },
+      stakes: { bsonType: ["number", "null"] },
       skipped: { bsonType: ["number", "null"] },
       digests: { bsonType: ["number", "null"] },
       error: { bsonType: ["string", "null"] },
