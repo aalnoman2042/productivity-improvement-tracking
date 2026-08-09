@@ -89,7 +89,7 @@ export default function InstallPrompt({
           <button
             onClick={install}
             disabled={busy}
-            className="mt-3 rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+            className="mt-3 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
           >
             {busy ? "Installing…" : "Install PIT"}
           </button>
@@ -99,7 +99,7 @@ export default function InstallPrompt({
   }
 
   return (
-    <div className="hide-installed animate-rise-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-accent/40 card p-3 shadow-sm">
+    <div className="hide-installed animate-rise-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-accent/40 card p-3 shadow-sm">
       <span className="text-lg" aria-hidden="true">
         📲
       </span>
@@ -116,7 +116,7 @@ export default function InstallPrompt({
         <button
           onClick={install}
           disabled={busy}
-          className="shrink-0 rounded-md bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+          className="shrink-0 rounded-lg bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
         >
           {busy ? "Installing…" : "Install"}
         </button>

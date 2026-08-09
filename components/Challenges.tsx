@@ -169,7 +169,7 @@ export default function Challenges({
         </p>
         <button
           onClick={openForm}
-          className="mt-3 rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+          className="mt-3 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
         >
           Take a challenge
         </button>
@@ -194,7 +194,7 @@ export default function Challenges({
       {showForm && (
         <form
           onSubmit={submit}
-          className="animate-rise-in space-y-4 rounded-lg border border-edge card p-4 shadow-sm"
+          className="animate-rise-in space-y-4 rounded-xl border border-edge card p-4 shadow-sm"
         >
           <div>
             <label className="mb-1 block text-sm font-medium">
@@ -323,7 +323,7 @@ export default function Challenges({
             <button
               type="submit"
               disabled={busy || !form.name.trim() || !daysOk}
-              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {busy ? "Taking it…" : "Take the challenge"}
             </button>
@@ -351,7 +351,7 @@ export default function Challenges({
             return (
               <li
                 key={c.id}
-                className="rounded-lg border border-edge card p-3 shadow-sm sm:p-4"
+                className="rounded-xl border border-edge card p-3 shadow-sm sm:p-4"
               >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="min-w-0 flex-1 truncate font-medium">

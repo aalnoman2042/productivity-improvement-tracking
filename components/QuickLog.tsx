@@ -183,7 +183,7 @@ export default function QuickLog({
         </button>
         <button
           onClick={atEnd ? onClose : next}
-          className="flex-1 rounded-md bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
+          className="flex-1 rounded-lg bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
         >
           {atEnd ? "Finish" : filled ? "Next →" : "Skip →"}
         </button>

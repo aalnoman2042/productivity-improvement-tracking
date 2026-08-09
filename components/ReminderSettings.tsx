@@ -241,7 +241,7 @@ export default function ReminderSettings() {
   const on = Boolean(status?.enabled && subscribed);
 
   return (
-    <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+    <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
       <h2 className="font-semibold">Nightly reminder</h2>
       <p className="mt-1 text-sm text-secondary">
         Every night at 11, PIT asks how your day went — so you can put it on
@@ -272,7 +272,7 @@ export default function ReminderSettings() {
               className={
                 on
                   ? "rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
-                  : "rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+                  : "rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
               }
             >
               {busy ? "Working…" : on ? "Turn off on this device" : "Turn on reminders"}

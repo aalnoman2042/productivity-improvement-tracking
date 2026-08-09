@@ -40,7 +40,7 @@ const monthShort = (m: string) => {
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-edge card p-3 shadow-sm">
+    <div className="rounded-xl border border-edge card p-3 shadow-sm">
       <p className="text-xs text-secondary">{label}</p>
       <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
@@ -210,7 +210,7 @@ export default function TrackerDetailPage() {
 
   if (!tracker) {
     return (
-      <p className="mx-auto max-w-xl rounded-lg border border-edge card p-4 text-sm text-muted">
+      <p className="mx-auto max-w-xl rounded-xl border border-edge card p-4 text-sm text-muted">
         This tracker doesn&apos;t exist (or isn&apos;t yours).{" "}
         <Link href="/trackers" className="font-medium text-accent underline">
           Back to trackers
@@ -312,7 +312,7 @@ export default function TrackerDetailPage() {
       </div>
 
       {/* The long arc, month by month */}
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <section className="rounded-xl border border-edge card p-4 shadow-sm">
         <h2 className="font-semibold">Month by month</h2>
         <p className="mt-1 text-sm text-secondary">
           {aggregate === "sum" ? "Total" : "Average"} per month, up to the last
@@ -346,7 +346,7 @@ export default function TrackerDetailPage() {
       </section>
 
       {/* The last three months, day by day */}
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <section className="rounded-xl border border-edge card p-4 shadow-sm">
         <h2 className="font-semibold">Day by day</h2>
         <p className="mt-1 text-sm text-secondary">
           {tracker.goal?.period === "day"
@@ -367,7 +367,7 @@ export default function TrackerDetailPage() {
       </section>
 
       {/* Every note, findable again */}
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <section className="rounded-xl border border-edge card p-4 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold">Notes</h2>
           <span className="text-xs text-muted">

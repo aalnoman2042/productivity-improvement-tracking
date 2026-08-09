@@ -51,7 +51,7 @@ function ResetForm() {
         </p>
         <Link
           href="/forgot"
-          className="mt-5 block rounded-md bg-brand-gradient py-2.5 text-center font-medium text-white hover:brightness-110"
+          className="mt-5 block rounded-lg bg-brand-gradient py-2.5 text-center font-medium text-white hover:brightness-110"
         >
           Request a new link
         </Link>
@@ -84,7 +84,7 @@ function ResetForm() {
       <button
         type="submit"
         disabled={busy}
-        className="mt-5 w-full rounded-md bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+        className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
       >
         {busy ? "Saving…" : "Set new password"}
       </button>
@@ -95,7 +95,7 @@ function ResetForm() {
 export default function ResetPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
-      <div className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md">
+      <div className="animate-rise-in w-full max-w-sm rounded-xl border border-edge card p-8 shadow-md">
         <div className="mb-3 flex justify-center">
           <Logo size={52} />
         </div>

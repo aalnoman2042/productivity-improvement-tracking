@@ -86,7 +86,7 @@ function goalRows(stats: Stats): GoalRow[] {
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-edge card p-3 shadow-sm">
+    <div className="rounded-xl border border-edge card p-3 shadow-sm">
       <p className="text-xs text-secondary">{label}</p>
       <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
@@ -258,7 +258,7 @@ export default function StatusPage() {
           <div className="skeleton h-40 rounded-lg" />
         </div>
       ) : !stats || !stats.hasEntries ? (
-        <p className="rounded-lg border border-edge card p-4 text-sm text-muted">
+        <p className="rounded-xl border border-edge card p-4 text-sm text-muted">
           Nothing logged in this range yet.{" "}
           <Link href="/" className="font-medium text-accent underline">
             Log a few days
@@ -302,7 +302,7 @@ export default function StatusPage() {
           {/* The advice — not what's happening, but what to do about it,
               biggest win first. Quiet when there's nothing to fix. */}
           {advice.length > 0 && (
-            <section className="rounded-lg border border-accent/40 card p-4 shadow-sm">
+            <section className="rounded-xl border border-accent/40 card p-4 shadow-sm">
               <h2 className="font-semibold">🎯 Focus first</h2>
               <p className="mt-1 text-sm text-secondary">
                 The biggest wins available right now, in order.
@@ -334,7 +334,7 @@ export default function StatusPage() {
           )}
 
           {/* What to fix first — the point of the page, so it leads. */}
-          <section className="rounded-lg border border-edge card p-4 shadow-sm">
+          <section className="rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">Key points to improve</h2>
             {toImprove.length === 0 ? (
               <p className="mt-2 text-sm text-muted">
@@ -366,7 +366,7 @@ export default function StatusPage() {
 
           {/* Goals, split by verdict */}
           {fails.length > 0 && (
-            <section className="rounded-lg border border-edge card p-4 shadow-sm">
+            <section className="rounded-xl border border-edge card p-4 shadow-sm">
               <h2 className="font-semibold text-red-600">Falling short</h2>
               <p className="mt-1 text-sm text-secondary">
                 Goals hit less than 60% of the time in this range.
@@ -376,7 +376,7 @@ export default function StatusPage() {
           )}
 
           {wins.length > 0 && (
-            <section className="rounded-lg border border-edge card p-4 shadow-sm">
+            <section className="rounded-xl border border-edge card p-4 shadow-sm">
               <h2 className="font-semibold text-green-700 dark:text-green-500">
                 Holding up
               </h2>
@@ -388,7 +388,7 @@ export default function StatusPage() {
           )}
 
           {goingWell.length > 0 && (
-            <section className="rounded-lg border border-edge card p-4 shadow-sm">
+            <section className="rounded-xl border border-edge card p-4 shadow-sm">
               <h2 className="font-semibold">Going well</h2>
               <ul className="mt-3 space-y-2">
                 {goingWell.map((insight, i) => (
@@ -414,7 +414,7 @@ export default function StatusPage() {
           )}
 
           {/* Every number, for the trackers without goals too */}
-          <section className="rounded-lg border border-edge card p-4 shadow-sm">
+          <section className="rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">The numbers</h2>
             <ul className="mt-3 divide-y divide-edge text-sm">
               {stats.trackers

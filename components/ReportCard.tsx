@@ -58,7 +58,7 @@ export default function ReportCard({ report }: { report: Report | null }) {
   const showedUp = Math.round((report.daysLogged / report.spanDays) * 100);
 
   return (
-    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+    <section className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold">🎓 Report card</h2>

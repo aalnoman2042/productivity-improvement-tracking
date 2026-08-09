@@ -142,7 +142,7 @@ export default function InstallButton({
       </button>
 
       {showHow && (
-        <div className="animate-fade-in absolute top-full right-0 z-30 mt-2 w-64 rounded-lg border border-edge card p-3 text-sm shadow-lg">
+        <div className="animate-fade-in absolute top-full right-0 z-30 mt-2 w-64 rounded-xl border border-edge card p-3 text-sm shadow-lg">
           <p className="font-medium">Add PIT to your Home Screen</p>
           <p className="mt-1 text-secondary">
             <Steps ios={needsManual} />

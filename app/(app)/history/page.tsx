@@ -120,7 +120,7 @@ function Legend() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg border border-edge card p-3 shadow-sm">
+    <div className="rounded-xl border border-edge card p-3 shadow-sm">
       <div className="text-xl font-bold tabular-nums">{value}</div>
       <div className="mt-0.5 text-xs text-muted">{label}</div>
     </div>
@@ -204,7 +204,7 @@ export default function HistoryPage() {
         </div>
       ) : (
         <>
-          <section className="rounded-lg border border-edge card p-3 shadow-sm sm:p-4">
+          <section className="rounded-xl border border-edge card p-3 shadow-sm sm:p-4">
             <div className="mb-2 grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted">
               {WEEKDAY_INITIALS.map((d, i) => (
                 <span key={i}>{d}</span>
@@ -258,7 +258,7 @@ export default function HistoryPage() {
           {/* What you wrote this month, readable again instead of buried in
               the days it was typed on. */}
           {inPast.some((d) => (d.notes?.length ?? 0) > 0) && (
-            <section className="rounded-lg border border-edge card p-4 shadow-sm">
+            <section className="rounded-xl border border-edge card p-4 shadow-sm">
               <h2 className="font-semibold">
                 📝 Notes this month
               </h2>

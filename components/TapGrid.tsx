@@ -30,7 +30,7 @@ export default function TapGrid({
   set: (id: string, patch: Partial<Draft>) => void;
   date: string;
 }) {
-  const card = "rounded-lg border card p-3 shadow-sm transition-colors";
+  const card = "rounded-xl border card p-3 shadow-sm transition-colors";
   const name = (t: Tracker) => (
     <span className="flex min-w-0 items-center gap-2">
       <span

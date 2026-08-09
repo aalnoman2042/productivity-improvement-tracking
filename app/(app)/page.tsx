@@ -494,7 +494,7 @@ export default function TodayPage() {
       ) : (
         <>
           {/* How much of the day is filled in */}
-          <div className="rounded-lg border border-edge card p-3 shadow-sm">
+          <div className="rounded-xl border border-edge card p-3 shadow-sm">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="text-sm font-medium">
                 <span className="tabular-nums">{loggedCount}</span> of{" "}
@@ -571,7 +571,7 @@ export default function TodayPage() {
                     {group.typed.map((t) => (
                       <li
                         key={t.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm"
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-edge card p-3 shadow-sm"
                       >
                         <span
                           className="h-4 w-4 shrink-0 rounded-full"
@@ -603,7 +603,7 @@ export default function TodayPage() {
           {/* Sits above the save bar so it's the first thing under your thumb
               in the seconds after a save you didn't mean. */}
           {undo && undo.date === date && (
-            <div className="animate-rise-in sticky bottom-36 z-10 flex items-center gap-3 rounded-lg border border-amber-600/40 card p-3 shadow-md sm:bottom-20">
+            <div className="animate-rise-in sticky bottom-36 z-10 flex items-center gap-3 rounded-xl border border-amber-600/40 card p-3 shadow-md sm:bottom-20">
               <span className="min-w-0 flex-1 text-sm text-secondary">
                 Saved. Changed something by mistake?
               </span>
@@ -623,7 +623,7 @@ export default function TodayPage() {
             </div>
           )}
 
-          <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-md sm:bottom-4">
+          <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-edge card p-3 shadow-md sm:bottom-4">
             <span className="text-sm text-secondary">
               Time logged:{" "}
               <strong
@@ -651,7 +651,7 @@ export default function TodayPage() {
                 void saveNow();
               }}
               disabled={state === "saving"}
-              className="ml-auto rounded-md bg-brand-gradient px-6 py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="ml-auto rounded-lg bg-brand-gradient px-6 py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {state === "saving" ? "Saving…" : "Save now"}
             </button>

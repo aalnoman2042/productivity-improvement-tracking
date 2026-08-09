@@ -47,7 +47,7 @@ export default function LoginPage() {
       </p>
       <form
         onSubmit={submit}
-        className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md"
+        className="animate-rise-in w-full max-w-sm rounded-xl border border-edge card p-8 shadow-md"
       >
         <div className="mb-3 flex justify-center">
           <Logo size={52} />
@@ -88,7 +88,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-5 w-full rounded-md bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+          className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>

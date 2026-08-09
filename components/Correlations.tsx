@@ -82,7 +82,7 @@ export default function Correlations() {
           return (
             <li
               key={i}
-              className="flex gap-3 overflow-hidden rounded-lg border border-edge card shadow-sm"
+              className="flex gap-3 overflow-hidden rounded-xl border border-edge card shadow-sm"
             >
               <span className={`w-1 shrink-0 ${tone.bar}`} aria-hidden="true" />
               <div className="min-w-0 flex-1 py-3 pr-3">

@@ -131,7 +131,7 @@ export default function DeleteDays({
   }
 
   return (
-    <section className="animate-rise-in rounded-lg border border-red-600/40 card p-4 shadow-sm">
+    <section className="animate-rise-in rounded-xl border border-red-600/40 card p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-red-600">Delete logged days</h2>

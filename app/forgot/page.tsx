@@ -33,7 +33,7 @@ export default function ForgotPage() {
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
-      <div className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md">
+      <div className="animate-rise-in w-full max-w-sm rounded-xl border border-edge card p-8 shadow-md">
         <div className="mb-3 flex justify-center">
           <Logo size={52} />
         </div>
@@ -57,7 +57,7 @@ export default function ForgotPage() {
             </p>
             <Link
               href="/login"
-              className="mt-5 block rounded-md bg-brand-gradient py-2.5 text-center font-medium text-white hover:brightness-110"
+              className="mt-5 block rounded-lg bg-brand-gradient py-2.5 text-center font-medium text-white hover:brightness-110"
             >
               Back to sign in
             </Link>
@@ -80,7 +80,7 @@ export default function ForgotPage() {
             <button
               type="submit"
               disabled={busy}
-              className="mt-5 w-full rounded-md bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {busy ? "Sending…" : "Send reset link"}
             </button>

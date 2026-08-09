@@ -53,7 +53,7 @@ export default function SignupPage() {
     <main className="flex flex-1 items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="animate-rise-in w-full max-w-sm rounded-lg border border-edge card p-8 shadow-md"
+        className="animate-rise-in w-full max-w-sm rounded-xl border border-edge card p-8 shadow-md"
       >
         <div className="mb-3 flex justify-center">
           <Logo size={52} />
@@ -108,7 +108,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-5 w-full rounded-md bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
+          className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 font-medium text-white hover:brightness-110 disabled:opacity-40"
         >
           {busy ? "Creating…" : "Create account"}
         </button>
@@ -118,6 +118,19 @@ export default function SignupPage() {
           <Link href="/login" className="font-medium text-accent underline">
             Sign in
           </Link>
+        </p>
+
+        {/* The invite field says "ask the owner" — this is how you reach him. */}
+        <p className="mt-3 border-t border-edge pt-3 text-center text-xs text-muted">
+          Don&apos;t have an invite code?{" "}
+          <a
+            href="https://abdullah-al-noman.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-accent underline underline-offset-2"
+          >
+            Contact the owner
+          </a>
         </p>
       </form>
     </main>

@@ -109,7 +109,7 @@ export default function SettingsPage() {
           a doorway here as well as the one at the top of Status. */}
       <Link
         href="/history"
-        className="animate-rise-in flex items-center justify-between gap-3 rounded-lg border border-edge card p-4 shadow-sm hover:bg-surface-2"
+        className="animate-rise-in flex items-center justify-between gap-3 rounded-xl border border-edge card p-4 shadow-sm hover:bg-surface-2"
       >
         <span className="flex min-w-0 items-center gap-3">
           <span className="text-xl" aria-hidden="true">
@@ -133,7 +133,7 @@ export default function SettingsPage() {
         <>
           <form
             onSubmit={saveProfile}
-            className="animate-rise-in space-y-4 rounded-lg border border-edge card p-4 shadow-sm"
+            className="animate-rise-in space-y-4 rounded-xl border border-edge card p-4 shadow-sm"
           >
             <h2 className="font-semibold">Profile</h2>
             <div>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={savingProfile || name === me.name}
-              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {savingProfile ? "Saving…" : "Save profile"}
             </button>
@@ -177,7 +177,7 @@ export default function SettingsPage() {
 
           <form
             onSubmit={changePassword}
-            className="animate-rise-in space-y-4 rounded-lg border border-edge card p-4 shadow-sm"
+            className="animate-rise-in space-y-4 rounded-xl border border-edge card p-4 shadow-sm"
           >
             <h2 className="font-semibold">Change password</h2>
             <div>
@@ -215,13 +215,13 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={savingPw || !current || !next}
-              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {savingPw ? "Changing…" : "Change password"}
             </button>
           </form>
 
-          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+          <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">Your data</h2>
             <p className="mt-1 text-sm text-secondary">
               Everything you&apos;ve logged, in a file that&apos;s yours to
@@ -231,7 +231,7 @@ export default function SettingsPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <a
                 href="/api/export?format=csv"
-                className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+                className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
               >
                 Download CSV
               </a>
@@ -245,7 +245,7 @@ export default function SettingsPage() {
             <ImportBackup />
           </section>
 
-          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+          <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">Sign out</h2>
             <p className="mt-1 mb-4 text-sm text-secondary">
               You&apos;ll need your email and password to get back in. Anything
@@ -265,7 +265,7 @@ export default function SettingsPage() {
             </button>
           </section>
 
-          <section className="animate-rise-in rounded-lg border border-edge card p-4 shadow-sm">
+          <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">About</h2>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between gap-4">

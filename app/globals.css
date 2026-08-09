@@ -210,6 +210,72 @@ input {
     transform 120ms ease;
 }
 
+/* =====================================================================
+   Focus, for the keyboard only.
+
+   Fields tint their own border on focus, but buttons, links and tabs had
+   nothing at all — tab through the app and you couldn't tell where you
+   were. `:focus-visible` is the whole trick: the ring appears for keyboard
+   and assistive navigation and stays away from mouse and touch presses,
+   which is why it can be this loud without ever being in the way.
+
+   Deliberately *not* `[tabindex]`: the quick-log panel is a focusable div
+   that gets focused programmatically to catch key presses, and a ring drawn
+   around the whole overlay would be noise, not guidance.
+   ===================================================================== */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Fields keep their border tint and take a softer ring beside it, so the
+   two focus signals read as one thing rather than fighting. */
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+/* =====================================================================
+   Scrollbars — themed, and thin enough to stop being furniture. Firefox
+   takes the standard properties; everything else takes the WebKit ones.
+   The thumb is drawn inside a transparent border so it reads as a floating
+   pill instead of a full-height gutter.
+   ===================================================================== */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--chart-axis) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--chart-axis);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+}
+@media (hover: hover) {
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-muted);
+    background-clip: content-box;
+    border: 3px solid transparent;
+  }
+}
+
 button:active:not(:disabled) {
   transform: scale(0.97);
 }

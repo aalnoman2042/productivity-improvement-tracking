@@ -361,7 +361,7 @@ export default function TrackersPage() {
             </button>
             <button
               onClick={openAdd}
-              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
             >
               + New tracker
             </button>
@@ -378,7 +378,7 @@ export default function TrackersPage() {
           {TEMPLATE_PACKS.map((pack) => (
             <section
               key={pack.id}
-              className="rounded-lg border border-edge card p-4 shadow-sm"
+              className="rounded-xl border border-edge card p-4 shadow-sm"
             >
               <h2 className="font-semibold">{pack.label}</h2>
               <p className="mt-1 text-sm text-secondary">{pack.hint}</p>
@@ -399,7 +399,7 @@ export default function TrackersPage() {
               <button
                 onClick={() => addPack(pack.id)}
                 disabled={busy}
-                className="mt-4 rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+                className="mt-4 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
               >
                 {busy ? "Adding…" : `Add ${pack.label.toLowerCase()}`}
               </button>
@@ -414,7 +414,7 @@ export default function TrackersPage() {
       {showForm && (
         <form
           onSubmit={submit}
-          className="space-y-4 rounded-lg border border-edge card p-4 shadow-sm"
+          className="space-y-4 rounded-xl border border-edge card p-4 shadow-sm"
         >
           <div>
             <label className="mb-1 block text-sm font-medium">Name</label>
@@ -622,7 +622,7 @@ export default function TrackersPage() {
             <button
               type="submit"
               disabled={busy || !form.name.trim()}
-              className="rounded-md bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               {editingId ? "Save changes" : "Add tracker"}
             </button>
@@ -708,7 +708,7 @@ export default function TrackersPage() {
                 key={pack.id}
                 onClick={() => addPack(pack.id)}
                 disabled={busy}
-                className="rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+                className="rounded-lg bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
               >
                 {busy ? "Adding…" : `Add ${pack.label.toLowerCase()}`}
               </button>
@@ -726,7 +726,7 @@ export default function TrackersPage() {
                 {group.items.map((t) => (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-edge card p-3 shadow-sm sm:p-4"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-edge card p-3 shadow-sm sm:p-4"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"
@@ -780,7 +780,7 @@ export default function TrackersPage() {
                 {archived.map((t) => (
                   <li
                     key={t.id}
-                    className="flex items-center gap-3 rounded-lg border border-edge card p-4 opacity-60 shadow-sm"
+                    className="flex items-center gap-3 rounded-xl border border-edge card p-4 opacity-60 shadow-sm"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded-full"
@@ -878,7 +878,7 @@ function DeleteDialog({
         if (e.target === e.currentTarget && !busy) onCancel();
       }}
     >
-      <div className="animate-rise-in w-full max-w-md rounded-lg border border-red-600/40 card p-5 shadow-lg">
+      <div className="animate-rise-in w-full max-w-md rounded-xl border border-red-600/40 card p-5 shadow-lg">
         <h2 className="text-lg font-semibold text-red-600">
           Delete “{usage.name}”?
         </h2>

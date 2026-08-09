@@ -89,7 +89,7 @@ function StatTile({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-edge card p-4 shadow-sm">
+    <div className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="text-2xl font-bold">{value}</div>
       <div className="mt-0.5 text-xs text-muted">{label}</div>
       {footer && <div className="mt-1">{footer}</div>}
@@ -205,7 +205,7 @@ const SleepClockCard = memo(function SleepClockCard({
   const earlier = clock && clock.prevBed != null && clock.bed < clock.prevBed;
 
   return (
-    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+    <section className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
           className="h-3 w-3 shrink-0 rounded-full"
@@ -288,7 +288,7 @@ const StreakCard = memo(function StreakCard({
   const run = s.streak;
   const days = run?.current ?? 0;
   return (
-    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+    <section className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
           className="h-3 w-3 shrink-0 rounded-full"
@@ -363,7 +363,7 @@ const TrackerCard = memo(function TrackerCard({
 
   if (!s || s.days === 0) {
     return (
-      <section className="rounded-lg border border-edge card p-4 shadow-sm">
+      <section className="rounded-xl border border-edge card p-4 shadow-sm">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <span
             className="h-3 w-3 rounded-full"
@@ -391,7 +391,7 @@ const TrackerCard = memo(function TrackerCard({
     type === "scale" ? [0, 5] : type === "prayer" ? [0, 5] : undefined;
 
   return (
-    <section className="rounded-lg border border-edge card p-4 shadow-sm">
+    <section className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
           className="h-3 w-3 shrink-0 rounded-full"
@@ -584,7 +584,7 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-        <div className="flex flex-wrap gap-1 rounded-lg border border-edge card p-1 shadow-sm">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-edge card p-1 shadow-sm">
           {PERIODS.map((p) => (
             <button
               key={p.value}
@@ -634,7 +634,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/trackers"
-            className="mt-5 inline-block rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110"
+            className="mt-5 inline-block rounded-lg bg-brand-gradient px-5 py-2.5 text-sm font-medium text-white hover:brightness-110"
           >
             Set up trackers
           </Link>
@@ -712,13 +712,13 @@ export default function DashboardPage() {
           {/* Everything together */}
           {totalTime > 0 && (
             <div className="animate-rise-in grid gap-4 lg:grid-cols-5">
-              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-2">
+              <section className="rounded-xl border border-edge card p-4 shadow-sm lg:col-span-2">
                 <h2 className="mb-3 text-sm font-semibold text-secondary">
                   Where your time went
                 </h2>
                 <DonutChart data={timeSlices} />
               </section>
-              <section className="rounded-lg border border-edge card p-4 shadow-sm lg:col-span-3">
+              <section className="rounded-xl border border-edge card p-4 shadow-sm lg:col-span-3">
                 <h2 className="mb-1 text-sm font-semibold text-secondary">
                   All activities stacked
                 </h2>

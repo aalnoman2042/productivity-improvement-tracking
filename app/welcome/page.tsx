@@ -14,8 +14,52 @@ import Logo from "@/components/Logo";
 export const metadata: Metadata = {
   title: "PIT — Track everything that makes a day good",
   description:
-    "Sleep, study, work, workouts, namaz, habits and streaks — logged in taps, charted over time, with a status page that says what to fix first.",
+    "Sleep, study, work, workouts, namaz, habits and streaks — logged in taps, charted over time, scored out of 100, and read back by an AI coach that says what to fix first.",
 };
+
+/** The path from an empty account to knowing what to do about your week. */
+const STEPS: { title: string; text: string }[] = [
+  {
+    title: "Pick what you're tracking",
+    text: "Start from a ready-made pack — sleep, study, work, workout, water, namaz, junk food, clean streaks — or write your own. Each tracker knows what kind of thing it is, so it asks you the right question instead of a blank number box.",
+  },
+  {
+    title: "Log the day in taps",
+    text: "A stopwatch for study, bed and wake times for sleep, five buttons for namaz, one tap for yes-or-no. It saves as you go, works with no signal, and a single day can never add up to more than 24 hours.",
+  },
+  {
+    title: "The day gets a score",
+    text: "Every logged day is marked out of 100 — goals hit, showing up, sleep inside the healthy band, streaks kept and bad habits at zero. No AI in this part: it is arithmetic on your own numbers, so it means the same thing every single day.",
+  },
+  {
+    title: "Read what it says back",
+    text: "Status ranks what to fix first, worst thing at the top. The report card grades each tracker over its own lifetime, so adding something new never dents the old marks. And the coach reads the lot and tells you where you actually stand.",
+  },
+];
+
+/** What the AI does, and — just as much — what it is not allowed to do. */
+const COACH: { icon: string; title: string; text: string }[] = [
+  {
+    icon: "📈",
+    title: "It reads a real trend, not a total",
+    text: "Your last seven days against the seven before them, goal hit rates, average bedtime, streaks and grades are all worked out by the app before the AI is ever asked. It reads those facts and ranks them — it never does the arithmetic itself, so it can't quietly invent a number that flatters or scares you.",
+  },
+  {
+    icon: "🔢",
+    title: "The numbers are the app's, not the AI's",
+    text: "The day score, the rising-or-slipping arrow and the fortnight of bars on the card are computed from your own log and shown exactly as calculated. The AI supplies the judgement and the words around them, and only that.",
+  },
+  {
+    icon: "🎯",
+    title: "It ends with something to do",
+    text: "What's genuinely working, what's quietly slipping, the one thing to fix first, a concrete step for tonight and two or three moves for the rest of the week. Every point names the habit it's about and stands on a number you can go and check yourself.",
+  },
+  {
+    icon: "🔒",
+    title: "It never sees your words",
+    text: "Only numbers and tracker names are ever sent — never your notes, never your email. It runs on demand, once every eight hours, and re-reading the last answer costs nothing and works offline.",
+  },
+];
 
 const FEATURES: { icon: string; title: string; text: string }[] = [
   {
@@ -80,14 +124,14 @@ export default function WelcomePage() {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-secondary">
           Sleep, study, work, workouts, namaz, habits, clean streaks — logged
-          in taps, charted over time, and read back to you as the things worth
-          fixing first.
+          in taps, charted over time, scored out of 100, and read back to you
+          by an AI coach as the things worth fixing first.
         </p>
 
         <div className="mx-auto mt-8 flex max-w-sm flex-col items-center gap-3">
           <Link
             href="/signup"
-            className="w-full rounded-md bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
+            className="w-full rounded-lg bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
           >
             Create your account
           </Link>
@@ -125,13 +169,75 @@ export default function WelcomePage() {
         </div>
       </section>
 
+      {/* How it works — the whole loop, before any feature list. */}
+      <section className="mx-auto w-full max-w-5xl px-4 pb-14">
+        <h2 className="text-center text-2xl font-bold tracking-tight">
+          How it works
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-secondary">
+          Four steps, and the fourth is the one everything else is for.
+        </p>
+        <ol className="mt-8 grid gap-4 sm:grid-cols-2">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.title}
+              className="flex gap-4 rounded-xl border border-edge card p-5 shadow-sm"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent"
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <h3 className="font-semibold">{s.title}</h3>
+                <p className="mt-1 text-sm text-secondary">{s.text}</p>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* The coach, at length — it's the part people ask about. */}
+      <section className="mx-auto w-full max-w-5xl px-4 pb-16">
+        <div className="overflow-hidden rounded-2xl border border-accent/40 card shadow-sm">
+          <div className="bg-brand-gradient px-5 py-5 text-white sm:px-6">
+            <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+              <span aria-hidden="true">🧠</span> Life right now
+            </h2>
+            <p className="mt-1.5 max-w-2xl text-sm text-white/85">
+              One tap, and everything you have ever logged is read back to you
+              as an honest answer to &ldquo;how am I actually doing?&rdquo; — a
+              headline, what&apos;s working, what&apos;s slipping, and the one
+              thing to fix first, starting tonight.
+            </p>
+          </div>
+          <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+            {COACH.map((c) => (
+              <div key={c.title}>
+                <h3 className="flex items-center gap-2 font-semibold">
+                  <span aria-hidden="true">{c.icon}</span>
+                  {c.title}
+                </h3>
+                <p className="mt-1 text-sm text-secondary">{c.text}</p>
+              </div>
+            ))}
+          </div>
+          <p className="border-t border-edge px-5 py-3 text-xs text-muted sm:px-6">
+            The coach runs on a free AI model. Nothing you log is used to train
+            anything, and the app works exactly the same if you never press the
+            button.
+          </p>
+        </div>
+      </section>
+
       {/* Why it sticks */}
       <section className="mx-auto w-full max-w-5xl px-4 pb-16">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-lg border border-edge card p-5 shadow-sm"
+              className="rounded-xl border border-edge card p-5 shadow-sm"
             >
               <span className="text-2xl" aria-hidden="true">
                 {f.icon}
@@ -152,13 +258,13 @@ export default function WelcomePage() {
           <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3">
             <Link
               href="/signup"
-              className="w-full rounded-md bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
+              className="w-full rounded-lg bg-brand-gradient px-6 py-3 font-medium text-white hover:brightness-110"
             >
               Get started
             </Link>
             <Link
               href="/login"
-              className="w-full rounded-md border border-edge px-6 py-3 font-medium text-secondary hover:bg-surface-2"
+              className="w-full rounded-lg border border-edge px-6 py-3 font-medium text-secondary hover:bg-surface-2"
             >
               I already have an account
             </Link>
