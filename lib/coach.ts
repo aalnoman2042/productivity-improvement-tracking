@@ -29,6 +29,38 @@ export type CoachReview = {
     /** The first concrete step, tonight. */
     tonight: string;
   };
+  /** Two or three concrete moves for the rest of the week. Optional: reviews
+   * written before this field existed are still perfectly good reviews. */
+  week?: string[];
+};
+
+/**
+ * The numbers on the card — worked out by the app, never by the model.
+ *
+ * The review is a judgement and the model is allowed to be wrong about it;
+ * these are facts, so they're computed server-side from the same data the
+ * model was shown and rendered exactly as given. It means the top of the
+ * card is trustworthy at a glance even on a run where the writing is weak.
+ */
+export type CoachSnapshot = {
+  /** Day score of the most recent day that has one, 0–100. */
+  score: number | null;
+  scoreDate: string | null;
+  /** Average day score over the last 7 days, and the 7 before them. */
+  avg7: number | null;
+  prevAvg7: number | null;
+  /** Which way that moved — the one-glance answer to "am I improving?". */
+  momentum: "rising" | "steady" | "slipping" | null;
+  /** The window, oldest day first — the card's sparkline. */
+  days: { date: string; score: number | null }[];
+  daysLogged: number;
+  windowDays: number;
+  /** Consecutive logged days ending today. */
+  streak: number;
+  /** All-time report-card letter, when there's enough history to grade. */
+  grade: string | null;
+  /** "6h 40m a night · bed 1:20 am", when sleep is tracked. */
+  sleep: string | null;
 };
 
 const str = (v: unknown, max: number): string | null =>
@@ -44,6 +76,18 @@ function points(raw: unknown): CoachPoint[] {
     if (point) out.push({ point, evidence: evidence ?? "" });
   }
   return out;
+}
+
+/** Short, concrete lines — anything longer is a paragraph pretending. */
+function moves(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const item of raw) {
+    if (out.length >= 3) break;
+    const line = str(item, 180);
+    if (line) out.push(line);
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 /** The model's JSON into a CoachReview, or null if it isn't one. */
@@ -70,5 +114,6 @@ export function parseReview(raw: string): CoachReview | null {
     working: points(d.working),
     slipping: points(d.slipping),
     fix: { what, tonight },
+    week: moves(d.week),
   };
 }

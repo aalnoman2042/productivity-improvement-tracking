@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { hit, tooMany } from "@/lib/rateLimit";
-import { addDays, formatMinutes, isValidDateStr } from "@/lib/dates";
+import { isValidDateStr } from "@/lib/dates";
 import { toTracker } from "@/lib/trackerDoc";
-import { dayFactsFrom, dayScore } from "@/lib/score";
-import { gradeLetter, buildReportCard, type ReportEntry } from "@/lib/report";
-import { categoryMeta, formatValue, typeMeta, type Tracker, type TrackerType } from "@/lib/trackers";
-import { challengeProgress } from "@/lib/challenges";
-import { COACH_COOLDOWN_MS, parseReview } from "@/lib/coach";
+import { buildReportCard } from "@/lib/report";
+import type { Tracker } from "@/lib/trackers";
+import {
+  buildCoachFacts,
+  type CoachChallengeRow,
+  type CoachEntry,
+} from "@/lib/coachFacts";
+import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach";
 
 /**
  * The AI coach: "what does my life actually look like right now?"
@@ -24,19 +27,43 @@ import { COACH_COOLDOWN_MS, parseReview } from "@/lib/coach";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_MODEL = "llama-3.3-70b-versatile";
 
-const SYSTEM = `You are a blunt but kind personal coach. You are given a person's life-tracking data as JSON: an all-time report card, the last 14 days in detail (including a 0-100 day score), per-tracker recent numbers, and any challenges.
+const SYSTEM = `You are a sharp, warm personal coach reading one person's life-tracking data. Someone should understand their own life in ten seconds of reading you.
 
-Produce an honest read of their life RIGHT NOW, second person, plain English. Ground every claim in the numbers given — never invent data; if data is thin, say so in the verdict. "habit":"bad" means less is better.
+WHAT YOU ARE GIVEN (JSON)
+- rightNow: the latest day score (0-100), the last 7 days' average against the 7 before it, and "momentum" — which way that moved.
+- allTime: the report card — overall grade, graded subjects, logging history.
+- last14Days: every day in the window with its score, goals met, trackers logged and sleep.
+- trackers: each one with its goal, its grade, the last 7 days against the 7 before, and "readsAs" — whether that change is better or worse FOR THIS HABIT. Sleep trackers also carry average bedtime and wake time; clean-streak trackers carry the streak.
+- challenges: any challenge under way.
 
-Respond with ONLY a JSON object, exactly this shape:
+ACCURACY RULES — these outrank style
+1. Every number you write must appear in the JSON exactly as it is printed there. Do not calculate, estimate, re-round, convert units, subtract one number from another, or claim a habit is worth so many points of the score.
+2. If a fact is not in the JSON, it does not exist. Never mention mood, energy, work, people, or anything untracked.
+3. Name trackers exactly as they are named in the data.
+4. "habit":"bad" means less is better. When judging a change, trust "readsAs" over your own instinct.
+5. Never contradict "momentum" or a grade — those are computed, not opinions.
+6. If few days are logged, that IS the headline finding: say so plainly and keep everything else short. An empty list beats an invented point.
+7. Reporting a number and setting a target are different jobs. Numbers you report are copied exactly. A target is a number to aim at, so it must be BETTER than where they are now — never hand back their current average as the thing to reach for. "You're in bed at 12:45 am, so get there by 11:30" is right; "get to bed by 12:45" is not.
+
+HOW TO WRITE
+Second person. Short, plain sentences a tired person gets in one pass. No jargon, no corporate tone, no flattery, no hedging, no therapy-speak. Every point names the tracker it is about and stands on a number. Say what is causing what, not just what the numbers are — the score is the symptom, the habit is the story.
+
+Talk about the person's life, not the app: "your sleep", never "the sleep tracker". Never print a JSON field name — not in the evidence, not anywhere.
+
+Evidence is a plain-English phrase, never a dump of the data: "5h 30m a night, against 7h 30m the week before" — not "last7Days:5h 30m, change:down 27%". Never print a field name from the JSON.
+
+The headline is a sentence with a verb, not a label. "Two strong weeks undone by a 2 am bedtime" is a headline; "Sleep is slipping" is a label — never write one of those. The 0-100 number is called the day score, nothing else.
+
+Respond with ONLY this JSON object:
 {
-  "headline": "one punchy sentence - the whole read in a line, max 15 words",
-  "verdict": "2-3 sentences: what this life looks like right now, said plainly",
-  "working": [{"point": "what is genuinely going well", "evidence": "the exact numbers it stands on"}],
-  "slipping": [{"point": "what is slipping and what it costs", "evidence": "the exact numbers"}],
-  "fix": {"what": "the ONE thing to fix first this week and why it is first", "tonight": "the first concrete step, doable tonight"}
+  "headline": "one sentence of 8 to 14 words naming the thing driving all this - the story, not the score",
+  "verdict": "2-3 sentences: what this life looks like right now, and what is driving it",
+  "working": [{"point": "what is genuinely going well, one short sentence", "evidence": "the exact numbers, copied"}],
+  "slipping": [{"point": "what is slipping and what it costs, one short sentence", "evidence": "the exact numbers, copied"}],
+  "fix": {"what": "the ONE thing to fix first and why it is first", "tonight": "one concrete step for tonight, with a time or a number in it, under 15 words"},
+  "week": ["2-3 moves for the rest of the week; each names a tracker and a number to aim at"]
 }
-2-3 items each in "working" and "slipping" (fewer if the data is thin). Direct, warm, zero corporate tone, no flattery padding. No markdown anywhere.`;
+2-3 items each in "working" and "slipping", fewer when the data is thin. No markdown, no emoji, no headings.`;
 
 export async function GET() {
   const userId = await currentUserId();
@@ -56,6 +83,9 @@ export async function GET() {
           // plain-text rows come through as `text` and render as prose.
           review: parseReview(String(doc.text)),
           text: String(doc.text),
+          // Reviews written before the snapshot existed simply don't have
+          // one, and the card drops the numbers strip rather than guessing.
+          snapshot: (doc.snapshot as CoachSnapshot | undefined) ?? null,
           today: doc.today ?? null,
           createdAt: doc.createdAt,
         }
@@ -114,23 +144,26 @@ export async function POST(req: Request) {
   }
 
   /* --------------------------- gather the facts -------------------------- */
+  // `meta` comes along for the ride: bedtimes are the one thing the coach was
+  // most often asked about and had no way of knowing.
   const [trackerDocs, entryDocs, challengeDocs] = await Promise.all([
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     d
       .collection("entries")
       .find(
         { userId, date: { $lte: today } },
-        { projection: { trackerId: 1, date: 1, value: 1, _id: 0 } }
+        { projection: { trackerId: 1, date: 1, value: 1, meta: 1, _id: 0 } }
       )
       .toArray(),
     d.collection("challenges").find({ userId }).toArray(),
   ]);
 
   const trackers = trackerDocs.map(toTracker) as Tracker[];
-  const entries: ReportEntry[] = entryDocs.map((e) => ({
+  const entries: CoachEntry[] = entryDocs.map((e) => ({
     trackerId: String(e.trackerId),
     date: String(e.date),
     value: Number(e.value),
+    meta: (e.meta as CoachEntry["meta"]) ?? null,
   }));
   if (entries.length === 0) {
     return NextResponse.json(
@@ -139,104 +172,23 @@ export async function POST(req: Request) {
     );
   }
 
+  const challengeRows: CoachChallengeRow[] = challengeDocs.map((c) => ({
+    name: String(c.name),
+    trackerId: String(c.trackerId),
+    startDate: String(c.startDate),
+    days: Number(c.days),
+    target: c.target == null ? null : Number(c.target),
+    direction: c.direction === "max" ? "max" : "min",
+  }));
+
   const report = buildReportCard(trackers, entries, [], today);
-
-  // The last 14 days, day by day: values per tracker, then score + facts.
-  const since = addDays(today, -13);
-  const byDay = new Map<string, Record<string, number>>();
-  for (const e of entries) {
-    if (e.date < since || e.date > today) continue;
-    const m = byDay.get(e.date) ?? {};
-    m[e.trackerId] = e.value;
-    byDay.set(e.date, m);
-  }
-  const days = [];
-  for (let date = since; date <= today; date = addDays(date, 1)) {
-    const values = byDay.get(date) ?? {};
-    const facts = dayFactsFrom(trackers, values, new Set(Object.keys(values)));
-    days.push({
-      date,
-      score: dayScore(facts),
-      goalsMet: `${facts.goalsMet}/${facts.goalsTotal}`,
-      trackersLogged: `${facts.logged}/${facts.trackers}`,
-      sleep: facts.sleep === null ? null : formatMinutes(facts.sleep),
-    });
-  }
-
-  // Per-tracker view of the same window, in the tracker's own terms.
-  const active = trackers.filter((t) => !t.archived);
-  const trackerFacts = active.map((t) => {
-    const type = t.type as TrackerType;
-    const rows = entries.filter(
-      (e) => e.trackerId === t.id && e.date >= since && e.date <= today
-    );
-    const sum = rows.reduce((s, e) => s + e.value, 0);
-    const aggregate = typeMeta(type).aggregate;
-    const shown = aggregate === "sum" ? sum : rows.length > 0 ? sum / rows.length : 0;
-    return {
-      name: t.name,
-      kind: typeMeta(type).label,
-      category: categoryMeta(t.category).label,
-      habit: t.habit ?? "good",
-      goal: t.goal
-        ? `${t.goal.direction === "min" ? "at least" : "at most"} ${formatValue(t.goal.target, type, t.unit)} per ${t.goal.period}`
-        : null,
-      last14days: {
-        daysLogged: rows.length,
-        [aggregate === "sum" ? "total" : "avgPerLoggedDay"]: formatValue(
-          shown,
-          type,
-          t.unit
-        ),
-      },
-    };
-  });
-
-  const challenges = challengeDocs.map((c) => {
-    const start = String(c.startDate);
-    const values: Record<string, number> = {};
-    for (const e of entries) {
-      if (e.trackerId === String(c.trackerId)) values[e.date] = e.value;
-    }
-    const p = challengeProgress(
-      {
-        startDate: start,
-        days: Number(c.days),
-        target: c.target == null ? null : Number(c.target),
-        direction: c.direction === "max" ? "max" : "min",
-        values,
-      },
-      today
-    );
-    return {
-      name: String(c.name),
-      length: `${Number(c.days)} days`,
-      status: p.status,
-      daysDone: p.met,
-      missed: p.missed,
-    };
-  });
-
-  const payload = {
-    today,
-    allTime: {
-      firstLogged: report.firstDate,
-      daysLogged: `${report.daysLogged}/${report.spanDays}`,
-      bestLoggingStreak: report.bestStreak,
-      currentLoggingStreak: report.currentStreak,
-      totalEntries: report.totalEntries,
-      timeLogged: formatMinutes(report.timeMinutes),
-      overallGrade: report.overall !== null ? gradeLetter(report.overall) : null,
-      subjects: report.subjects.map((s) => ({
-        category: categoryMeta(s.category).label,
-        grade: gradeLetter(s.score),
-        pct: Math.round(s.score * 100),
-      })),
-    },
-    last14Days: days,
-    trackers: trackerFacts,
-    challenges,
-  };
+  const { facts, snapshot } = buildCoachFacts(
+    trackers,
+    entries,
+    challengeRows,
+    report,
+    today
+  );
 
   /* ------------------------------ ask the AI ----------------------------- */
 
@@ -253,10 +205,12 @@ export async function POST(req: Request) {
         model,
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: JSON.stringify(payload) },
+          { role: "user", content: JSON.stringify(facts) },
         ],
-        max_tokens: 900,
-        temperature: 0.4,
+        max_tokens: 1200,
+        // Low: this is a reading of someone's real numbers, not a piece of
+        // writing — invention is the only failure mode that matters here.
+        temperature: 0.25,
         response_format: { type: "json_object" },
       }),
       signal: AbortSignal.timeout(30_000),
@@ -296,13 +250,19 @@ export async function POST(req: Request) {
   }
 
   const createdAt = new Date();
+  // The snapshot is stored beside the review so a later GET shows the same
+  // numbers this read was written against, not today's recomputed ones.
   await d.collection("aiReviews").insertOne({
     userId,
     text: text.slice(0, 10000),
+    snapshot,
     today,
     model,
     createdAt,
   });
 
-  return NextResponse.json({ review, text, today, createdAt }, { status: 201 });
+  return NextResponse.json(
+    { review, text, snapshot, today, createdAt },
+    { status: 201 }
+  );
 }

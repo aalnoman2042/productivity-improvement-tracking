@@ -11,6 +11,7 @@ const good = {
     { point: "Bedtime is drifting", evidence: "2:05 am avg, 9 of 14 nights past 1 am" },
   ],
   fix: { what: "Bedtime before midnight", tonight: "Screens off at 11:15 pm." },
+  week: ["Pull bedtime back 20 minutes a night.", "Log every day, even the bad ones."],
 };
 
 describe("parseReview", () => {
@@ -44,5 +45,24 @@ describe("parseReview", () => {
     );
     expect(r!.working.map((p) => p.point)).toEqual(["a", "b", "c", "d"]);
     expect(r!.working[1].evidence).toBe("");
+  });
+
+  it("keeps the week's moves, capped, and shrugs off a missing list", () => {
+    const r = parseReview(JSON.stringify(good));
+    expect(r!.week).toEqual([
+      "Pull bedtime back 20 minutes a night.",
+      "Log every day, even the bad ones.",
+    ]);
+
+    const capped = parseReview(
+      JSON.stringify({ ...good, week: ["a", "b", "c", "d"] })
+    );
+    expect(capped!.week).toEqual(["a", "b", "c"]);
+
+    // A review written before the field existed is still a good review.
+    expect(parseReview(JSON.stringify({ ...good, week: undefined }))!.week)
+      .toBeUndefined();
+    expect(parseReview(JSON.stringify({ ...good, week: "not a list" }))!.week)
+      .toBeUndefined();
   });
 });

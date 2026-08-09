@@ -165,6 +165,9 @@ const VALIDATORS: Record<string, object> = {
     properties: {
       userId: { bsonType: "objectId" },
       text: { bsonType: "string", maxLength: 10000 },
+      // The numbers the review was written against, computed by the app —
+      // kept so an old review is never re-read beside newer figures.
+      snapshot: { bsonType: ["object", "null"] },
       today: { bsonType: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
       model: { bsonType: ["string", "null"] },
       createdAt: { bsonType: "date" },
