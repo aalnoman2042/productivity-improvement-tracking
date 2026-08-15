@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
 import { parseGoal, parseHabit } from "@/lib/trackerDoc";
+import { parseReminderTime } from "@/lib/trackerReminders";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -33,6 +34,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (typeof body.archived === "boolean") set.archived = body.archived;
   if ("goal" in body) set.goal = parseGoal(body.goal);
   if ("habit" in body) set.habit = parseHabit(body.habit);
+  if ("reminder" in body) {
+    const time = parseReminderTime(body.reminder);
+    // A fresh time starts a fresh day — an edit made after today's push
+    // already went out may fire once more today, which beats the opposite
+    // failure of a new time staying silent until tomorrow.
+    set.reminder = time ? { time, lastSentFor: null } : null;
+  }
 
   if (Object.keys(set).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
@@ -45,6 +53,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (res.matchedCount === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // A reminder time means nothing without knowing where the user's clock is.
+  // The browser sends its offset alongside; it lives on the user because the
+  // nightly reminder reads the same field.
+  const tzOffset = Number(body.tzOffset);
+  if ("reminder" in body && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 840) {
+    await d
+      .collection("users")
+      .updateOne({ _id: userId }, { $set: { "reminder.tzOffset": tzOffset } });
+  }
+
   return NextResponse.json({ ok: true });
 }
 

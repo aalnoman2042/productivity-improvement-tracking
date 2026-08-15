@@ -14,6 +14,9 @@ import { db } from "./db";
 /** The name the nightly reminder is filed under. */
 export const REMINDER_JOB = "reminders";
 
+/** The polled per-tracker reminder schedule (see /api/cron/tracker-reminders). */
+export const TRACKER_REMINDER_JOB = "tracker-reminders";
+
 export type CronRun = {
   job: string;
   startedAt: Date;

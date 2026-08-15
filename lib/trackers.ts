@@ -34,6 +34,8 @@ export type Tracker = {
   category: Category;
   goal: Goal;
   habit?: Habit;
+  /** Daily push time "HH:MM" in the owner's local day, or null for none. */
+  reminder?: string | null;
   archived: boolean;
   order: number;
 };

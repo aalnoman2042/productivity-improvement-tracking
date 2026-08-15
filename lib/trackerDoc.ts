@@ -19,6 +19,8 @@ export function toTracker(doc: WithId<Document>) {
     color: doc.color as string,
     category: doc.category as string,
     goal: (doc.goal ?? null) as Goal,
+    // The client only needs the time of day; lastSentFor is the cron's.
+    reminder: (doc.reminder?.time ?? null) as string | null,
     // Trackers from before the field read as "good" — how they always behaved.
     habit: (doc.habit === "bad" ? "bad" : "good") as Habit,
     archived: Boolean(doc.archived),

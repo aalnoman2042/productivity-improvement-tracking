@@ -47,6 +47,8 @@ type Form = {
   goalTarget: string;
   goalPeriod: "day" | "week";
   goalDirection: "min" | "max";
+  remindOn: boolean;
+  remindAt: string;
 };
 
 const BLANK: Form = {
@@ -60,6 +62,8 @@ const BLANK: Form = {
   goalTarget: "",
   goalPeriod: "day",
   goalDirection: "min",
+  remindOn: false,
+  remindAt: "20:00",
 };
 
 /** Goal targets for time trackers are typed in hours but stored in minutes. */
@@ -144,6 +148,8 @@ export default function TrackersPage() {
       unit: t.unit,
       color: t.color,
       habit: t.habit ?? "good",
+      remindOn: Boolean(t.reminder),
+      remindAt: t.reminder ?? "20:00",
       ...goalToForm(t),
     } as Form);
     setEditingId(t.id);
@@ -165,6 +171,9 @@ export default function TrackersPage() {
       color: form.color,
       habit: form.habit,
       goal: goalFromForm(form),
+      reminder: form.remindOn ? form.remindAt : null,
+      // Minutes east of UTC — how the server knows when "18:00" is for you.
+      tzOffset: -new Date().getTimezoneOffset(),
     };
     const res = await fetch(
       editingId ? `/api/trackers/${editingId}` : "/api/trackers",
@@ -616,6 +625,35 @@ export default function TrackersPage() {
             )}
           </div>
 
+          <div className="rounded-md border border-edge p-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={form.remindOn}
+                onChange={(e) => setF("remindOn", e.target.checked)}
+              />
+              Daily reminder
+            </label>
+            {form.remindOn && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  type="time"
+                  required
+                  value={form.remindAt}
+                  onChange={(e) => setF("remindAt", e.target.value)}
+                  className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
+                />
+                <span className="text-sm text-secondary">
+                  a push at this time, every day it isn&apos;t logged yet
+                </span>
+                <p className="w-full text-xs text-muted">
+                  Uses the same notifications as the nightly reminder — turn
+                  those on in Account on each device you want nudged.
+                </p>
+              </div>
+            )}
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex gap-2">
@@ -744,6 +782,7 @@ export default function TrackersPage() {
                       <div className="text-xs text-muted">
                         {typeMeta(t.type as TrackerType).label}
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}
+                        {t.reminder ? ` · ⏰ ${t.reminder}` : ""}
                       </div>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-1">

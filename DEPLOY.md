@@ -132,6 +132,35 @@ notification.
 > The reminder goes out **every night**, logged or not — the 11 PM ask is
 > the closing ritual of the day. Tapping it opens that day's log.
 
+## 3c. Turn on per-tracker reminders (optional, needs 3b)
+
+Any tracker can carry its own daily reminder time — "Gym at 18:00", "Namaz at
+05:00" — set when adding or editing the tracker on the Trackers page. The push
+goes out at that time **only if the tracker hasn't been logged yet** that day,
+and arrives on every device where you've turned reminders on (step 3b).
+
+Vercel's free plan only fires a schedule once a day, so this one is driven by
+a free external scheduler instead:
+
+1. Sign up at https://cron-job.org (free).
+2. Create a cronjob with:
+   - **URL**: `https://your-site.vercel.app/api/cron/tracker-reminders`
+   - **Schedule**: every 15 minutes
+   - Under **Advanced → Headers**, add `Authorization` with the value
+     `Bearer <your CRON_SECRET>` (the same secret from step 3b).
+     If headers are awkward, appending `?key=<CRON_SECRET>` to the URL
+     works too.
+3. Save. That's all — the endpoint is safe to call as often as you like. Each
+   reminder sends at most once per day, is skipped once the tracker is logged,
+   and one that couldn't be delivered within 3 hours of its time is dropped
+   rather than arriving at midnight. You can test it by hand:
+
+   ```powershell
+   curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://your-site.vercel.app/api/cron/tracker-reminders
+   ```
+
+   It answers with what it did — `checked`, `notified`, `skipped`.
+
 ## 4. Use it from your phone
 
 Open the URL on your phone, sign in, and (optional but recommended) use the

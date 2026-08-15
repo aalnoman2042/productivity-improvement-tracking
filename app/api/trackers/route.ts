@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { toTracker, parseGoal, parseHabit } from "@/lib/trackerDoc";
+import { parseReminderTime } from "@/lib/trackerReminders";
 import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
 
 export async function GET() {
@@ -94,10 +95,21 @@ export async function POST(req: Request) {
     category,
     goal: parseGoal(body?.goal),
     habit: parseHabit(body?.habit),
+    reminder: (() => {
+      const time = parseReminderTime(body?.reminder);
+      return time ? { time, lastSentFor: null } : null;
+    })(),
     archived: false,
     order,
     createdAt: new Date(),
   });
+
+  const tzOffset = Number(body?.tzOffset);
+  if (body?.reminder && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 840) {
+    await d
+      .collection("users")
+      .updateOne({ _id: userId }, { $set: { "reminder.tzOffset": tzOffset } });
+  }
 
   const doc = await d.collection("trackers").findOne({ _id: res.insertedId });
   return NextResponse.json(doc ? toTracker(doc) : { ok: true }, { status: 201 });
