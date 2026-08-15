@@ -8,13 +8,13 @@ import { nightLabel } from "./clock";
  * short nights land on the days I study late?" is answerable — and it is the
  * only question here that a spreadsheet doesn't answer more easily.
  *
- * Three deliberate choices, because this is the part of the app most able to
+ * Four deliberate choices, because this is the part of the app most able to
  * mislead:
  *
  * 1. **Contrasts, not coefficients.** Nobody acts on "r = 0.62". They act on
  *    "7h 40m on the nights you're in bed before midnight, 5h 50m after". So
  *    days are split into two groups and the two averages are reported. The
- *    correlation is still computed — it's what the ranking uses — but it never
+ *    correlation is still computed — it feeds the ranking — but it never
  *    reaches the screen.
  *
  * 2. **Deliberately hard thresholds.** Fifteen trackers make 105 pairs, and at
@@ -24,6 +24,11 @@ import { nightLabel } from "./clock";
  *
  * 3. **Stated as association.** Nothing here establishes cause, and the copy
  *    never claims it does. "goes with" is the strongest verb used.
+ *
+ * 4. **Ranked by impact, not correlation.** A tight little effect can carry
+ *    r = 0.9 and change nothing; what earns the top slot is a strong link
+ *    *and* a gap worth acting on *and* enough days behind it — with findings
+ *    that point a way you'd want (or wouldn't) outranking the merely curious.
  */
 
 /* --------------------------- the shared grid --------------------------- */
@@ -41,8 +46,10 @@ export type Finding = {
   title: string;
   /** The numbers it came from. */
   detail: string;
-  /** How strongly the two move together, 0–1. Used for ranking only. */
+  /** How strongly the two move together, 0–1. */
   strength: number;
+  /** What the ranking sorts by: strength × size of the gap × days behind it. */
+  impact: number;
   /** Days the finding is built from — shown so nobody over-reads a small one. */
   days: number;
   /** Whether the association points the way you'd want. */
@@ -99,15 +106,45 @@ export const MAX_FINDINGS = 5;
 
 const isTime = (t: Tracker) => t.type === "duration" || t.type === "sleep";
 
+/** Yes/no trackers: the day either happened or it didn't. */
+const isBinary = (t: Tracker) => t.type === "check" || t.type === "streak";
+
 function fmt(t: Tracker, value: number): string {
   return formatValue(value, t.type as TrackerType, t.unit);
 }
 
-/** More of this is better, unless a goal says otherwise. */
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+
+/**
+ * More of this is better, unless the tracker says otherwise. The habit flag
+ * is the user's clearest statement of direction and outranks the type's
+ * default — junk food rising with study time is a cost, not a win. The one
+ * exception is a clean-streak tracker: its VALUE counts clean days, so more
+ * is better even when the habit it guards is a bad one.
+ */
 function wantMore(t: Tracker): boolean | null {
+  if (t.type === "streak") return true;
+  if (t.habit === "bad") return false;
   if (t.goal) return t.goal.direction === "min";
   if (t.type === "measure") return null; // weight could go either way
   return true;
+}
+
+/**
+ * The composite the ranking sorts by. Correlation alone over-ranks tight,
+ * tiny effects; the gap alone over-ranks noisy ones; and days are the
+ * reader's only defense against coincidence. A finding with no direction to
+ * act on is docked rather than dropped — interesting, but not urgent.
+ */
+function impactOf(
+  strength: number,
+  gapRatio: number,
+  days: number,
+  tone: Finding["tone"]
+): number {
+  const confidence = Math.min(1, days / 30);
+  const base = strength * Math.min(1, gapRatio) * confidence;
+  return Math.round((tone === "neutral" ? base * 0.85 : base) * 100) / 100;
 }
 
 /** Days both trackers were logged, as two aligned arrays. */
@@ -127,10 +164,39 @@ function overlap(a: Series, b: Series): { xs: number[]; ys: number[]; dates: str
 
 /* ------------------------------ the pairs ------------------------------ */
 
+/** "On your clean X days" / "On days you did X" / "On days with more than 2h". */
+function highLabel(driver: Tracker, cut: number): string {
+  if (driver.type === "streak") return `On your clean ${driver.name} days`;
+  if (driver.type === "check") return `On days you did ${driver.name}`;
+  return `On days with more than ${fmt(driver, cut)}${
+    isTime(driver) ? "" : ` ${driver.name.toLowerCase()}`
+  }`;
+}
+
+function lowLabel(driver: Tracker): string {
+  if (driver.type === "streak") return "slip days";
+  if (driver.type === "check") return "days you didn't";
+  return "the rest";
+}
+
 /**
- * Split the days by whether the driver was above or below its own median, and
- * compare what the outcome did in each half. A median split rather than a
- * threshold because it adapts to whatever range this person actually lives in.
+ * "averaged 7h 40m — against 5h 50m on the rest". A yes/no outcome gets a
+ * rate instead, because the average of Done and not-Done is a share of days,
+ * not an amount — `formatValue` would print a nonsense "Done" for 0.7.
+ */
+function outcomeContrast(t: Tracker, hi: number, lo: number, rest: string): string {
+  if (t.type === "streak")
+    return `stayed clean on ${pct(hi)} of them — against ${pct(lo)} on ${rest}`;
+  if (t.type === "check")
+    return `got done on ${pct(hi)} of them — against ${pct(lo)} on ${rest}`;
+  return `averaged ${fmt(t, hi)} — against ${fmt(t, lo)} on ${rest}`;
+}
+
+/**
+ * Split the days by the driver and compare what the outcome did in each half.
+ * A numeric driver splits at its own median, because that adapts to whatever
+ * range this person actually lives in; a yes/no driver splits on did-vs-didn't
+ * — the median of 0s and 1s would leave one side empty.
  */
 function pairFinding(driver: Series, outcome: Series): Finding | null {
   const { xs, ys } = overlap(driver, outcome);
@@ -139,11 +205,11 @@ function pairFinding(driver: Series, outcome: Series): Finding | null {
   const r = pearson(xs, ys);
   if (Math.abs(r) < MIN_R) return null;
 
-  const cut = median(xs);
+  const cut = isBinary(driver.tracker) ? 0 : median(xs);
   const high: number[] = [];
   const low: number[] = [];
   for (let i = 0; i < xs.length; i++) (xs[i] > cut ? high : low).push(ys[i]);
-  // A median split is useless if almost everything lands on one side.
+  // A split is useless if almost everything lands on one side.
   if (high.length < 4 || low.length < 4) return null;
 
   const hi = mean(high);
@@ -157,20 +223,29 @@ function pairFinding(driver: Series, outcome: Series): Finding | null {
   const tone: Finding["tone"] =
     better === null ? "neutral" : more === better ? "good" : "bad";
 
-  // "more than 2h" reads naturally for time; "more than 6 glasses" for the
-  // rest. Same sentence, but the unit does the work.
-  const driverHigh = `more than ${fmt(driver.tracker, cut)}${
-    isTime(driver.tracker) ? "" : ` ${driver.tracker.name.toLowerCase()}`
-  }`;
+  const binaryOut = isBinary(outcome.tracker);
+  const moreWord = binaryOut
+    ? more ? "more often" : "less often"
+    : more ? "higher" : "lower";
+  const verb = outcome.tracker.type === "streak"
+    ? "stays clean"
+    : binaryOut ? "happens" : "is";
+  const driverDays =
+    driver.tracker.type === "streak"
+      ? `clean ${driver.tracker.name} days`
+      : driver.tracker.type === "check"
+        ? `days you do ${driver.tracker.name}`
+        : `bigger ${driver.tracker.name} days`;
 
   return {
     kind: "pair",
-    title: `${outcome.tracker.name} is ${more ? "higher" : "lower"} on your bigger ${driver.tracker.name} days`,
+    title: `${outcome.tracker.name} ${verb} ${moreWord} on your ${driverDays}`,
     detail:
-      `On days with ${driverHigh}, ${outcome.tracker.name} averaged ` +
-      `${fmt(outcome.tracker, hi)} — against ${fmt(outcome.tracker, lo)} on the rest. ` +
+      `${highLabel(driver.tracker, cut)}, ${outcome.tracker.name} ` +
+      `${outcomeContrast(outcome.tracker, hi, lo, lowLabel(driver.tracker))}. ` +
       `${xs.length} days have both.`,
     strength: Math.abs(r),
+    impact: impactOf(Math.abs(r), gap / base, xs.length, tone),
     days: xs.length,
     tone,
   };
@@ -221,23 +296,30 @@ function weekdayFinding(s: Series): Finding | null {
 
   // A "missed" day only means something for the types where a low value is
   // unambiguously a miss. Less work on a Friday isn't a failure — it's the
-  // weekend — and the app has no idea which days yours are, so for everything
-  // else this is reported flatly and left for you to judge.
+  // weekend — and the app has no idea which days yours are, so most trackers
+  // get this reported flatly and left for you to judge. A bad habit is the
+  // exception in the other direction: the day it spikes is bad on any
+  // calendar, weekend or not.
   const isMiss = ["check", "prayer", "streak"].includes(s.tracker.type);
+  const badHabit = s.tracker.habit === "bad" && s.tracker.type !== "streak";
+  const tone: Finding["tone"] = isMiss || badHabit ? "bad" : "neutral";
 
   return {
     kind: "weekday",
     title: isMiss
       ? `${DAY_NAMES[worst]}s are where ${s.tracker.name} slips`
-      : `${DAY_NAMES[worst]}s are your ${better ? "lowest" : "highest"} day for ${s.tracker.name}`,
+      : badHabit
+        ? `${DAY_NAMES[worst]}s are when ${s.tracker.name} creeps up`
+        : `${DAY_NAMES[worst]}s are your ${better ? "lowest" : "highest"} day for ${s.tracker.name}`,
     detail:
       `${DAY_NAMES[worst]}s average ${fmt(s.tracker, worstMean)}, against ` +
       `${fmt(s.tracker, others)} on every other day — ` +
       `${Math.round(gap * 100)}% ${better ? "lower" : "higher"}, across ` +
       `${groups[worst].length} ${DAY_NAMES[worst]}s.`,
     strength: Math.min(1, gap),
+    impact: impactOf(Math.min(1, gap), gap, s.byDate.size, tone),
     days: s.byDate.size,
-    tone: isMiss ? "bad" : "neutral",
+    tone,
   };
 }
 
@@ -281,24 +363,30 @@ function bedtimeFinding(
     better === null ? "neutral" : lateIsWorse === better ? "bad" : "good";
 
   // "less Mood" is not English. Ratings and measurements go up and down;
-  // hours and counts are more and less.
+  // hours and counts are more and less; a yes/no tracker gains or loses days.
+  const binaryOut = isBinary(outcome.tracker);
   const rated = ["scale", "measure"].includes(outcome.tracker.type);
-  const direction = rated
-    ? lateIsWorse
-      ? "lower"
-      : "higher"
-    : lateIsWorse
-      ? "less"
-      : "more";
+  const direction = binaryOut
+    ? lateIsWorse ? "fewer" : "more"
+    : rated
+      ? lateIsWorse ? "lower" : "higher"
+      : lateIsWorse ? "less" : "more";
+
+  const t = outcome.tracker;
+  const detail = binaryOut
+    ? `In bed before ${nightLabel(cut)}, ${t.name} ` +
+      `${t.type === "streak" ? "stayed clean" : "got done"} on ${pct(earlyMean)} ` +
+      `of days. After it, ${pct(lateMean)}. ${dates.length} nights have both.`
+    : `In bed before ${nightLabel(cut)}, ${t.name} averaged ` +
+      `${fmt(t, earlyMean)}. After it, ${fmt(t, lateMean)}. ` +
+      `${dates.length} nights have both.`;
 
   return {
     kind: "bedtime",
-    title: `Late nights go with ${direction} ${outcome.tracker.name}`,
-    detail:
-      `In bed before ${nightLabel(cut)}, ${outcome.tracker.name} averaged ` +
-      `${fmt(outcome.tracker, earlyMean)}. After it, ${fmt(outcome.tracker, lateMean)}. ` +
-      `${dates.length} nights have both.`,
+    title: `Late nights go with ${direction} ${t.name}${binaryOut ? " days" : ""}`,
+    detail,
     strength: Math.abs(r),
+    impact: impactOf(Math.abs(r), gap / base, dates.length, tone),
     days: dates.length,
     tone,
   };
@@ -313,16 +401,14 @@ export type CorrelationInput = {
 };
 
 /**
- * Everything worth saying, strongest first.
+ * Everything worth saying, most impactful first.
  *
  * A pair is only considered in one direction — the tracker you have more
  * control over drives. Sleep and bedtime drive everything; otherwise the
  * one whose values accumulate does.
  */
 export function findCorrelations({ series, bedByDate }: CorrelationInput): Finding[] {
-  const usable = series.filter(
-    (s) => s.byDate.size >= MIN_DAYS && s.tracker.type !== "streak"
-  );
+  const usable = series.filter((s) => s.byDate.size >= MIN_DAYS);
 
   const found: Finding[] = [];
 
@@ -354,10 +440,10 @@ export function findCorrelations({ series, bedByDate }: CorrelationInput): Findi
     if (f) found.push(f);
   }
 
-  // Strongest first, and never more than a handful — a wall of findings is
-  // how a reader learns to stop trusting them.
+  // Most impactful first, and never more than a handful — a wall of findings
+  // is how a reader learns to stop trusting them.
   return found
-    .sort((x, y) => y.strength - x.strength)
+    .sort((x, y) => y.impact - x.impact)
     .slice(0, MAX_FINDINGS);
 }
 

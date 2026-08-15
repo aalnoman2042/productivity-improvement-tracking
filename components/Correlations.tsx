@@ -19,6 +19,17 @@ const TONE: Record<Finding["tone"], { bar: string; icon: string }> = {
 };
 
 /**
+ * The impact score in words — a number would invite false precision. Old
+ * cached responses pre-date the score and fall back to raw strength.
+ */
+function impactLabel(f: Finding): string {
+  const impact = f.impact ?? f.strength;
+  if (impact >= 0.45) return "strong link";
+  if (impact >= 0.25) return "clear link";
+  return "early signal";
+}
+
+/**
  * What goes with what.
  *
  * The one thing here a spreadsheet doesn't do more easily, because it knows
@@ -73,7 +84,9 @@ export default function Correlations() {
         </span>
       </div>
       <p className="mb-3 text-sm text-secondary">
-        Where two of your trackers move together. Strongest first.
+        Where two of your trackers move together. The most impactful first —
+        judged by how strongly they move, how big the difference is, and how
+        many days back it up.
       </p>
 
       <ul className="stagger space-y-2">
@@ -86,12 +99,17 @@ export default function Correlations() {
             >
               <span className={`w-1 shrink-0 ${tone.bar}`} aria-hidden="true" />
               <div className="min-w-0 flex-1 py-3 pr-3">
-                <p className="text-sm font-semibold">
-                  <span className="mr-1 text-muted" aria-hidden="true">
-                    {tone.icon}
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold">
+                    <span className="mr-1 text-muted" aria-hidden="true">
+                      {tone.icon}
+                    </span>
+                    {f.title}
+                  </p>
+                  <span className="shrink-0 rounded-md border border-edge px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                    {impactLabel(f)}
                   </span>
-                  {f.title}
-                </p>
+                </div>
                 <p className="mt-1 text-sm text-secondary">{f.detail}</p>
               </div>
             </li>
