@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   const userId = await currentUserId();
@@ -16,5 +17,8 @@ export async function GET() {
     id: String(user._id),
     name: user.name,
     email: user.email,
+    // Shows the Admin doorway on the Account page. Cosmetic only — the
+    // admin API re-checks the email itself on every request.
+    admin: isAdminEmail(user.email),
   });
 }

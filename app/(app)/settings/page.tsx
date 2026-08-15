@@ -9,7 +9,7 @@ import PasswordInput from "@/components/PasswordInput";
 import ReminderSettings from "@/components/ReminderSettings";
 import { APP_VERSION } from "@/lib/version";
 
-type Me = { id: string; name: string; email: string };
+type Me = { id: string; name: string; email: string; admin?: boolean };
 
 const field =
   "w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent";
@@ -126,6 +126,30 @@ export default function SettingsPage() {
           →
         </span>
       </Link>
+
+      {/* Only the emails in ADMIN_EMAILS ever see this doorway — everyone
+          else's Account page is unchanged, and the API behind it re-checks. */}
+      {me?.admin && (
+        <Link
+          href="/admin"
+          className="animate-rise-in flex items-center justify-between gap-3 rounded-xl border border-edge card p-4 shadow-sm hover:bg-surface-2"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="text-xl" aria-hidden="true">
+              🛡️
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">Admin</span>
+              <span className="block text-sm text-secondary">
+                Every account, counted — users, trackers, logged days.
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 text-accent" aria-hidden="true">
+            →
+          </span>
+        </Link>
+      )}
 
       {me === null ? (
         <p className="text-sm text-muted">Loading…</p>
