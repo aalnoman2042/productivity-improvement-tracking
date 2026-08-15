@@ -134,10 +134,12 @@ notification.
 
 ## 3c. Turn on per-tracker reminders (optional, needs 3b)
 
-Any tracker can carry its own daily reminder time — "Gym at 18:00", "Namaz at
-05:00" — set when adding or editing the tracker on the Trackers page. The push
-goes out at that time **only if the tracker hasn't been logged yet** that day,
-and arrives on every device where you've turned reminders on (step 3b).
+Any tracker can carry its own daily reminder times — "Gym at 18:00", or up to
+five for a prayer tracker, one per waqt — set when adding or editing the
+tracker on the Trackers page. Each time fires **only while the day still
+needs it**: most trackers go quiet once logged, a prayer tracker only once
+all five prayers are in. Pushes arrive on every device where you've turned
+reminders on (step 3b).
 
 Vercel's free plan only fires a schedule once a day, so this one is driven by
 a free external scheduler instead:

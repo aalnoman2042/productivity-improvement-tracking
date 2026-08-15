@@ -103,14 +103,20 @@ const VALIDATORS: Record<string, object> = {
       // Good habits are built up, bad ones cut down — growth on a bad one
       // reads as falling behind. Absent on old rows, which read as "good".
       habit: { enum: ["good", "bad", null] },
-      // A daily push at a local time of day, skipped once the day is logged.
-      // lastSentFor stamps the local date last handled, so the polling
-      // schedule can call in as often as it likes without double-sending.
+      // Daily pushes at chosen local times — up to five, one per waqt for a
+      // prayer tracker. lastSentFor stamps the latest slot handled
+      // ("YYYY-MM-DD HH:MM"), so the polling schedule can call in as often
+      // as it likes without double-sending.
       reminder: {
         bsonType: ["object", "null"],
-        required: ["time"],
+        required: ["times"],
         properties: {
-          time: { bsonType: "string", pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+          times: {
+            bsonType: "array",
+            minItems: 1,
+            maxItems: 5,
+            items: { bsonType: "string", pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+          },
           lastSentFor: { bsonType: ["string", "null"] },
         },
       },

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { toTracker, parseGoal, parseHabit } from "@/lib/trackerDoc";
-import { parseReminderTime } from "@/lib/trackerReminders";
+import { parseReminderTimes } from "@/lib/trackerReminders";
 import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
 
 export async function GET() {
@@ -96,8 +96,8 @@ export async function POST(req: Request) {
     goal: parseGoal(body?.goal),
     habit: parseHabit(body?.habit),
     reminder: (() => {
-      const time = parseReminderTime(body?.reminder);
-      return time ? { time, lastSentFor: null } : null;
+      const times = parseReminderTimes(body?.reminder);
+      return times ? { times, lastSentFor: null } : null;
     })(),
     archived: false,
     order,

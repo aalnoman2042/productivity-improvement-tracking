@@ -48,7 +48,7 @@ type Form = {
   goalPeriod: "day" | "week";
   goalDirection: "min" | "max";
   remindOn: boolean;
-  remindAt: string;
+  remindTimes: string[];
 };
 
 const BLANK: Form = {
@@ -63,7 +63,7 @@ const BLANK: Form = {
   goalPeriod: "day",
   goalDirection: "min",
   remindOn: false,
-  remindAt: "20:00",
+  remindTimes: ["20:00"],
 };
 
 /** Goal targets for time trackers are typed in hours but stored in minutes. */
@@ -148,8 +148,8 @@ export default function TrackersPage() {
       unit: t.unit,
       color: t.color,
       habit: t.habit ?? "good",
-      remindOn: Boolean(t.reminder),
-      remindAt: t.reminder ?? "20:00",
+      remindOn: Boolean(t.reminder?.length),
+      remindTimes: t.reminder?.length ? t.reminder : ["20:00"],
       ...goalToForm(t),
     } as Form);
     setEditingId(t.id);
@@ -171,7 +171,7 @@ export default function TrackersPage() {
       color: form.color,
       habit: form.habit,
       goal: goalFromForm(form),
-      reminder: form.remindOn ? form.remindAt : null,
+      reminder: form.remindOn ? form.remindTimes : null,
       // Minutes east of UTC — how the server knows when "18:00" is for you.
       tzOffset: -new Date().getTimezoneOffset(),
     };
@@ -635,18 +635,55 @@ export default function TrackersPage() {
               Daily reminder
             </label>
             {form.remindOn && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  type="time"
-                  required
-                  value={form.remindAt}
-                  onChange={(e) => setF("remindAt", e.target.value)}
-                  className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-                />
-                <span className="text-sm text-secondary">
-                  a push at this time, every day it isn&apos;t logged yet
-                </span>
-                <p className="w-full text-xs text-muted">
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {form.remindTimes.map((tm, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      <input
+                        type="time"
+                        required
+                        value={tm}
+                        onChange={(e) =>
+                          setF(
+                            "remindTimes",
+                            form.remindTimes.map((x, j) => (j === i ? e.target.value : x))
+                          )
+                        }
+                        className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
+                      />
+                      {form.remindTimes.length > 1 && (
+                        <button
+                          type="button"
+                          aria-label="Remove this time"
+                          onClick={() =>
+                            setF(
+                              "remindTimes",
+                              form.remindTimes.filter((_, j) => j !== i)
+                            )
+                          }
+                          className="rounded-md px-1.5 py-1 text-sm text-secondary hover:bg-surface-2"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {form.remindTimes.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setF("remindTimes", [...form.remindTimes, ""])}
+                      className="rounded-md border border-edge px-3 py-1.5 text-sm text-secondary hover:bg-surface-2"
+                    >
+                      + Add a time
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-secondary">
+                  {form.type === "prayer"
+                    ? "One per waqt — up to five. Each fires until that day's prayers are all logged."
+                    : "A push at each time, every day this isn't logged yet."}
+                </p>
+                <p className="text-xs text-muted">
                   Uses the same notifications as the nightly reminder — turn
                   those on in Account on each device you want nudged.
                 </p>
@@ -782,7 +819,13 @@ export default function TrackersPage() {
                       <div className="text-xs text-muted">
                         {typeMeta(t.type as TrackerType).label}
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}
-                        {t.reminder ? ` · ⏰ ${t.reminder}` : ""}
+                        {t.reminder?.length
+                          ? ` · ⏰ ${
+                              t.reminder.length === 1
+                                ? t.reminder[0]
+                                : `${t.reminder.length}× daily`
+                            }`
+                          : ""}
                       </div>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-1">

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
 import { parseGoal, parseHabit } from "@/lib/trackerDoc";
-import { parseReminderTime } from "@/lib/trackerReminders";
+import { parseReminderTimes } from "@/lib/trackerReminders";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -35,11 +35,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if ("goal" in body) set.goal = parseGoal(body.goal);
   if ("habit" in body) set.habit = parseHabit(body.habit);
   if ("reminder" in body) {
-    const time = parseReminderTime(body.reminder);
-    // A fresh time starts a fresh day — an edit made after today's push
+    const times = parseReminderTimes(body.reminder);
+    // Fresh times start a fresh day — an edit made after today's push
     // already went out may fire once more today, which beats the opposite
     // failure of a new time staying silent until tomorrow.
-    set.reminder = time ? { time, lastSentFor: null } : null;
+    set.reminder = times ? { times, lastSentFor: null } : null;
   }
 
   if (Object.keys(set).length === 0) {
