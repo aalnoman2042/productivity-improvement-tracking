@@ -13,6 +13,7 @@ import {
 } from "@/lib/coachFacts";
 import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach";
 
+
 /**
  * The AI coach: "what does my life actually look like right now?"
  *
@@ -25,7 +26,7 @@ import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach"
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_MODEL = "openai/gpt-oss-120b"
 
 const SYSTEM = `You are a sharp, warm personal coach reading one person's life-tracking data. Someone should understand their own life in ten seconds of reading you.
 
@@ -192,6 +193,9 @@ export async function POST(req: Request) {
 
   /* ------------------------------ ask the AI ----------------------------- */
 
+
+  
+
   let text = "";
   let model = process.env.GROQ_MODEL || DEFAULT_MODEL;
   try {
@@ -207,10 +211,11 @@ export async function POST(req: Request) {
           { role: "system", content: SYSTEM },
           { role: "user", content: JSON.stringify(facts) },
         ],
-        max_tokens: 1200,
+        max_tokens: 4000,
         // Low: this is a reading of someone's real numbers, not a piece of
         // writing — invention is the only failure mode that matters here.
         temperature: 0.25,
+      reasoning_effort: "low",
         response_format: { type: "json_object" },
       }),
       signal: AbortSignal.timeout(30_000),
