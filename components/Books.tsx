@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useCached } from "@/lib/useCached";
-import MotivationLine from "@/components/MotivationLine";
 import { prettyDate, toDateStr } from "@/lib/dates";
 import {
   BOOK_STATUSES,
@@ -17,43 +16,36 @@ import {
 } from "@/lib/books";
 
 /**
- * The bookshelf.
+ * The bookshelf, living with the trackers.
  *
- * Trackers answer the same question every day; a book asks one question once
- * and then goes quiet for a fortnight. So this page is a shelf rather than a
- * log: three headings you move a book between, a bar for the one you're in
- * the middle of, and — the number the whole thing exists for — how many you
- * have actually finished.
+ * A book is not a habit — it asks its question once and then goes quiet for a
+ * fortnight — so it isn't a tracker type, and none of this touches a day's
+ * score, streaks or the coach. But it is the same kind of thing to *manage*
+ * as a tracker or a challenge: something you set up here and act on for weeks
+ * afterwards. So it sits on this page beside them rather than claiming a tab
+ * of its own, exactly like 🏆 Challenges.
  *
- * Everything is one tap from the shelf it's on. Nothing here asks for a date:
- * starting a book stamps today, finishing it stamps today, and the dates stay
- * editable only in the sense that the shelf owns them.
+ * Three shelves and one tap between them. Nothing asks for a date: starting a
+ * book stamps today, finishing it stamps today, and `afterStatusChange` in
+ * lib/books owns those rules so the page and the tests can't disagree.
  */
 
 const field =
   "w-full rounded-md border border-edge bg-transparent px-3 py-2 text-sm outline-none focus:border-accent";
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="rounded-xl border border-edge card p-3 shadow-sm">
-      <div className="text-xl font-bold tabular-nums">{value}</div>
-      <div className="mt-0.5 text-xs text-muted">{label}</div>
-    </div>
-  );
-}
+/** How many finished books show before the shelf offers to unfold. */
+const SHELF_PREVIEW = 5;
 
 /** The bar, and the honest blank where a page count was never typed. */
 function Progress({ book }: { book: Book }) {
   const pct = progressOf(book);
   if (pct === null) return null;
   return (
-    <div className="mt-2">
-      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div
-          className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
-          style={{ width: `${Math.round(pct * 100)}%` }}
-        />
-      </div>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+      <div
+        className="bg-brand-gradient h-full rounded-full transition-[width] duration-500 ease-out"
+        style={{ width: `${Math.round(pct * 100)}%` }}
+      />
     </div>
   );
 }
@@ -86,7 +78,7 @@ function Stars({
   );
 }
 
-export default function BooksPage() {
+export default function Books() {
   const today = toDateStr(new Date());
   const q = useCached<Book[]>("/api/books", "books");
   const books = useMemo(() => q.data ?? [], [q.data]);
@@ -98,13 +90,9 @@ export default function BooksPage() {
   const [author, setAuthor] = useState("");
   const [pages, setPages] = useState("");
   const [shelf, setShelf] = useState<BookStatus>("wishlist");
+  const [unfolded, setUnfolded] = useState<string[]>([]);
 
   const stats = useMemo(() => bookStats(books, today), [books, today]);
-
-  /** Fold one changed book back into the list on screen. */
-  function replace(book: Book) {
-    q.update(books.map((b) => (b.id === book.id ? book : b)));
-  }
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(true);
@@ -120,9 +108,10 @@ export default function BooksPage() {
         setError(data?.error ?? "Could not save that");
         return;
       }
-      replace(data as Book);
+      const book = data as Book;
+      q.update(books.map((b) => (b.id === book.id ? book : b)));
     } catch {
-      setError("Could not reach the server — try again when you're back on");
+      setError("Could not reach the server — books need a connection");
     } finally {
       setBusy(false);
     }
@@ -139,7 +128,7 @@ export default function BooksPage() {
       }
       q.update(books.filter((b) => b.id !== book.id));
     } catch {
-      setError("Could not reach the server — try again when you're back on");
+      setError("Could not reach the server — books need a connection");
     } finally {
       setBusy(false);
     }
@@ -173,171 +162,189 @@ export default function BooksPage() {
       setPages("");
       setAdding(false);
     } catch {
-      setError("Could not reach the server — try again when you're back on");
+      setError("Could not reach the server — books need a connection");
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Books</h1>
-        <p className="mt-1 text-sm text-secondary">
-          What you want to read, what you&apos;re in the middle of, and what
-          you actually finished.
-        </p>
+  const form = (
+    <form
+      onSubmit={add}
+      className="animate-rise-in space-y-3 rounded-xl border border-edge card p-4 shadow-sm"
+    >
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        maxLength={MAX_BOOK_TITLE}
+        placeholder="Title"
+        aria-label="Title"
+        className={field}
+      />
+      <div className="flex flex-wrap gap-3">
+        <input
+          value={author}
+          onChange={(e) => setAuthor(e.target.value)}
+          maxLength={MAX_BOOK_AUTHOR}
+          placeholder="Author (optional)"
+          aria-label="Author"
+          className={`${field} min-w-40 flex-1`}
+        />
+        <input
+          value={pages}
+          onChange={(e) => setPages(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+          inputMode="numeric"
+          placeholder="Pages"
+          aria-label="Total pages"
+          className={`${field} w-24 shrink-0`}
+        />
       </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat value={String(stats.finished)} label="books read" />
-        <Stat value={String(stats.finishedThisYear)} label={`read in ${today.slice(0, 4)}`} />
-        <Stat value={String(stats.reading)} label="on the go" />
-        <Stat value={String(stats.wishlist)} label="on the wishlist" />
-      </div>
-
-      {stats.pagesRead > 0 && (
-        <p className="text-sm text-secondary">
-          <strong className="tabular-nums text-foreground">
-            {stats.pagesRead.toLocaleString()}
-          </strong>{" "}
-          pages, counted from the books you finished and how far you are into
-          the rest.
-        </p>
-      )}
-
-      {/* Adding is the one thing that has to be quick — the moment you hear
-          about a book is the moment it gets written down or forgotten. */}
-      {adding ? (
-        <form
-          onSubmit={add}
-          className="animate-rise-in space-y-3 rounded-xl border border-edge card p-4 shadow-sm"
-        >
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={MAX_BOOK_TITLE}
-            placeholder="Title"
-            className={field}
-          />
-          <div className="flex flex-wrap gap-3">
-            <input
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              maxLength={MAX_BOOK_AUTHOR}
-              placeholder="Author (optional)"
-              className={`${field} min-w-40 flex-1`}
-            />
-            <input
-              value={pages}
-              onChange={(e) => setPages(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
-              inputMode="numeric"
-              placeholder="Pages"
-              aria-label="Total pages"
-              className={`${field} w-24 shrink-0`}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-secondary">Put it on:</span>
-            {(["wishlist", "reading", "finished"] as BookStatus[]).map((s) => {
-              const meta = BOOK_STATUSES.find((b) => b.value === s)!;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setShelf(s)}
-                  className={`rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                    shelf === s
-                      ? "border-accent bg-accent text-white"
-                      : "border-edge text-secondary hover:bg-surface-2"
-                  }`}
-                >
-                  {meta.icon} {meta.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-secondary">Put it on:</span>
+        {(["wishlist", "reading", "finished"] as BookStatus[]).map((s) => {
+          const meta = BOOK_STATUSES.find((b) => b.value === s)!;
+          return (
             <button
-              type="submit"
-              disabled={busy || !title.trim()}
-              className="rounded-lg bg-brand-gradient px-5 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
-            >
-              Add book
-            </button>
-            <button
+              key={s}
               type="button"
-              onClick={() => setAdding(false)}
-              className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
+              onClick={() => setShelf(s)}
+              className={`rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                shelf === s
+                  ? "border-accent bg-accent text-white"
+                  : "border-edge text-secondary hover:bg-surface-2"
+              }`}
             >
-              Cancel
+              {meta.icon} {meta.label}
             </button>
-          </div>
-        </form>
-      ) : (
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setAdding(true)}
-          className="w-full rounded-lg bg-brand-gradient px-5 py-2.5 font-medium text-white hover:brightness-110"
+          type="submit"
+          disabled={busy || !title.trim()}
+          className="rounded-lg bg-brand-gradient px-5 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
         >
-          ＋ Add a book
+          Add book
         </button>
-      )}
-
+        <button
+          type="button"
+          onClick={() => setAdding(false)}
+          className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
+        >
+          Cancel
+        </button>
+      </div>
       {error && (
         <p className="animate-fade-in text-sm font-medium text-red-600">{error}</p>
       )}
+    </form>
+  );
 
-      {q.loading ? (
-        <div className="space-y-3">
-          <div className="skeleton h-24 w-full rounded-xl" aria-hidden="true" />
-          <div className="skeleton h-24 w-full rounded-xl" aria-hidden="true" />
-          <MotivationLine />
-        </div>
-      ) : (
-        BOOK_STATUSES.map((section) => {
-          const shelfBooks = shelfOrder(books, section.value);
-          // The two shelves that are always worth a heading are the ones you
-          // act on; an empty "put down" pile is just clutter.
-          if (
-            shelfBooks.length === 0 &&
-            (section.value === "dropped" || section.value === "finished")
-          ) {
-            return null;
-          }
-          return (
-            <section key={section.value}>
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
-                <span>
-                  {section.icon} {section.label}
-                </span>
-                <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-muted">
-                  {shelfBooks.length}
-                </span>
-              </div>
-              {shelfBooks.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-edge p-4 text-center text-sm text-muted">
-                  {section.empty}
-                </p>
-              ) : (
-                <ul className="stagger space-y-2">
-                  {shelfBooks.map((book) => (
-                    <BookCard
-                      key={book.id}
-                      book={book}
-                      today={today}
-                      busy={busy}
-                      onPatch={patch}
-                      onRemove={remove}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })
+  // Nothing on the shelf yet: an invitation, not an empty grid of headings.
+  if (books.length === 0) {
+    return adding ? (
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        {form}
+      </section>
+    ) : (
+      <section className="rounded-lg border border-dashed border-edge p-5 text-center">
+        <p className="font-medium">📚 A shelf for what you read</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-secondary">
+          Not a habit and not a tracker — a wishlist, whatever you&apos;re in
+          the middle of, and the count of what you actually finished.
+        </p>
+        <button
+          onClick={() => setAdding(true)}
+          className="mt-3 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+        >
+          Add a book
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="ml-auto rounded-md border border-edge px-3 py-1.5 text-sm font-medium text-secondary hover:bg-surface-2"
+          >
+            + Add a book
+          </button>
+        )}
+      </div>
+
+      {/* The number the shelf exists for, first — the rest is bookkeeping. */}
+      <p className="text-sm text-secondary">
+        <strong className="tabular-nums text-foreground">{stats.finished}</strong>{" "}
+        {stats.finished === 1 ? "book" : "books"} read
+        {stats.finishedThisYear > 0 && (
+          <>
+            , <strong className="tabular-nums">{stats.finishedThisYear}</strong> in{" "}
+            {today.slice(0, 4)}
+          </>
+        )}
+        {stats.reading > 0 && <> · {stats.reading} on the go</>}
+        {stats.wishlist > 0 && <> · {stats.wishlist} on the wishlist</>}
+        {stats.pagesRead > 0 && (
+          <> · {stats.pagesRead.toLocaleString()} pages</>
+        )}
+      </p>
+
+      {adding && form}
+      {error && !adding && (
+        <p className="animate-fade-in text-sm font-medium text-red-600">{error}</p>
       )}
-    </div>
+
+      {BOOK_STATUSES.map((section) => {
+        const shelfBooks = shelfOrder(books, section.value);
+        if (shelfBooks.length === 0) return null;
+        const open = unfolded.includes(section.value);
+        // A finished shelf grows for years; showing all of it inside another
+        // page would bury everything under it.
+        const shown =
+          open || shelfBooks.length <= SHELF_PREVIEW
+            ? shelfBooks
+            : shelfBooks.slice(0, SHELF_PREVIEW);
+
+        return (
+          <div key={section.value} className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted">
+              <span>
+                {section.icon} {section.label}
+              </span>
+              <span className="tabular-nums">({shelfBooks.length})</span>
+            </div>
+            <ul className="space-y-2">
+              {shown.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  today={today}
+                  busy={busy}
+                  onPatch={patch}
+                  onRemove={remove}
+                />
+              ))}
+            </ul>
+            {shelfBooks.length > shown.length && (
+              <button
+                onClick={() => setUnfolded((ids) => [...ids, section.value])}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Show all {shelfBooks.length}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -404,11 +411,7 @@ function BookCard({
               type="button"
               disabled={busy || !title.trim()}
               onClick={async () => {
-                await onPatch(book.id, {
-                  title,
-                  author,
-                  pages: pages || null,
-                });
+                await onPatch(book.id, { title, author, pages: pages || null });
                 setEditing(false);
               }}
               className="rounded-md bg-brand-gradient px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:opacity-40"

@@ -16,6 +16,13 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(to);
   }
 
+  // The bookshelf briefly had a tab of its own before it moved in with the
+  // trackers. Anything that remembers the old address — a bookmark, an
+  // installed app's cached shell — lands where the shelf actually is.
+  if (pathname === "/books") {
+    return NextResponse.redirect(new URL("/trackers", req.url));
+  }
+
   // The pitch used to live at /welcome and is now the home page itself. The
   // old address forwards to the root, where signed-out visitors get the
   // pitch (rewritten below) and signed-in ones get the log.

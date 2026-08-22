@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
+import Books from "@/components/Books";
 import Challenges from "@/components/Challenges";
 import MotivationLine from "@/components/MotivationLine";
 import { cacheRemove } from "@/lib/sync";
@@ -381,6 +382,11 @@ export default function TrackersPage() {
       {/* "This, every day, for N days" — challenges watch a tracker over a
           window, so they live with the trackers they're judged by. */}
       {!showForm && <Challenges trackers={trackers} onTrackerCreated={load} />}
+
+      {/* Books aren't trackers and never touch a day's score — but they are
+          the same kind of thing to set up and keep an eye on, so the shelf
+          lives here rather than costing a whole tab. */}
+      {!showForm && <Books />}
 
       {showPacks && !showForm && (
         <div className="animate-rise-in grid gap-3 sm:grid-cols-2">

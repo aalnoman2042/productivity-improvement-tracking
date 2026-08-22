@@ -105,15 +105,18 @@ tabs, with a light slide so the page follows the finger.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
   ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
   a clean streak). Adding a pack twice skips what you already have. Past eight
-  trackers a search box appears, matching on name, category or kind.
-- **Books** (`/books`) — the bookshelf, which is deliberately not a
-  tracker: a book is one slow thing with a start, a middle and an end rather
-  than a question asked every day. Three shelves — wishlist, reading now,
-  read — and one tap to move a book between them, which stamps the start
-  and finish dates for you. A page count buys a progress bar and a pace
-  ("about 10/day, 19 to go"); finished books take a rating. The headline
-  number is the one the shelf exists for: how many you have actually read,
-  all time and this year.
+  trackers a search box appears, matching on name, category or kind. Two
+  things that aren't trackers but are set up the same way live here too:
+  - **🏆 Challenges** — "this, every day, for N days", watching a tracker
+    over a window.
+  - **📚 Books** — a shelf, deliberately not a tracker type: a book is one
+    slow thing with a start, a middle and an end rather than a question asked
+    every day. Wishlist → reading now (page progress and a pace, "about
+    10/day, 19 to go") → read (a rating, the date). One tap moves a book and
+    stamps the dates for you. The headline is the count the shelf exists for:
+    how many you have actually read, all time and this year. Nothing here
+    touches a day's score, a streak or the coach. (`/books` forwards here —
+    the shelf briefly had a tab of its own.)
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
   every tracker's numbers. It holds History's old slot in the nav — "how am

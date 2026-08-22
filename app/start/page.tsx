@@ -88,7 +88,7 @@ const STEPS: Step[] = [
       },
       {
         label: "And a shelf for books",
-        text: "Books aren't habits, so they get their own page: a wishlist, whatever you're in the middle of with a progress bar, and the count of what you've actually finished this year.",
+        text: "Books aren't habits, so they sit on the Trackers page as a shelf rather than a tracker: a wishlist, whatever you're in the middle of with a progress bar, and the count of what you've actually finished this year.",
       },
     ],
   },
