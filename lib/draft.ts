@@ -160,6 +160,38 @@ export function digits(raw: string, max: number): string {
 /** Minutes in a day — the hard ceiling on a day's time log. */
 export const DAY_MINUTES = 24 * 60;
 
+/** One tracker's share of the day, for the 24-hour dial. */
+export type TimeSlice = {
+  id: string;
+  name: string;
+  color: string;
+  minutes: number;
+};
+
+/**
+ * The day broken into its time-measured parts, in the order the trackers are
+ * kept — what the dial on the daily log draws.
+ *
+ * Only trackers counted in minutes appear, and only once they have minutes in
+ * them: an empty row is not a slice of nothing, it is simply not part of the
+ * day yet. Everything not covered by these is the gap the dial leaves open,
+ * which is the number the whole thing exists to show.
+ */
+export function timeSlices(
+  trackers: Tracker[],
+  draft: Record<string, Draft>
+): TimeSlice[] {
+  return trackers
+    .filter((t) => t.type === "duration" || t.type === "sleep")
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      color: t.color,
+      minutes: draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY).value,
+    }))
+    .filter((slice) => slice.minutes > 0);
+}
+
 /**
  * The day's time-measured total: everything counted in minutes — time spent
  * and sleep — added up. This is the number that strictly cannot pass 24

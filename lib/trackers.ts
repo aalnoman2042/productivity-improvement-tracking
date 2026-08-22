@@ -181,7 +181,19 @@ export type Template = {
   habit?: Habit;
 };
 
-/** Ready-made trackers, added a whole pack at a time from the Trackers page. */
+/**
+ * Ready-made trackers, added a whole pack at a time from the Trackers page.
+ *
+ * A pack is a *kind of person*, not a category: the gym one, the one who
+ * lives by a plan, the one who reads. Someone setting up an account knows
+ * instantly which of those they are trying to be, and picking two or three
+ * covers most of a life in a couple of taps — which is the whole point, since
+ * the empty account is where this app is most often abandoned.
+ *
+ * Packs overlap on purpose (Water and Weight belong to more than one life),
+ * and adding a pack skips any tracker whose name you already have, so taking
+ * two of them never leaves you with two of anything.
+ */
 export const TEMPLATE_PACKS: {
   id: string;
   label: string;
@@ -287,6 +299,220 @@ export const TEMPLATE_PACKS: {
         unit: "",
         category: "discipline",
         color: "#4a3aa7",
+        goal: null,
+      },
+    ],
+  },
+  {
+    id: "gym",
+    label: "Gym man",
+    hint: "Workout, cardio, steps, protein, water and the weight they move.",
+    items: [
+      {
+        name: "Workout",
+        type: "duration",
+        unit: "min",
+        category: "fitness",
+        color: "#eb6834",
+        goal: { target: 45, period: "day", direction: "min" },
+      },
+      {
+        name: "Cardio",
+        type: "duration",
+        unit: "min",
+        category: "fitness",
+        color: "#e34948",
+        goal: { target: 120, period: "week", direction: "min" },
+      },
+      {
+        name: "Steps",
+        type: "count",
+        unit: "steps",
+        category: "health",
+        color: "#1baf7a",
+        goal: { target: 8000, period: "day", direction: "min" },
+      },
+      {
+        name: "Protein",
+        type: "measure",
+        unit: "g",
+        category: "food",
+        color: "#eda100",
+        goal: { target: 120, period: "day", direction: "min" },
+      },
+      {
+        name: "Water",
+        type: "count",
+        unit: "glasses",
+        category: "food",
+        color: "#2a78d6",
+        goal: { target: 8, period: "day", direction: "min" },
+      },
+      {
+        name: "Weight",
+        type: "measure",
+        unit: "kg",
+        category: "health",
+        color: "#008300",
+        goal: null,
+      },
+    ],
+  },
+  {
+    id: "productive",
+    label: "Productive man",
+    hint: "Deep work, the day's plan, an early start — and the scrolling that eats them.",
+    items: [
+      {
+        name: "Deep work",
+        type: "duration",
+        unit: "min",
+        category: "work",
+        color: "#2a78d6",
+        goal: { target: 180, period: "day", direction: "min" },
+      },
+      {
+        name: "Work",
+        type: "duration",
+        unit: "min",
+        category: "work",
+        color: "#1baf7a",
+        goal: null,
+      },
+      {
+        name: "Plan the day",
+        type: "check",
+        unit: "",
+        category: "work",
+        color: "#eda100",
+        goal: { target: 1, period: "day", direction: "min" },
+      },
+      {
+        name: "Up before 7",
+        type: "check",
+        unit: "",
+        category: "discipline",
+        color: "#4a3aa7",
+        goal: { target: 1, period: "day", direction: "min" },
+      },
+      {
+        name: "Doomscrolling",
+        type: "duration",
+        unit: "min",
+        category: "discipline",
+        color: "#e34948",
+        goal: { target: 60, period: "day", direction: "max" },
+        habit: "bad",
+      },
+      {
+        name: "Focus",
+        type: "scale",
+        unit: "/5",
+        category: "work",
+        color: "#e87ba4",
+        goal: null,
+      },
+    ],
+  },
+  {
+    id: "learner",
+    label: "Learner",
+    hint: "Study, reading, a course to finish and the words you keep.",
+    items: [
+      {
+        name: "Self study",
+        type: "duration",
+        unit: "min",
+        category: "study",
+        color: "#2a78d6",
+        goal: { target: 180, period: "day", direction: "min" },
+      },
+      {
+        name: "Reading",
+        type: "duration",
+        unit: "min",
+        category: "study",
+        color: "#4a3aa7",
+        goal: { target: 30, period: "day", direction: "min" },
+      },
+      {
+        name: "Course",
+        type: "duration",
+        unit: "min",
+        category: "study",
+        color: "#1baf7a",
+        goal: null,
+      },
+      {
+        name: "Revision",
+        type: "duration",
+        unit: "min",
+        category: "study",
+        color: "#eda100",
+        goal: { target: 3, period: "week", direction: "min" },
+      },
+      {
+        name: "New words",
+        type: "count",
+        unit: "words",
+        category: "study",
+        color: "#e87ba4",
+        goal: { target: 5, period: "day", direction: "min" },
+      },
+      {
+        name: "Wrote notes",
+        type: "check",
+        unit: "",
+        category: "study",
+        color: "#eb6834",
+        goal: null,
+      },
+    ],
+  },
+  {
+    id: "calm",
+    label: "Calm mind",
+    hint: "Mood, meditation, time outside — and the screen time that undoes them.",
+    items: [
+      {
+        name: "Mood",
+        type: "scale",
+        unit: "/5",
+        category: "health",
+        color: "#e87ba4",
+        goal: null,
+      },
+      {
+        name: "Meditation",
+        type: "duration",
+        unit: "min",
+        category: "health",
+        color: "#4a3aa7",
+        goal: { target: 10, period: "day", direction: "min" },
+      },
+      {
+        name: "Outdoors",
+        type: "duration",
+        unit: "min",
+        category: "health",
+        color: "#1baf7a",
+        goal: { target: 30, period: "day", direction: "min" },
+      },
+      {
+        name: "Screen time",
+        type: "duration",
+        unit: "min",
+        category: "discipline",
+        color: "#e34948",
+        goal: { target: 180, period: "day", direction: "max" },
+        habit: "bad",
+      },
+      {
+        name: "Gratitude",
+        type: "check",
+        unit: "",
+        category: "other",
+        color: "#eda100",
         goal: null,
       },
     ],

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { loggingRun, nightlyMessage, type StakeInput } from "../lib/stakes";
+import {
+  LAPSE_DAYS,
+  lapseMessage,
+  loggingRun,
+  nightlyMessage,
+  type StakeInput,
+} from "../lib/stakes";
 
 /**
  * The nightly ask picks one message from a ladder. These pin the order, and —
@@ -142,5 +148,37 @@ describe("loggingRun", () => {
   it("stops at the first gap, and is zero with nothing to count", () => {
     expect(loggingRun(days("2026-08-10", "2026-08-13"), TODAY)).toBe(1);
     expect(loggingRun(days(), TODAY)).toBe(0);
+  });
+});
+
+describe("lapseMessage", () => {
+  it("waits three days before saying anything unprompted", () => {
+    // The constant is the promise; the run reads the same one.
+    expect(LAPSE_DAYS).toBe(3);
+  });
+
+  it("names the last day on record, so the gap is a fact not a scolding", () => {
+    const m = lapseMessage(3, "2026-08-19");
+    expect(m.title).toContain("3 days");
+    expect(m.body).toContain("19 Aug");
+    expect(m.url).toBe("/");
+  });
+
+  it("softens as the gap grows instead of shouting louder", () => {
+    const week = lapseMessage(8, "2026-08-14");
+    const fortnight = lapseMessage(21, "2026-08-01");
+    expect(week.title).not.toBe(fortnight.title);
+    // Nothing here may read as a telling-off — that is how notifications get
+    // switched off, and then there is no way back at all.
+    for (const m of [week, fortnight]) {
+      expect(m.body).not.toMatch(/fail|lazy|should have|behind/i);
+    }
+    expect(fortnight.body).toContain("hasn't gone anywhere");
+  });
+
+  it("has something to say to an account that never logged at all", () => {
+    const m = lapseMessage(9, null);
+    expect(m.title).toMatch(/first day/i);
+    expect(m.body).not.toContain("null");
   });
 });

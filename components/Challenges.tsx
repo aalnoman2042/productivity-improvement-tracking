@@ -46,9 +46,12 @@ type Form = {
 export default function Challenges({
   trackers,
   onTrackerCreated,
+  standalone = false,
 }: {
   trackers: Tracker[] | null;
   onTrackerCreated: () => void;
+  /** On its own view the page owns the heading, so this doesn't draw one. */
+  standalone?: boolean;
 }) {
   const today = toDateStr(new Date());
   const q = useCached<ChallengeRow[]>("/api/challenges", "challenges");
@@ -180,7 +183,9 @@ export default function Challenges({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-secondary">🏆 Challenges</h2>
+        {!standalone && (
+          <h2 className="text-sm font-semibold text-secondary">🏆 Challenges</h2>
+        )}
         {!showForm && (
           <button
             onClick={openForm}

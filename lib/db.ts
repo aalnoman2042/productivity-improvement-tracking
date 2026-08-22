@@ -283,6 +283,8 @@ const VALIDATORS: Record<string, object> = {
       checked: { bsonType: ["number", "null"] },
       notified: { bsonType: ["number", "null"] },
       stakes: { bsonType: ["number", "null"] },
+      // Check-ins sent to people who had gone quiet for days.
+      lapses: { bsonType: ["number", "null"] },
       skipped: { bsonType: ["number", "null"] },
       digests: { bsonType: ["number", "null"] },
       error: { bsonType: ["string", "null"] },

@@ -13,6 +13,9 @@ import type { Tracker, TrackerType } from "@/lib/trackers";
  * light up as they're tapped, which turns the start of logging a day into a
  * few seconds of tap-tap-tap rather than a hunt down a list.
  *
+ * Two to a row on a phone, more as the screen allows — a dozen trackers
+ * should be a screenful, not a scroll.
+ *
  * Everything writes through the same `set` as the full rows, so autosave,
  * undo and the offline queue don't know this grid exists. Scales and prayers
  * reuse `TrackerInput` outright — a "3/5 mood" must mean the same thing here
@@ -43,7 +46,7 @@ export default function TapGrid({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
       {trackers.map((t) => {
         const dr = draft[t.id] ?? EMPTY;
         const type = t.type as TrackerType;

@@ -13,6 +13,9 @@ type Status = {
   time: string;
   devices: number;
   schedule?: CronHealth;
+  /** The polled per-tracker schedule, and whether anything needs it. */
+  trackerSchedule?: CronHealth;
+  timedTrackers?: number;
 };
 
 /** "4 hours ago", "yesterday" — vague on purpose; the exact minute is noise. */
@@ -30,15 +33,24 @@ function ago(hours: number): string {
  * exactly like a run of days you happened to log early. So the last run is
  * stated outright, and going quiet for more than a day is called out.
  */
-function ScheduleHealth({ schedule }: { schedule: CronHealth }) {
+function ScheduleHealth({
+  schedule,
+  label = "Schedule",
+  path = "/api/cron/reminders",
+}: {
+  schedule: CronHealth;
+  label?: string;
+  path?: string;
+}) {
   if (!schedule.everRan) {
     return (
-      <p className="mt-3 rounded-md border border-edge bg-surface-2 p-2.5 text-xs text-secondary">
-        The reminder schedule hasn&apos;t sent anything yet — no run has ever
-        been recorded. If reminders never arrive, check that the schedule is
-        polling <code className="rounded bg-surface px-1">/api/cron/reminders</code>{" "}
-        and that <code className="rounded bg-surface px-1">CRON_SECRET</code> is
-        set.
+      <p className="mt-3 rounded-md border border-amber-600/40 bg-surface-2 p-2.5 text-xs text-amber-700 dark:text-amber-500">
+        ⚠ {label} has never run. A time you choose only arrives if something
+        is awake to notice it — check that a scheduler is polling{" "}
+        <code className="rounded bg-surface px-1">{path}</code> (the GitHub
+        Action in the repo does this) and that{" "}
+        <code className="rounded bg-surface px-1">CRON_SECRET</code> is set.
+        Until then, opening PIT sends anything that is already due.
       </p>
     );
   }
@@ -51,7 +63,7 @@ function ScheduleHealth({ schedule }: { schedule: CronHealth }) {
   return (
     <p className={`mt-3 rounded-md border bg-surface-2 p-2.5 text-xs ${tone}`}>
       {broken ? "⚠ " : "✓ "}
-      Schedule last ran{" "}
+      {label} last ran{" "}
       <strong>{ago(schedule.hoursAgo ?? 0)}</strong>
       {schedule.lastRunOk
         ? schedule.notified !== null &&
@@ -286,7 +298,8 @@ export default function ReminderSettings() {
         riding on the day it says so instead: a challenge on its last day, a
         milestone you just crossed, a logging run about to break. On Sunday
         nights it also sends your week in review: days logged, sleep, namaz and
-        your streak.
+        your streak. Go quiet for three days and it checks in on its own —
+        that one doesn&apos;t wait to be asked for.
       </p>
 
       {supported === null ? (
@@ -387,7 +400,20 @@ export default function ReminderSettings() {
             </p>
           )}
 
-          {status.schedule && <ScheduleHealth schedule={status.schedule} />}
+          {status.schedule && (
+            <ScheduleHealth schedule={status.schedule} label="The daily ask" />
+          )}
+
+          {/* The per-tracker times are a different schedule with a different
+              failure: it can be perfectly healthy and silent, so it is only
+              worth reporting once something actually depends on it. */}
+          {(status.timedTrackers ?? 0) > 0 && status.trackerSchedule && (
+            <ScheduleHealth
+              schedule={status.trackerSchedule}
+              label="Tracker reminders"
+              path="/api/cron/tracker-reminders"
+            />
+          )}
         </>
       )}
     </section>

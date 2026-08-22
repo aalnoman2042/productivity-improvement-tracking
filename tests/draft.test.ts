@@ -6,6 +6,7 @@ import {
   draftNote,
   draftToEntry,
   isLogged,
+  timeSlices,
   toDraft,
 } from "../lib/draft";
 import type { Tracker } from "../lib/trackers";
@@ -140,5 +141,56 @@ describe("notes on an entry", () => {
   it("a note alone does not make a day logged — it rides on what is", () => {
     expect(isLogged("count", { ...EMPTY, note: "meant to" })).toBe(false);
     expect(isLogged("count", { ...EMPTY, num: "2", note: "meant to" })).toBe(true);
+  });
+});
+
+describe("timeSlices", () => {
+  const t = (id: string, type: Tracker["type"], color = "#2a78d6"): Tracker => ({
+    id,
+    name: id,
+    type,
+    unit: "",
+    color,
+    category: "other",
+    goal: null,
+    archived: false,
+    order: 0,
+  });
+
+  const trackers = [
+    t("work", "duration"),
+    t("water", "count"),
+    t("sleep", "sleep"),
+    t("gym", "duration"),
+  ];
+
+  it("keeps only the minute-counted trackers, in the order given", () => {
+    const draft = {
+      work: { ...EMPTY, h: "6", m: "30" },
+      water: { ...EMPTY, num: "8" },
+      sleep: { ...EMPTY, start: "23:00", end: "07:00" },
+      gym: { ...EMPTY, h: "1", m: "0" },
+    };
+    expect(timeSlices(trackers, draft).map((s) => [s.id, s.minutes])).toEqual([
+      ["work", 390],
+      ["sleep", 480],
+      ["gym", 60],
+    ]);
+  });
+
+  it("leaves out the rows with nothing in them — an empty row is not a slice", () => {
+    const draft = { work: { ...EMPTY, h: "2", m: "0" } };
+    expect(timeSlices(trackers, draft)).toHaveLength(1);
+    expect(timeSlices(trackers, {})).toEqual([]);
+  });
+
+  it("adds up to the same total the 24h cap is judged against", () => {
+    const draft = {
+      work: { ...EMPTY, h: "6", m: "30" },
+      sleep: { ...EMPTY, start: "23:00", end: "07:00" },
+    };
+    const sum = timeSlices(trackers, draft).reduce((n, s) => n + s.minutes, 0);
+    expect(sum).toBe(dayTimeTotal(trackers, draft));
+    expect(sum).toBeLessThan(DAY_MINUTES);
   });
 });

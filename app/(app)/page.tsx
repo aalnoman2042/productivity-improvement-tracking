@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import DayDial from "@/components/DayDial";
 import DayNotes from "@/components/DayNotes";
 import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -12,7 +13,7 @@ import ReadingToday from "@/components/ReadingToday";
 import TapGrid from "@/components/TapGrid";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
-import { useCached } from "@/lib/useCached";
+import { useCached, useStored } from "@/lib/useCached";
 import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import { buildPrefills, type RecentEntry } from "@/lib/prefill";
@@ -118,6 +119,10 @@ function TodayLog() {
   const [state, setState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
   const [quick, setQuick] = useState(false);
+  // Which category sections are rolled up. Kept on the device rather than in
+  // the account: it's about the screen you're logging on, and a phone and a
+  // laptop have different amounts of room to spend.
+  const [folded, setFolded] = useStored<string[]>("logFolded", []);
 
   const today = toDateStr(new Date());
 
@@ -430,6 +435,14 @@ function TodayLog() {
     items.filter((t) => isLogged(t.type as TrackerType, draft[t.id] ?? EMPTY))
       .length;
 
+  const isFolded = (category: string) => folded.includes(category.toLowerCase());
+
+  /** Roll a section up or down. Folding never touches what's in it. */
+  function toggleFold(category: string) {
+    const key = category.toLowerCase();
+    setFolded(isFolded(key) ? folded.filter((f) => f !== key) : [...folded, key]);
+  }
+
   /* -------------------------------- render ------------------------------- */
 
   const statusLine =
@@ -448,12 +461,17 @@ function TodayLog() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Daily log</h1>
-        <p className="mt-1 text-sm text-secondary">
-          Tap or type — it saves itself. Leave anything blank if it doesn&apos;t
-          apply.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">Daily log</h1>
+          <p className="mt-1 text-sm text-secondary">
+            Tap or type — it saves itself. Leave anything blank if it
+            doesn&apos;t apply.
+          </p>
+        </div>
+        {/* Twenty-four hours, and how much of them is on record — the gap in
+            the ring is the part of the day nobody wrote down. */}
+        {trackers.length > 0 && <DayDial trackers={trackers} draft={draft} />}
       </div>
 
       <InstallPrompt />
@@ -565,64 +583,91 @@ function TodayLog() {
 
           {/* One section per category. Taps still come first inside each,
               so most of a section is settled in a few seconds. */}
-          {groups.map((group) => (
-            <section key={group.value}>
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-secondary">
-                <span>
-                  {group.icon} {group.label}
-                </span>
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
-                    doneInGroup(group.items) === group.items.length
-                      ? "bg-green-700/10 text-green-700 dark:text-green-500"
-                      : "bg-surface-2 text-muted"
-                  }`}
+          {groups.map((group) => {
+            const done = doneInGroup(group.items);
+            const open = !isFolded(group.value);
+            return (
+              <section key={group.value}>
+                {/* The whole header folds the section. A day with a dozen
+                    trackers is a long scroll otherwise, and the sections
+                    already finished are the ones worth getting out of the
+                    way. */}
+                <button
+                  type="button"
+                  onClick={() => toggleFold(group.value)}
+                  aria-expanded={open}
+                  className="mb-2 flex w-full items-center gap-2 text-sm font-semibold text-secondary"
                 >
-                  {doneInGroup(group.items)}/{group.items.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {group.taps.length > 0 && (
-                  <TapGrid
-                    trackers={group.taps}
-                    draft={draft}
-                    set={set}
-                    date={date}
-                  />
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block text-xs transition-transform duration-200 ${
+                      open ? "rotate-90" : ""
+                    }`}
+                  >
+                    &#9654;
+                  </span>
+                  <span>
+                    {group.icon} {group.label}
+                  </span>
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                      done === group.items.length
+                        ? "bg-green-700/10 text-green-700 dark:text-green-500"
+                        : "bg-surface-2 text-muted"
+                    }`}
+                  >
+                    {done}/{group.items.length}
+                  </span>
+                </button>
+                {open && (
+                  <div className="space-y-2">
+                    {group.taps.length > 0 && (
+                      <TapGrid
+                        trackers={group.taps}
+                        draft={draft}
+                        set={set}
+                        date={date}
+                      />
+                    )}
+                    {/* The typed kinds go two to a row once there is width
+                        for it — the name above its inputs, so a narrow
+                        column never squeezes a stopwatch and two boxes onto
+                        one line. On a phone it stays a single column. */}
+                    {group.typed.length > 0 && (
+                      <ul className="stagger grid gap-2 sm:grid-cols-2">
+                        {group.typed.map((t) => (
+                          <li
+                            key={t.id}
+                            className="flex flex-col gap-2 rounded-xl border border-edge card p-3 shadow-sm"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="h-3.5 w-3.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: seriesColor(t.color) }}
+                              />
+                              <span className="min-w-0 truncate font-medium">
+                                {t.name}
+                              </span>
+                            </span>
+                            <div className="flex justify-end">
+                              <TrackerInput
+                                tracker={t}
+                                draft={draft[t.id]}
+                                set={set}
+                                date={date}
+                                onTimerSaved={afterTimer}
+                                prefill={prefills[t.id]}
+                              />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
-                {group.typed.length > 0 && (
-                  <ul className="stagger space-y-2">
-                    {group.typed.map((t) => (
-                      <li
-                        key={t.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-edge card p-3 shadow-sm"
-                      >
-                        <span
-                          className="h-4 w-4 shrink-0 rounded-full"
-                          style={{ backgroundColor: seriesColor(t.color) }}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {t.name}
-                        </span>
-                        {/* Inputs sit beside the name on a wide screen and
-                            drop to their own full-width row on a phone. */}
-                        <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
-                          <TrackerInput
-                            tracker={t}
-                            draft={draft[t.id]}
-                            set={set}
-                            date={date}
-                            onTimerSaved={afterTimer}
-                            prefill={prefills[t.id]}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-          ))}
+              </section>
+            );
+          })}
 
           {/* A bookmark is a thing you move at the end of a day too, and
               nobody goes to another screen to do it. Renders nothing at all

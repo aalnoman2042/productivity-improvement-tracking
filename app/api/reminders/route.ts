@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { pushConfigured } from "@/lib/push";
 import { parseTimeOfDay, reminderTime } from "@/lib/reminders";
-import { REMINDER_JOB, cronHealth } from "@/lib/cronLog";
+import { REMINDER_JOB, TRACKER_REMINDER_JOB, cronHealth } from "@/lib/cronLog";
 
 /**
  * Whether reminders are on, how many browsers would receive one — and whether
@@ -15,10 +15,16 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const d = await db();
-  const [user, devices, schedule] = await Promise.all([
+  const [user, devices, schedule, trackerSchedule, timed] = await Promise.all([
     d.collection("users").findOne({ _id: userId }, { projection: { reminder: 1 } }),
     d.collection("pushSubs").countDocuments({ userId }),
     cronHealth(REMINDER_JOB),
+    cronHealth(TRACKER_REMINDER_JOB),
+    // Whether this account has any per-tracker times set at all — without
+    // one, the tracker schedule staying quiet is correct, not broken.
+    d
+      .collection("trackers")
+      .countDocuments({ userId, archived: false, reminder: { $ne: null } }),
   ]);
 
   return NextResponse.json({
@@ -30,6 +36,8 @@ export async function GET() {
     time: reminderTime(user?.reminder?.time),
     devices,
     schedule,
+    trackerSchedule,
+    timedTrackers: timed,
   });
 }
 

@@ -55,6 +55,59 @@ export type StakeInput = {
 const STREAK_WORTH_SAVING = 5;
 
 /**
+ * How many days of silence before the app says something unprompted.
+ *
+ * Three is the number where a gap stops being a busy week and starts being
+ * the habit coming apart — and it is also how long someone can be away before
+ * coming back feels like starting over. Anything shorter is nagging.
+ */
+export const LAPSE_DAYS = 3;
+
+/**
+ * The check-in for someone who has gone quiet.
+ *
+ * Not a nightly ask and not a scolding: the app noticed, it isn't keeping
+ * score of the silence, and the way back is one tap. The tone is the whole
+ * design here — a message that makes someone feel behind is a message that
+ * gets notifications switched off, and then the app has no way back at all.
+ *
+ * `days` is the size of the gap; `lastDate` is the last day with anything on
+ * it, or null for an account that has never logged.
+ */
+export function lapseMessage(days: number, lastDate: string | null): Stake {
+  if (!lastDate) {
+    return {
+      kind: "plain",
+      title: "Your first day is still waiting",
+      body: "Nothing on the record yet. One tap on anything and the app has something to work with.",
+      url: "/",
+    };
+  }
+  if (days >= 14) {
+    return {
+      kind: "plain",
+      title: "Still here whenever you are",
+      body: `Nothing logged since ${prettyDate(lastDate)}. Your history hasn't gone anywhere — pick it up on today, not on the days you missed.`,
+      url: "/",
+    };
+  }
+  if (days >= 7) {
+    return {
+      kind: "plain",
+      title: "A week without a word",
+      body: `The last day on record is ${prettyDate(lastDate)}. Log today and the run starts again from one.`,
+      url: "/",
+    };
+  }
+  return {
+    kind: "plain",
+    title: `${days} days quiet`,
+    body: `Nothing since ${prettyDate(lastDate)}. Even one tracker tonight keeps the record honest.`,
+    url: "/",
+  };
+}
+
+/**
  * Consecutive days with something logged, ending today — or ending yesterday
  * when today is still blank, which is the case the reminder exists for.
  *

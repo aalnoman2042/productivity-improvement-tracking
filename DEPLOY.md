@@ -113,28 +113,53 @@ reminders aren't set up.
 
 ### Setting the time
 
-The hour is chosen **in the app**, not here: Account → Daily reminder →
-*Ask me at*. It is stored per account, in your own timezone, and applies to
-every device you have switched reminders on for.
+The hour is chosen **in the app**: Account → Daily reminder → *Ask me at*. It
+is stored per account, in your own timezone, and applies to every device you
+have switched reminders on for.
 
-For that choice to be honoured, something has to check whose hour has come —
-so the reminder endpoint wants **polling**, the same way per-tracker
-reminders do (step 3c). Add a second cron-job.org job:
+### 3b-i. The thing that has to be awake (do this, or times don't work)
 
-- **URL**: `https://your-site.vercel.app/api/cron/reminders`
-- **Schedule**: every 15 minutes
-- The same `Authorization: Bearer <CRON_SECRET>` header (or `?key=<CRON_SECRET>`)
+A reminder set for 18:00 needs *something* to notice that it is 18:00. Vercel's
+free plan fires a cron **once a day**, so on its own it can only ever deliver
+at one moment — which is exactly the "the only notification I get is the
+11 PM one" symptom. Two schedules need polling:
 
-Calling it often is safe and cheap: a poll that arrives before anybody's hour
-does nothing at all, and each account records which day it was last nagged
-about, so the ask goes out exactly once a day whatever the schedule does.
+| Endpoint | What it sends |
+|---|---|
+| `/api/cron/reminders` | the daily ask at your hour, the Sunday digest, the three-day check-in |
+| `/api/cron/tracker-reminders` | per-tracker times (gym at 18:00, namaz at all five waqts) |
 
-`vercel.json` still schedules one run a day as a **backstop**, in **UTC**,
-shipped as `0 17 * * *` — 17:00 UTC, which is 11 PM in UTC+6 (Bangladesh).
-Without the poller above, that one run is the only chance the reminder gets:
-it reaches anyone whose chosen hour has already passed locally by then, and
-quietly misses anyone whose has not. If you would rather not run a poller,
-set the hour to `23 − your UTC offset` and leave the in-app time near 11 PM:
+**The repo already ships the poller**: `.github/workflows/reminders.yml` calls
+both every 15 minutes from GitHub Actions, free. Turn it on once, in the
+GitHub repo under **Settings → Secrets and variables → Actions**:
+
+- **Variables** tab → New variable: `PIT_URL` = `https://your-site.vercel.app`
+  (no trailing slash)
+- **Secrets** tab → New secret: `CRON_SECRET` = the same value you put in Vercel
+
+Then open **Actions → Reminders → Run workflow** once to prove it: the run log
+prints the HTTP status and what each endpoint did. Two caveats about GitHub's
+scheduler — it runs late when busy (5−20 minutes, which the three-hour grace
+window on a slot absorbs), and it pauses schedules on a repository with no
+activity for 60 days (a commit, or the Enable button, brings it back).
+
+Prefer not to use GitHub? Any HTTP scheduler does — cron-job.org (free) with
+the two URLs above, every 15 minutes, sending
+`Authorization: Bearer <CRON_SECRET>` (or `?key=<CRON_SECRET>` if headers are
+awkward). Calling either endpoint often is safe: everything is stamped per
+day, so nothing sends twice.
+
+**Two things happen even with no poller at all**, so the app is never
+completely silent: the daily cron in `vercel.json` runs both schedules once
+(17:00 and 15:30 UTC), and **opening PIT sends anything already due for you**
+— the app pokes `/api/reminders/flush` when it comes to the front, at most
+once every ten minutes, for your account only.
+
+### Where the daily cron fires
+
+`vercel.json` schedules both jobs once a day in **UTC** as a backstop, shipped
+as `0 17 * * *` (17:00 UTC = 11 PM in UTC+6) and `30 15 * * *`. If you are not
+running a poller, set the first to `23 − your UTC offset`:
 
 | Your timezone | Line in `vercel.json` |
 |---|---|
@@ -146,7 +171,8 @@ set the hour to `23 − your UTC offset` and leave the in-app time near 11 PM:
 > The reminder goes out **every day**, logged or not — the ask is the closing
 > ritual of the day, and tapping it opens that day's log. One set for the
 > morning asks about *yesterday*: nobody can report on a day that has not
-> happened yet.
+> happened yet. And after three days with nothing logged, PIT checks in on
+> its own, whether or not the daily ask is switched on.
 
 ## 3c. Turn on per-tracker reminders (optional, needs 3b)
 
@@ -157,28 +183,22 @@ needs it**: most trackers go quiet once logged, a prayer tracker only once
 all five prayers are in. Pushes arrive on every device where you've turned
 reminders on (step 3b).
 
-Vercel's free plan only fires a schedule once a day, so this one is driven by
-a free external scheduler instead — the same one that polls the daily ask
-above, as a second job:
+This is the schedule that needs the poller from **3b-i** — the GitHub Action
+in the repo already calls it every 15 minutes, alongside the daily ask. Turn
+that on and there is nothing else to do here.
 
-1. Sign up at https://cron-job.org (free).
-2. Create a cronjob with:
-   - **URL**: `https://your-site.vercel.app/api/cron/tracker-reminders`
-   - **Schedule**: every 15 minutes
-   - Under **Advanced → Headers**, add `Authorization` with the value
-     `Bearer <your CRON_SECRET>` (the same secret from step 3b).
-     If headers are awkward, appending `?key=<CRON_SECRET>` to the URL
-     works too.
-3. Save. That's all — the endpoint is safe to call as often as you like. Each
-   reminder sends at most once per day, is skipped once the tracker is logged,
-   and one that couldn't be delivered within 3 hours of its time is dropped
-   rather than arriving at midnight. You can test it by hand:
+Whatever polls it, the endpoint is safe to call as often as you like. Each
+reminder sends at most once per day, is skipped once the tracker is logged,
+and one that couldn't be delivered within 3 hours of its time is dropped
+rather than arriving at midnight. You can test it by hand:
 
-   ```powershell
-   curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://your-site.vercel.app/api/cron/tracker-reminders
-   ```
+```powershell
+curl.exe -H "Authorization: Bearer <CRON_SECRET>" https://your-site.vercel.app/api/cron/tracker-reminders
+```
 
-   It answers with what it did — `checked`, `notified`, `skipped`.
+It answers with what it did — `checked`, `notified`, `skipped`. The
+Account page reports on this schedule too, as soon as any tracker has a time
+set: if it says the schedule has never run, nothing is polling it.
 
 ## 4. Use it from your phone
 

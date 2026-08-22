@@ -1,0 +1,50 @@
+name: Reminders
+
+# The reminder schedules are *polled*, not scheduled: a reminder set for
+# 18:00 needs something awake at 18:00, and Vercel's Hobby plan fires a cron
+# once a day. GitHub's scheduler is free, already has the repo, and is happy
+# to make an HTTP request every quarter of an hour — so it is the thing that
+# is awake.
+#
+# One-time setup (Settings → Secrets and variables → Actions):
+#   • Variable  PIT_URL       https://your-site.vercel.app   (no trailing slash)
+#   • Secret    CRON_SECRET   the same value as in Vercel's env vars
+#
+# Two caveats worth knowing: GitHub runs scheduled workflows late when it is
+# busy (five to twenty minutes is normal, which the three-hour grace window
+# on a reminder slot absorbs), and it disables schedules on repositories with
+# no activity for 60 days — a commit, or the "Enable workflow" button, brings
+# it back.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  # So it can be run by hand from the Actions tab to check the plumbing.
+  workflow_dispatch:
+
+jobs:
+  poke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send anything that is due
+        env:
+          PIT_URL: ${{ vars.PIT_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$PIT_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing setup: add the PIT_URL variable and the CRON_SECRET secret" >&2
+            echo "under Settings -> Secrets and variables -> Actions." >&2
+            exit 1
+          fi
+          status=0
+          for job in reminders tracker-reminders; do
+            code=$(curl -sS --max-time 60 -o /tmp/body \
+              -w '%{http_code}' \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "$PIT_URL/api/cron/$job") || code=000
+            echo "$job -> $code $(head -c 400 /tmp/body)"
+            # A failure is worth a red run: silence is the failure mode this
+            # whole workflow exists to prevent.
+            [ "$code" = "200" ] || status=1
+          done
+          exit $status

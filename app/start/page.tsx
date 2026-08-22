@@ -34,7 +34,7 @@ const STEPS: Step[] = [
     points: [
       {
         label: "Ready-made packs",
-        text: "The essentials — sleep, study, work, workout, water, junk food, diet and weight — or faith & discipline: namaz, Quran and a clean streak. One tap adds the lot.",
+        text: "Pick the kind of person you're trying to be and take the lot in one tap: the essentials, faith & discipline, gym man, productive man, learner, calm mind. They overlap on purpose, and a pack skips anything you already have — so take two or three.",
       },
       {
         label: "Every tracker has a type",

@@ -120,6 +120,9 @@ function TrackersList() {
   // `/books` — the address it briefly had — forwards here asking for it.
   const params = useSearchParams();
   const [showBooks, setShowBooks] = useState(() => params.get("books") === "1");
+  const [showChallenges, setShowChallenges] = useState(
+    () => params.get("challenges") === "1"
+  );
 
   const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
   const trackers = trackersQ.data;
@@ -357,8 +360,33 @@ function TrackersList() {
   const field =
     "w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent";
 
-  // A page of its own in everything but the URL. The trackers list is long
-  // enough already; a shelf of forty books underneath it would bury both.
+  // Two views of their own in everything but the URL. Both are things you
+  // set up and then leave running for weeks, and neither is what you came to
+  // this page to do most days — so they wait behind a button instead of
+  // pushing the tracker list further down the screen.
+  if (showChallenges) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">🏆 Challenges</h1>
+            <p className="mt-1 text-sm text-secondary">
+              This tracker, every day, for N days — and every day of it on the
+              record.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowChallenges(false)}
+            className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+          >
+            ← Trackers
+          </button>
+        </div>
+        <Challenges trackers={trackers} onTrackerCreated={load} standalone />
+      </div>
+    );
+  }
+
   if (showBooks) {
     return (
       <div className="space-y-6">
@@ -395,6 +423,12 @@ function TrackersList() {
         {!showForm && (
           <div className="flex flex-wrap gap-2">
             <button
+              onClick={() => setShowChallenges(true)}
+              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            >
+              🏆 Challenges
+            </button>
+            <button
               onClick={() => setShowBooks(true)}
               className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
             >
@@ -416,9 +450,6 @@ function TrackersList() {
         )}
       </div>
 
-      {/* "This, every day, for N days" — challenges watch a tracker over a
-          window, so they live with the trackers they're judged by. */}
-      {!showForm && <Challenges trackers={trackers} onTrackerCreated={load} />}
 
       {showPacks && !showForm && (
         <div className="animate-rise-in grid gap-3 sm:grid-cols-2">

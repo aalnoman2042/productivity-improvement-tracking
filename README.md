@@ -78,9 +78,17 @@ tabs, with a light slide so the page follows the finger.
 
 - **Today** (`/`) — log a day; every tracker gets the input its type needs. It
   **saves as you type** (and when you leave the page), shows how much of the
-  day is filled in, groups trackers into collapsible sections, and can copy
-  yesterday onto a blank day. Also where you delete logged days (see below).
-  `?date=YYYY-MM-DD` opens on a specific day.
+  day is filled in, and can copy yesterday onto a blank day. Also where you
+  delete logged days (see below). `?date=YYYY-MM-DD` opens on a specific day.
+  - **The 24-hour dial** sits beside the heading: one ring, one coloured arc
+    per time tracker — sleep included — and the gap left in it is the part
+    of the day nobody wrote down. It turns red past 24 hours, which is also
+    the point at which the day refuses to save.
+  - **It reads as a grid, not a scroll.** One-tap trackers sit two to a row
+    on a phone and up to four on a wide screen; the typed kinds go two to a
+    row from tablet width up. Each category section folds from its heading,
+    and which ones are rolled up is remembered on that device — a phone and
+    a laptop have different amounts of room to spend.
   - **Quick log** walks one tracker at a time, full screen, with controls big
     enough to hit without looking and Enter to move on — a twelve-tracker day
     becomes a rhythm instead of a scroll. It starts on the first thing not yet
@@ -108,21 +116,30 @@ tabs, with a light slide so the page follows the finger.
   bad day are different things and collapsing them hides exactly the gaps
   you're looking for. Tap any day to open it ready to fill in.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
-  ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
-  a clean streak). Adding a pack twice skips what you already have. Past eight
-  trackers a search box appears, matching on name, category or kind. Two
-  things that aren't trackers but are set up the same way live here too:
+  ready-made packs. A pack is a kind of person rather than a category, so two
+  or three taps cover most of a life: **Essentials**, **Faith & discipline**
+  (namaz, Quran, a clean streak), **Gym man** (workout, cardio, steps,
+  protein, water, weight), **Productive man** (deep work, the day's plan, up
+  before 7 — and the doomscrolling that eats them), **Learner** (study,
+  reading, a course, new words) and **Calm mind** (mood, meditation,
+  outdoors, screen time). Packs overlap on purpose, and adding one skips
+  every tracker whose name you already have, so taking two never leaves you
+  with two of anything. Past eight trackers a search box appears, matching on
+  name, category or kind.
+
+  Two things that aren't trackers but are set up the same way sit **behind
+  their own buttons** at the top of the page, each taking the whole page when
+  opened — the list is what you came for, and neither of these is a daily
+  read:
   - **🏆 Challenges** — "this, every day, for N days", watching a tracker
-    over a window.
+    over a window. (`/trackers?challenges=1` opens straight onto it.)
   - **📚 Books** — a shelf, deliberately not a tracker type: a book is one
     slow thing with a start, a middle and an end rather than a question asked
     every day. Wishlist → reading now (page progress and a pace, "about
     10/day, 19 to go") → read (a rating, the date). One tap moves a book and
     stamps the dates for you. The headline is the count the shelf exists for:
     how many you have actually read, all time and this year. Nothing here
-    touches a day's score, a streak or the coach. It opens from a **📚 Books**
-    button rather than sitting under the list — this page is long enough
-    without a shelf of forty books on the end of it. (`/books` forwards to
+    touches a day's score, a streak or the coach. (`/books` forwards to
     `/trackers?books=1`, which opens the shelf; it briefly had a tab.)
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
@@ -169,14 +186,33 @@ could change it, and what an account that never touches the field keeps. A
 reminder set for the morning asks about *yesterday* — nobody can report on a
 day that hasn't happened yet.
 
-Because the time is per person, the endpoint is **polled** rather than
-scheduled: an external scheduler (cron-job.org, every 15 minutes — the same
-one that drives per-tracker reminders) calls `/api/cron/reminders`, and each
-poll works out whose hour has come. Polls before anybody's hour do nothing and
-aren't even logged. Once the hour passes the reminder is *owed* rather than
-scheduled, so a scheduler that stalls delivers late instead of skipping the
-day. The once-a-day cron in `vercel.json` remains as a backstop;
-[DEPLOY.md](./DEPLOY.md) covers both.
+Because the time is per person, the endpoints are **polled** rather than
+scheduled, and something has to be awake to do the polling — a reminder set
+for 18:00 is silent if nothing notices that it is 18:00. The repo ships that
+something: `.github/workflows/reminders.yml` calls both schedules every 15
+minutes from GitHub Actions, free, once you add a `PIT_URL` variable and a
+`CRON_SECRET` secret to the repository. Any other HTTP scheduler works the
+same way. Polls before anybody's hour do nothing and aren't even logged; once
+the hour passes the reminder is *owed* rather than scheduled, so a scheduler
+that stalls delivers late instead of skipping the day.
+
+Two fallbacks mean it is never completely silent: the once-a-day crons in
+`vercel.json`, and the app itself — **opening PIT sends anything already due
+for you**, via `/api/reminders/flush`, at most once every ten minutes and only
+ever for your own account. [DEPLOY.md](./DEPLOY.md) §3b-i covers the setup.
+
+### When you go quiet
+
+Three days with nothing logged and PIT says something on its own — *"3 days
+quiet. Nothing since 19 Aug. Even one tracker tonight keeps the record
+honest."* This one doesn't wait for the daily-reminder toggle: it goes to any
+account with a subscribed device, because by the time it applies you have
+stopped opening the app, and it replaces that day's ordinary ask rather than
+arriving beside it. It repeats no more often than the gap it is about, and the
+wording softens as the gap grows — a message that makes someone feel behind
+is a message that gets notifications switched off. (Browser permission is
+still required, as it is for every web push: PIT can only reach a device that
+agreed to be reached.)
 
 ### The Sunday week in review
 
