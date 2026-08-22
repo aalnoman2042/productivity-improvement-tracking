@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const { start, end } = monthRange(month);
   const d = await db();
 
-  const [trackerDocs, rows] = await Promise.all([
+  const [trackerDocs, rows, noteRows] = await Promise.all([
     d.collection("trackers").find({ userId }).toArray(),
     d
       .collection("entries")
@@ -41,7 +41,19 @@ export async function GET(req: Request) {
         { projection: { trackerId: 1, date: 1, value: 1, note: 1, _id: 0 } }
       )
       .toArray(),
+    // The day's own note lives in its own collection, so it survives a day
+    // with nothing logged — which is often exactly the day worth explaining.
+    d
+      .collection("dayNotes")
+      .find(
+        { userId, date: { $gte: start, $lte: end } },
+        { projection: { date: 1, text: 1, _id: 0 } }
+      )
+      .toArray(),
   ]);
+  const dayNotes = new Map(
+    noteRows.map((n) => [String(n.date), String(n.text ?? "")])
+  );
 
   const trackers = trackerDocs.map(toTracker);
   const active = trackers.filter((t) => !t.archived);
@@ -102,6 +114,7 @@ export async function GET(req: Request) {
       goalsTotal: logged > 0 ? dailyGoals.length : 0,
       minutes: slot?.minutes ?? 0,
       notes: slot?.notes ?? [],
+      dayNote: dayNotes.get(date) ?? null,
     });
 
     run = logged > 0 ? run + 1 : 0;

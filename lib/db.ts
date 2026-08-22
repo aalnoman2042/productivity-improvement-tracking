@@ -61,6 +61,12 @@ const VALIDATORS: Record<string, object> = {
           enabled: { bsonType: "bool" },
           // Minutes to add to UTC to get local time (+360 for UTC+6).
           tzOffset: { bsonType: "number", minimum: -840, maximum: 840 },
+          // The local time the ask should arrive, "HH:MM". Absent on rows
+          // written before it was anyone's choice — those read as 23:00.
+          time: {
+            bsonType: ["string", "null"],
+            pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          },
           // The last day-to-log we nagged about, so a re-run can't double-send.
           lastSentFor: { bsonType: ["string", "null"] },
           // The Sunday whose week-in-review has been sent, same idea.
@@ -211,6 +217,47 @@ const VALIDATORS: Record<string, object> = {
       lastUsedAt: { bsonType: ["date", "null"] },
     },
   },
+  // The day's own note — the sentence the numbers can't hold. One row per
+  // logged day at most; clearing the text deletes the row, so "wrote nothing"
+  // and "cleared it" are the same state rather than two.
+  dayNotes: {
+    bsonType: "object",
+    required: ["userId", "date", "text", "updatedAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      date: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      text: { bsonType: "string", maxLength: 2000 },
+      createdAt: { bsonType: "date" },
+      updatedAt: { bsonType: "date" },
+    },
+  },
+  // The bookshelf. Not a tracker: a book is one slow thing with a start, a
+  // middle and an end, rather than a question asked again every day.
+  books: {
+    bsonType: "object",
+    required: ["userId", "title", "status", "pagesRead", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      title: { bsonType: "string", minLength: 1, maxLength: 200 },
+      author: { bsonType: ["string", "null"], maxLength: 120 },
+      status: { enum: ["wishlist", "reading", "finished", "dropped"] },
+      // Null when nobody typed a page count — an unknown total is not zero.
+      pages: { bsonType: ["number", "null"], minimum: 1, maximum: 100000 },
+      pagesRead: { bsonType: "number", minimum: 0, maximum: 100000 },
+      rating: { bsonType: ["number", "null"], minimum: 1, maximum: 5 },
+      startedOn: {
+        bsonType: ["string", "null"],
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+      },
+      finishedOn: {
+        bsonType: ["string", "null"],
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+      },
+      note: { bsonType: ["string", "null"], maxLength: 1000 },
+      createdAt: { bsonType: "date" },
+      updatedAt: { bsonType: ["date", "null"] },
+    },
+  },
   // Attempt counters for the routes reachable without a session. `_id` is
   // "action:subject" and rows delete themselves once the window has passed.
   rateLimits: {
@@ -267,6 +314,9 @@ async function ensureSchema(d: Db): Promise<void> {
       .createIndex({ userId: 1, trackerId: 1, date: 1 }, { unique: true }),
     d.collection("entries").createIndex({ userId: 1, date: 1 }),
     d.collection("challenges").createIndex({ userId: 1, createdAt: -1 }),
+    // One note per day per person — the write is an upsert on exactly this.
+    d.collection("dayNotes").createIndex({ userId: 1, date: 1 }, { unique: true }),
+    d.collection("books").createIndex({ userId: 1, createdAt: -1 }),
     d.collection("aiReviews").createIndex({ userId: 1, createdAt: -1 }),
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),

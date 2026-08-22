@@ -1,10 +1,12 @@
 /**
  * Per-tracker reminders: "gym at 18:00" — or namaz at all five waqts.
  *
- * A tracker carries up to five local times of day. The nightly cron fires
- * once; this schedule is polled — an external scheduler hits
- * /api/cron/tracker-reminders every few minutes, because Vercel's Hobby plan
- * won't fire a cron more than once a day. Everything here is therefore
+ * A tracker carries up to five local times of day. This schedule is polled —
+ * an external scheduler hits /api/cron/tracker-reminders every few minutes,
+ * because Vercel's Hobby plan won't fire a cron more than once a day. (The
+ * daily ask in /api/cron/reminders is polled by the same scheduler now that
+ * its hour is the reader's to choose, but the arithmetic differs: that one
+ * catches up all day, these slots expire.) Everything here is therefore
  * written for a caller that arrives *repeatedly and unpredictably*: each
  * time-slot is due for a grace window, sends at most once per local day, and
  * a slot missed entirely (the scheduler was down) is stamped as missed

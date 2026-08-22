@@ -113,9 +113,28 @@ reminders aren't set up.
 
 ### Setting the time
 
-`vercel.json` schedules the job in **UTC**, and it ships set to `0 17 * * *` —
-17:00 UTC, which is **11 PM in UTC+6 (Bangladesh)**. If you're somewhere
-else, change the hour to `23 − your UTC offset`:
+The hour is chosen **in the app**, not here: Account → Daily reminder →
+*Ask me at*. It is stored per account, in your own timezone, and applies to
+every device you have switched reminders on for.
+
+For that choice to be honoured, something has to check whose hour has come —
+so the reminder endpoint wants **polling**, the same way per-tracker
+reminders do (step 3c). Add a second cron-job.org job:
+
+- **URL**: `https://your-site.vercel.app/api/cron/reminders`
+- **Schedule**: every 15 minutes
+- The same `Authorization: Bearer <CRON_SECRET>` header (or `?key=<CRON_SECRET>`)
+
+Calling it often is safe and cheap: a poll that arrives before anybody's hour
+does nothing at all, and each account records which day it was last nagged
+about, so the ask goes out exactly once a day whatever the schedule does.
+
+`vercel.json` still schedules one run a day as a **backstop**, in **UTC**,
+shipped as `0 17 * * *` — 17:00 UTC, which is 11 PM in UTC+6 (Bangladesh).
+Without the poller above, that one run is the only chance the reminder gets:
+it reaches anyone whose chosen hour has already passed locally by then, and
+quietly misses anyone whose has not. If you would rather not run a poller,
+set the hour to `23 − your UTC offset` and leave the in-app time near 11 PM:
 
 | Your timezone | Line in `vercel.json` |
 |---|---|
@@ -124,13 +143,10 @@ else, change the hour to `23 − your UTC offset`:
 | UTC+1 (London, summer) | `"schedule": "0 22 * * *"` |
 | UTC−5 (New York) | `"schedule": "0 4 * * *"` |
 
-Vercel's free Hobby plan allows one trigger per day, which is exactly what a
-nightly reminder needs. The job is safe to run more than once — it records
-which day it last nagged you about, so a retry can't produce a second
-notification.
-
-> The reminder goes out **every night**, logged or not — the 11 PM ask is
-> the closing ritual of the day. Tapping it opens that day's log.
+> The reminder goes out **every day**, logged or not — the ask is the closing
+> ritual of the day, and tapping it opens that day's log. One set for the
+> morning asks about *yesterday*: nobody can report on a day that has not
+> happened yet.
 
 ## 3c. Turn on per-tracker reminders (optional, needs 3b)
 
@@ -142,7 +158,8 @@ all five prayers are in. Pushes arrive on every device where you've turned
 reminders on (step 3b).
 
 Vercel's free plan only fires a schedule once a day, so this one is driven by
-a free external scheduler instead:
+a free external scheduler instead — the same one that polls the daily ask
+above, as a second job:
 
 1. Sign up at https://cron-job.org (free).
 2. Create a cronjob with:

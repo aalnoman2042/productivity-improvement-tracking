@@ -13,17 +13,18 @@ import ThemeToggle from "@/components/ThemeToggle";
 // calendar is one tap away from Status for whoever wants the day-by-day.
 // Exported so SwipeNav can walk the same tabs in the same order — a swipe
 // and a tap must never disagree about what "next" means.
-// The icons are for the phone's bottom bar, where four words in a row all
+// The icons are for the phone's bottom bar, where five words in a row all
 // look alike at a glance and a shape doesn't.
 export const LINKS = [
   { href: "/", label: "Today", icon: "📝" },
   { href: "/dashboard", label: "Stats", icon: "📈" },
   { href: "/status", label: "Status", icon: "🧭" },
   { href: "/trackers", label: "Trackers", icon: "📋" },
+  { href: "/books", label: "Books", icon: "📚" },
 ];
 
 // Reachable from the header on every screen, but kept out of the phone's
-// bottom bar so the three main destinations stay wide.
+// bottom bar so the daily destinations stay wide.
 const ACCOUNT = { href: "/settings", label: "Account" };
 
 export default function Nav() {
@@ -109,11 +110,11 @@ export default function Nav() {
               key={l.href}
               href={l.href}
               aria-current={active ? "page" : undefined}
-              className="flex flex-1 flex-col items-center gap-0.5 px-1 pt-1.5 pb-2"
+              className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 pt-1.5 pb-2"
             >
               <span
                 aria-hidden="true"
-                className={`flex h-7 w-14 items-center justify-center rounded-full text-base leading-none ${
+                className={`flex h-7 w-14 max-w-full items-center justify-center rounded-full text-base leading-none ${
                   active ? "bg-accent/15" : ""
                 }`}
               >

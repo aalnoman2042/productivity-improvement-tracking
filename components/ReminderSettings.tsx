@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import InstallPrompt from "@/components/InstallPrompt";
+import { prettyTime } from "@/lib/dates";
+import { DEFAULT_REMINDER_TIME } from "@/lib/reminders";
 import type { CronHealth } from "@/lib/cronLog";
 
 type Status = {
   available: boolean;
   enabled: boolean;
+  /** The local time the ask should arrive, "HH:MM". */
+  time: string;
   devices: number;
   schedule?: CronHealth;
 };
@@ -30,10 +34,11 @@ function ScheduleHealth({ schedule }: { schedule: CronHealth }) {
   if (!schedule.everRan) {
     return (
       <p className="mt-3 rounded-md border border-edge bg-surface-2 p-2.5 text-xs text-secondary">
-        The nightly schedule hasn&apos;t run yet — no run has ever been
-        recorded. If reminders never arrive, check the cron job in{" "}
-        <code className="rounded bg-surface px-1">vercel.json</code> and that{" "}
-        <code className="rounded bg-surface px-1">CRON_SECRET</code> is set.
+        The reminder schedule hasn&apos;t sent anything yet — no run has ever
+        been recorded. If reminders never arrive, check that the schedule is
+        polling <code className="rounded bg-surface px-1">/api/cron/reminders</code>{" "}
+        and that <code className="rounded bg-surface px-1">CRON_SECRET</code> is
+        set.
       </p>
     );
   }
@@ -90,6 +95,9 @@ const supportUnknown = () => null;
 
 export default function ReminderSettings() {
   const [status, setStatus] = useState<Status | null>(null);
+  // Held locally while it's being changed so the field doesn't jump back to
+  // the server's answer between the keystroke and the round trip.
+  const [time, setTime] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
@@ -160,6 +168,7 @@ export default function ReminderSettings() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: true,
+          time: time ?? status?.time ?? DEFAULT_REMINDER_TIME,
           tzOffset: -new Date().getTimezoneOffset(),
         }),
       });
@@ -209,6 +218,31 @@ export default function ReminderSettings() {
     }
   }
 
+  /**
+   * The hour is saved the moment it's picked — there is no Save button here,
+   * and a time input that silently forgot what you chose would be worse than
+   * no choice at all. The timezone rides along: a chosen hour is meaningless
+   * without knowing whose clock it is on.
+   */
+  async function saveTime(next: string) {
+    setTime(next);
+    setMsg(null);
+    const res = await fetch("/api/reminders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        time: next,
+        tzOffset: -new Date().getTimezoneOffset(),
+      }),
+    });
+    if (!res.ok) {
+      setMsg({ kind: "bad", text: "Could not save that time" });
+      return;
+    }
+    setMsg({ kind: "ok", text: `Reminder moved to ${prettyTime(next)}` });
+    await load();
+  }
+
   async function sendTest() {
     setBusy(true);
     setMsg(null);
@@ -239,16 +273,20 @@ export default function ReminderSettings() {
   }
 
   const on = Boolean(status?.enabled && subscribed);
+  // What the field shows: what's being typed, else what the server holds,
+  // else the hour this reminder has always kept.
+  const chosen = time ?? status?.time ?? DEFAULT_REMINDER_TIME;
 
   return (
     <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
-      <h2 className="font-semibold">Nightly reminder</h2>
+      <h2 className="font-semibold">Daily reminder</h2>
       <p className="mt-1 text-sm text-secondary">
-        Every night at 11, PIT asks how your day went — so you can put it on
-        record while it&apos;s still fresh. When something is riding on the
-        day it says so instead: a challenge on its last day, a milestone you
-        just crossed, a logging run about to break. On Sunday nights it also
-        sends your week in review: days logged, sleep, namaz and your streak.
+        Once a day at {prettyTime(chosen)}, PIT asks how your day went — so you
+        can put it on record while it&apos;s still fresh. When something is
+        riding on the day it says so instead: a challenge on its last day, a
+        milestone you just crossed, a logging run about to break. On Sunday
+        nights it also sends your week in review: days logged, sleep, namaz and
+        your streak.
       </p>
 
       {supported === null ? (
@@ -297,6 +335,25 @@ export default function ReminderSettings() {
                 </button>
               </>
             )}
+          </div>
+
+          {/* The hour, and the honest caveat about it: the schedule that
+              delivers is polled every few minutes, so "23:00" means the first
+              poll after 23:00, not the stroke of it. */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-edge pt-4">
+            <label htmlFor="reminder-time" className="text-sm font-medium">
+              Ask me at
+            </label>
+            <input
+              id="reminder-time"
+              type="time"
+              value={chosen}
+              onChange={(e) => e.target.value && void saveTime(e.target.value)}
+              className="rounded-md border border-edge bg-transparent px-3 py-1.5 text-sm tabular-nums outline-none focus:border-accent"
+            />
+            <span className="text-xs text-muted">
+              your time, within about 15 minutes
+            </span>
           </div>
 
           {on && (

@@ -98,11 +98,17 @@ export default function DeleteDays({
       // Drop the local copies too, or the deleted days would reappear
       // offline — and a save queued earlier would restore them for real.
       const dates: string[] = data.dates ?? [];
-      dates.forEach((dt) => cacheRemove(`entries:${dt}`));
+      dates.forEach((dt) => {
+        cacheRemove(`entries:${dt}`);
+        cacheRemove(`note:${dt}`);
+      });
       dropQueuedDays(dates);
 
+      const notes: number = data.notes ?? 0;
       setDone(
-        `Deleted ${data.entries} ${data.entries === 1 ? "entry" : "entries"} across ${data.days} ${data.days === 1 ? "day" : "days"}.`
+        `Deleted ${data.entries} ${data.entries === 1 ? "entry" : "entries"} across ${data.days} ${data.days === 1 ? "day" : "days"}${
+          notes > 0 ? `, and ${notes} ${notes === 1 ? "note" : "notes"}` : ""
+        }.`
       );
       reset();
       onDeleted();

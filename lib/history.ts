@@ -11,6 +11,8 @@ export type MonthDay = {
   minutes: number;
   /** What was written that day, tracker by tracker. */
   notes: { tracker: string; note: string }[];
+  /** The note about the day itself, if one was written. */
+  dayNote: string | null;
 };
 
 export type MonthSummary = {

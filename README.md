@@ -85,6 +85,11 @@ tabs, with a light slide so the page follows the finger.
     enough to hit without looking and Enter to move on — a twelve-tracker day
     becomes a rhythm instead of a scroll. It starts on the first thing not yet
     filled in.
+  - **Notes** sit at the foot of the day: one free-text note about the day
+    itself, plus a short note pinned to any tracker you filled in ("woke
+    twice", "finished chapter 4"). Both save themselves, and both are read
+    back on the calendar rather than disappearing into the day they were
+    typed on.
   - **Undo** stays available for ten seconds after each save. The page saves
     itself a second after you stop typing, which is right for logging on a
     phone at midnight and wrong for the moment you notice you typed into the
@@ -101,6 +106,14 @@ tabs, with a light slide so the page follows the finger.
   ready-made packs: **Essentials** and **Faith & discipline** (namaz, Quran,
   a clean streak). Adding a pack twice skips what you already have. Past eight
   trackers a search box appears, matching on name, category or kind.
+- **Books** (`/books`) — the bookshelf, which is deliberately not a
+  tracker: a book is one slow thing with a start, a middle and an end rather
+  than a question asked every day. Three shelves — wishlist, reading now,
+  read — and one tap to move a book between them, which stamps the start
+  and finish dates for you. A page count buys a progress bar and a pace
+  ("about 10/day, 19 to go"); finished books take a rating. The headline
+  number is the one the shelf exists for: how many you have actually read,
+  all time and this year.
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
   every tracker's numbers. It holds History's old slot in the nav — "how am
@@ -111,8 +124,8 @@ tabs, with a light slide so the page follows the finger.
   totals, the last three months day by day, streak and milestone badges, and
   every note ever written on it, searchable. Tracker names link here from
   Trackers, Stats and Status.
-- **Account** (`/settings`) — profile, password, the nightly reminder, and
-  your data: CSV/JSON download and backup import.
+- **Account** (`/settings`) — profile, password, the daily reminder (and
+  the hour it arrives), and your data: CSV/JSON download and backup import.
 
 `/today` still redirects to `/`, query string intact, so notifications sitting
 unread in a tray from before the move still land on the right day.
@@ -125,9 +138,9 @@ hitting, trackers you've stopped filling in. Every one carries the number it
 came from, and nothing is shown that the data doesn't support — see
 [`lib/insights.ts`](./lib/insights.ts).
 
-## Nightly reminder
+## Daily reminder
 
-With push notifications set up, PIT asks every night at 11 how your day went —
+With push notifications set up, PIT asks once a day how your day went —
 *"The day is finished — how was it? Tell me, so I can track your life
 better."* Tapping it opens the day's log.
 
@@ -136,16 +149,28 @@ npm run vapid-keys   # once; paste the output into .env.local
 ```
 
 Turn it on per device from the Account page (each phone or computer subscribes
-separately) and use **Send a test** to confirm it arrives. Tapping the
-notification opens that day's log. On iPhone, PIT must be added to the Home
-Screen first — iOS only delivers push to installed web apps.
+separately) and use **Send a test** to confirm it arrives. On iPhone, PIT must
+be added to the Home Screen first — iOS only delivers push to installed
+web apps.
 
-The schedule lives in `vercel.json` and fires once a day in UTC;
-[DEPLOY.md](./DEPLOY.md) explains how to set it to 11 PM your time.
+**The hour is yours to choose.** Account → Daily reminder → *Ask me at*
+stores a local time against your account; 11 PM is what it was before anyone
+could change it, and what an account that never touches the field keeps. A
+reminder set for the morning asks about *yesterday* — nobody can report on a
+day that hasn't happened yet.
+
+Because the time is per person, the endpoint is **polled** rather than
+scheduled: an external scheduler (cron-job.org, every 15 minutes — the same
+one that drives per-tracker reminders) calls `/api/cron/reminders`, and each
+poll works out whose hour has come. Polls before anybody's hour do nothing and
+aren't even logged. Once the hour passes the reminder is *owed* rather than
+scheduled, so a scheduler that stalls delivers late instead of skipping the
+day. The once-a-day cron in `vercel.json` remains as a backstop;
+[DEPLOY.md](./DEPLOY.md) covers both.
 
 ### The Sunday week in review
 
-The same nightly run also sends a digest when the day that just ended is a
+The same run also sends a digest when the day that just ended is a
 Sunday — *"Your week: 6/7 days logged · Sleep 7h 5m a night, bedtime 22 min
 earlier than last week · Namaz 4.1/5 — Fajr missed most."* Every line is a
 number read off what was logged (see [`lib/digest.ts`](./lib/digest.ts)); a
@@ -162,12 +187,15 @@ without waiting for Sunday.
 logged — archived trackers and their history included. CSV is one row per
 entry with sleep times, prayers and streak status broken out into columns,
 made for Excel and Google Sheets. JSON is the full backup: trackers with
-their goals, entries with their meta, in a shape close enough to the database
-that nothing is lost in translation.
+their goals, entries with their meta, the notes written about each day and
+the bookshelf, in a shape close enough to the database that nothing is lost
+in translation. (The CSV stays entries-only — it is a spreadsheet of days,
+and a shelf of books is not that.)
 
 **Import a backup** (same section) loads a JSON export back in. It's a merge,
 never a wipe: trackers are matched by name and type (created when there's no
-match), days in the file overwrite the same days here, and nothing not in the
+match), days in the file overwrite the same days here, books are matched by
+title and author so importing twice leaves one copy, and nothing not in the
 file is touched — so it works both as disaster recovery into an empty account
 and as filling gaps in a live one. Every imported row passes the same
 validation as a day typed by hand.
@@ -176,8 +204,9 @@ validation as a day typed by hand.
 
 A cron job that quietly stops looks exactly like a run of days you happened to
 log early — the only symptom is the absence of something, which is what nobody
-notices. So every run writes a row to `cronRuns`, failures included, and the
-Account page reads the last one back: *"Schedule last ran 6 hours ago, sending
+notices. So every run that did something writes a row to `cronRuns`, failures
+included — a poll that arrived before anybody's hour writes nothing, or four
+an hour would bury the rest — and the Account page reads the last one back: *"Schedule last ran 6 hours ago, sending
 1 reminder."* Going quiet for more than 26 hours, or failing, is called out
 rather than left to be inferred.
 
@@ -216,21 +245,27 @@ offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Six collections, all with `$jsonSchema` validators so the BSON types stay
+Eight collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
 - `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
-  `reminder` (`enabled`, `tzOffset`, `lastSentFor`)
+  `reminder` (`enabled`, `tzOffset`, `time`, `lastSentFor`)
 - `trackers` — `userId`, name, type, unit, color, category, goal, archived, order
 - `entries` — `userId`, `trackerId`, `date` (`YYYY-MM-DD`), `value`, optional
   `meta` (sleep times & quality, `parts` for namaz, `status` for streaks),
   `note`, timestamps. Unique on `(userId, trackerId, date)`.
+- `dayNotes` — `userId`, `date`, `text`: the note about a day itself, unique
+  on `(userId, date)`. Its own collection so it survives on a day with nothing
+  logged, and so it can't change what any number on that day means.
+- `books` — `userId`, title, author, `status` (wishlist / reading / finished /
+  dropped), `pages`, `pagesRead`, `rating`, `startedOn`, `finishedOn`, note.
 - `pushSubs` — one row per subscribed browser: `userId`, `endpoint` (unique),
   `keys`. Rows are deleted automatically when a push service reports the
   endpoint is gone.
 - `rateLimits` — attempt counters keyed `action:subject` (see below). Rows
   delete themselves when their window closes, via a TTL index on `resetAt`.
-- `cronRuns` — one row per run of the nightly job, kept for 30 days.
+- `cronRuns` — one row per run of a scheduled job that actually did
+  something, kept for 30 days.
 
 ## Demo data
 

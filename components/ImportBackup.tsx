@@ -15,6 +15,9 @@ import { cacheClearAll } from "@/lib/sync";
 type Parsed = {
   trackers: number;
   entries: number;
+  /** Both optional: a backup taken before they existed is still a backup. */
+  books: number;
+  dayNotes: number;
   exportedAt: string | null;
   body: unknown;
 };
@@ -22,6 +25,8 @@ type Parsed = {
 type Result = {
   trackers: { created: number; matched: number };
   entries: { imported: number; skipped: number };
+  books?: { imported: number };
+  dayNotes?: { imported: number };
 };
 
 export default function ImportBackup() {
@@ -44,6 +49,8 @@ export default function ImportBackup() {
       setParsed({
         trackers: data.trackers.length,
         entries: data.entries.length,
+        books: Array.isArray(data.books) ? data.books.length : 0,
+        dayNotes: Array.isArray(data.dayNotes) ? data.dayNotes.length : 0,
         exportedAt:
           typeof data.exportedAt === "string"
             ? data.exportedAt.slice(0, 10)
@@ -103,6 +110,8 @@ export default function ImportBackup() {
           <p>
             <strong>{parsed.trackers}</strong> trackers and{" "}
             <strong>{parsed.entries}</strong> entries
+            {parsed.dayNotes > 0 && <>, {parsed.dayNotes} day notes</>}
+            {parsed.books > 0 && <>, {parsed.books} books</>}
             {parsed.exportedAt && <>, exported {parsed.exportedAt}</>}. Days in
             this file will overwrite the same days in your account.
           </p>
@@ -122,6 +131,12 @@ export default function ImportBackup() {
           {done.trackers.created} trackers created, {done.trackers.matched}{" "}
           matched
           {done.entries.skipped > 0 && <>, {done.entries.skipped} rows skipped</>}
+          {done.dayNotes && done.dayNotes.imported > 0 && (
+            <>, {done.dayNotes.imported} day notes</>
+          )}
+          {done.books && done.books.imported > 0 && (
+            <>, {done.books.imported} books</>
+          )}
           ).
         </p>
       )}

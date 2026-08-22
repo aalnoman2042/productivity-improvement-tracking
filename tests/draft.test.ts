@@ -3,6 +3,7 @@ import {
   DAY_MINUTES,
   EMPTY,
   dayTimeTotal,
+  draftNote,
   draftToEntry,
   isLogged,
   toDraft,
@@ -98,5 +99,46 @@ describe("toDraft ↔ draftToEntry round trip", () => {
   it("reads old streak entries that pre-date the status field", () => {
     expect(toDraft("streak", { trackerId: "x", value: 1, meta: null }).status).toBe("clean");
     expect(toDraft("streak", { trackerId: "x", value: 0, meta: null }).status).toBe("slip");
+  });
+});
+
+describe("notes on an entry", () => {
+  it("comes back out of a stored entry, whatever kind it is", () => {
+    expect(
+      toDraft("duration", { trackerId: "t", value: 90, meta: null, note: "hard going" })
+        .note
+    ).toBe("hard going");
+    expect(
+      toDraft("sleep", {
+        trackerId: "t",
+        value: 480,
+        meta: { start: "23:00", end: "07:00" },
+        note: "woke twice",
+      }).note
+    ).toBe("woke twice");
+    expect(
+      toDraft("streak", {
+        trackerId: "t",
+        value: 0,
+        meta: { status: "slip" },
+        note: "long day",
+      }).note
+    ).toBe("long day");
+  });
+
+  it("is empty for a row that never had one, including old cached rows", () => {
+    expect(toDraft("count", { trackerId: "t", value: 3, meta: null }).note).toBe("");
+    expect(toDraft("count", undefined).note).toBe("");
+  });
+
+  it("sends nothing rather than an empty string", () => {
+    expect(draftNote({ ...EMPTY, note: "   " })).toBeNull();
+    expect(draftNote(undefined)).toBeNull();
+    expect(draftNote({ ...EMPTY, note: "  finished ch.4 " })).toBe("finished ch.4");
+  });
+
+  it("a note alone does not make a day logged — it rides on what is", () => {
+    expect(isLogged("count", { ...EMPTY, note: "meant to" })).toBe(false);
+    expect(isLogged("count", { ...EMPTY, num: "2", note: "meant to" })).toBe(true);
   });
 });

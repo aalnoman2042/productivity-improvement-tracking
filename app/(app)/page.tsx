@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import DayNotes from "@/components/DayNotes";
 import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
 import MotivationLine from "@/components/MotivationLine";
@@ -18,6 +20,7 @@ import {
   EMPTY,
   buildDraft,
   dayTimeTotal,
+  draftNote,
   draftToEntry,
   isLogged,
   type Draft,
@@ -71,6 +74,10 @@ async function persist(
   const all = trackers.map((t) => ({
     trackerId: t.id,
     ...draftToEntry(t.type as TrackerType, draft[t.id] ?? EMPTY),
+    // The note travels with every save, including the ones that didn't touch
+    // it: the server writes the note it is given, so leaving it out would
+    // quietly erase what was written the last time.
+    note: draftNote(draft[t.id]),
   }));
   const sending =
     only.size > 0 ? all.filter((e) => only.has(e.trackerId)) : all;
@@ -78,7 +85,7 @@ async function persist(
   // The cache holds the whole day as it stands on screen, sent or not.
   cacheSet(
     `entries:${date}`,
-    all.filter((e) => e.value > 0 || e.meta).map((e) => ({ ...e, note: null }))
+    all.filter((e) => e.value > 0 || e.meta)
   );
   return result;
 }
@@ -90,17 +97,21 @@ const chipCls = (on: boolean) =>
       : "border-edge text-secondary hover:bg-surface-2"
   }`;
 
-export default function TodayPage() {
-  // `?date=YYYY-MM-DD` opens straight on that day — it's how the nightly
-  // reminder lands you on the day it's nagging about. Read in the initial
-  // state so the first fetch already asks for the right day; the server
-  // prerender can't see the query string, which is what the
-  // `suppressHydrationWarning` on the date input below is about.
+function TodayLog() {
+  // `?date=YYYY-MM-DD` opens straight on that day — it's how the reminder
+  // lands you on the day it's nagging about, and how tapping a square on the
+  // calendar opens *that* square.
+  //
+  // It has to come from the router rather than from `window.location`: on a
+  // client-side navigation the address bar is only rewritten after the new
+  // page has rendered, so a page that reads the URL itself gets the one it
+  // was navigated *from* — which is why tapping a day used to land on today.
+  const params = useSearchParams();
+  const asked = params.get("date");
+
   const [date, setDate] = useState(() => {
-    const today = toDateStr(new Date());
-    if (typeof window === "undefined") return today;
-    const asked = new URLSearchParams(window.location.search).get("date");
-    return isValidDateStr(asked) && asked <= today ? asked : today;
+    const first = toDateStr(new Date());
+    return isValidDateStr(asked) && asked <= first ? asked : first;
   });
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [state, setState] = useState<SaveState>("idle");
@@ -316,6 +327,18 @@ export default function TodayPage() {
     const timer = setTimeout(() => setUndo(null), UNDO_MS);
     return () => clearTimeout(timer);
   }, [undo]);
+
+  // The address can also change under a page that's already open — the nav's
+  // Today tab is a link to `/`, with no day on it. Follow it, but only when
+  // it actually moves: an arrow tap changes the day without touching the URL,
+  // and that must not be undone on the next render.
+  const askedRef = useRef(asked);
+  useEffect(() => {
+    if (askedRef.current === asked) return;
+    askedRef.current = asked;
+    const wanted = isValidDateStr(asked) && asked <= today ? asked : today;
+    if (wanted !== latest.current.date) changeDate(wanted);
+  });
 
   function changeDate(next: string) {
     void saveNow(); // reads the day being left out of the ref, before it moves
@@ -600,6 +623,10 @@ export default function TodayPage() {
             </section>
           ))}
 
+          {/* Words last, after the numbers they explain — but still inside
+              the day, not on a page of their own. */}
+          <DayNotes date={date} trackers={trackers} draft={draft} set={set} />
+
           {/* Sits above the save bar so it's the first thing under your thumb
               in the seconds after a save you didn't mean. */}
           {undo && undo.date === date && (
@@ -683,5 +710,27 @@ export default function TodayPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Reading the query string makes this tree client-rendered, and Next asks for
+ * that boundary to be drawn on purpose rather than inferred. The fallback is
+ * the same grey blocks the page shows while its trackers load, so the
+ * handover is invisible.
+ */
+export default function TodayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-2" aria-hidden="true">
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+        </div>
+      }
+    >
+      <TodayLog />
+    </Suspense>
   );
 }

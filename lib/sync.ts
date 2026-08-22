@@ -213,10 +213,14 @@ function enqueue(path: string, body: unknown) {
   writeQueue([...next, job]);
 }
 
+/** Every write that is *about one day* and could resurrect a deleted one. */
+const DAY_WRITES = ["/api/entries", "/api/entries/increment", "/api/notes"];
+
 /**
  * Forget any queued save for these days. Used after deleting a date range:
  * without this, a save typed while offline would replay afterwards and
- * bring the deleted day back.
+ * bring the deleted day back — a note typed on a phone with no signal counts
+ * too, since the day it belonged to is gone.
  */
 export function dropQueuedDays(dates: string[]) {
   if (dates.length === 0) return;
@@ -225,7 +229,7 @@ export function dropQueuedDays(dates: string[]) {
   const kept = jobs.filter(
     (j) =>
       !(
-        (j.path === "/api/entries" || j.path === "/api/entries/increment") &&
+        DAY_WRITES.includes(j.path) &&
         drop.has(String((j.body as { date?: string })?.date))
       )
   );

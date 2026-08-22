@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
+import { toBook } from "@/lib/bookDoc";
 import { toTracker } from "@/lib/trackerDoc";
 import { APP_VERSION } from "@/lib/version";
 
@@ -13,8 +14,10 @@ export const dynamic = "force-dynamic";
  *
  * `?format=csv` is one row per entry, made for Excel and Google Sheets.
  * `?format=json` is the full backup — trackers with their goals, entries
- * with their meta — in a shape close enough to the database that nothing
- * is lost in translation.
+ * with their meta, the notes written about each day and the bookshelf — in a
+ * shape close enough to the database that nothing is lost in translation.
+ * The CSV stays entries-only: it is a spreadsheet of days, and a shelf of
+ * books is not that.
  *
  * Archived trackers and their history are included in both: an export that
  * silently dropped part of your data would be worse than none.
@@ -39,13 +42,15 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const [user, trackerDocs, entryDocs] = await Promise.all([
+  const [user, trackerDocs, entryDocs, noteDocs, bookDocs] = await Promise.all([
     d.collection("users").findOne(
       { _id: userId },
       { projection: { name: 1, email: 1, createdAt: 1 } }
     ),
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     d.collection("entries").find({ userId }).sort({ date: 1 }).toArray(),
+    d.collection("dayNotes").find({ userId }).sort({ date: 1 }).toArray(),
+    d.collection("books").find({ userId }).sort({ createdAt: 1 }).toArray(),
   ]);
 
   const trackers = trackerDocs.map(toTracker);
@@ -63,6 +68,11 @@ export async function GET(req: Request) {
         createdAt: user?.createdAt instanceof Date ? user.createdAt.toISOString() : null,
       },
       trackers,
+      dayNotes: noteDocs.map((n) => ({
+        date: String(n.date),
+        text: String(n.text ?? ""),
+      })),
+      books: bookDocs.map(toBook),
       entries: entryDocs.map((e) => ({
         trackerId: String(e.trackerId),
         tracker: byId.get(String(e.trackerId))?.name ?? null,

@@ -104,6 +104,16 @@ describe("dropQueuedDays", () => {
       "2026-08-05",
     ]);
   });
+
+  it("forgets a note typed offline for a day that was then deleted", async () => {
+    await post("/api/notes", { date: "2026-08-06", text: "rough one" });
+    await post("/api/notes", { date: "2026-08-07", text: "better" });
+
+    dropQueuedDays(["2026-08-06"]);
+    expect(getQueue().map((j) => (j.body as { date: string }).date)).toEqual([
+      "2026-08-07",
+    ]);
+  });
 });
 
 describe("mergeDayEntries", () => {

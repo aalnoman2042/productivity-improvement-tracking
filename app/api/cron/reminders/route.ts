@@ -3,7 +3,7 @@ import { type Db, type ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { pushConfigured, sendToUser } from "@/lib/push";
 import { addDays, parseDateStr } from "@/lib/dates";
-import { dayToLog } from "@/lib/reminders";
+import { dayToLog, dueNow, reminderTime } from "@/lib/reminders";
 import { buildDigest } from "@/lib/digest";
 import { challengeProgress } from "@/lib/challenges";
 import { streakInfo } from "@/lib/streak";
@@ -15,12 +15,18 @@ import { REMINDER_JOB, recordRun } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
 
 /**
- * The nightly nudge. Vercel Cron calls this on the schedule in vercel.json
- * (see DEPLOY.md); any scheduler that can send a header works just as well.
+ * The daily nudge, at the hour each person chose.
+ *
+ * That choice is what makes this a *polled* endpoint rather than a scheduled
+ * one: Vercel's Hobby plan fires a cron once a day, which can only ever be
+ * right for one timezone and one bedtime. So the same external scheduler
+ * that drives the per-tracker reminders calls this every 15 minutes (see
+ * DEPLOY.md), and each poll asks `dueNow` whose time has come. The Vercel
+ * cron in vercel.json stays as a once-a-day backstop.
  *
  * Deliberately idempotent: each user records the last day it nagged them
- * about, so calling this twice — a retry, a manual poke, a second scheduler —
- * can't produce two notifications for the same day.
+ * about, so calling this a hundred times — a retry, a manual poke, a second
+ * scheduler — can't produce two notifications for the same day.
  */
 export async function GET(req: Request) {
   const startedAt = new Date();
@@ -56,7 +62,14 @@ export async function GET(req: Request) {
 
   try {
     const result = await runReminders();
-    await recordRun(REMINDER_JOB, startedAt, { ok: true, ...result });
+    // Only a poll that *did* something is worth a row. Four an hour, all
+    // day, would bury the runs that matter — and the Account page reads the
+    // newest row to say when a reminder last went out, which should mean
+    // exactly that. A reminder owed but undeliverable counts: that is the
+    // outage worth seeing.
+    if (result.notified > 0 || result.digests > 0 || result.undelivered > 0) {
+      await recordRun(REMINDER_JOB, startedAt, { ok: true, ...counts(result) });
+    }
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -179,16 +192,27 @@ async function runReminders() {
 
   let notified = 0;
   let skipped = 0;
+  // Owed, but no browser took it — reminders on, no live subscription.
+  let undelivered = 0;
   let digests = 0;
   // How many of tonight's asks had something specific to say.
   let stakes = 0;
+  // Users whose chosen hour had passed when this poll came in.
+  let due = 0;
 
   for (const user of users) {
-    const date = dayToLog(now, Number(user.reminder?.tzOffset ?? 0));
+    const tzOffset = Number(user.reminder?.tzOffset ?? 0);
+    const time = reminderTime(user.reminder?.time);
+    // Their hour hasn't come round yet — say nothing, and don't count it as
+    // a skip either. Nothing was owed.
+    if (!dueNow(now, tzOffset, time)) continue;
+    due++;
 
-    // --- The nightly ask ---------------------------------------------------
-    // Goes out every night, logged or not — the 11 PM ask is the closing
-    // ritual of the day, not just a nag about an empty one. What it *says*
+    const date = dayToLog(now, tzOffset, time);
+
+    // --- The daily ask -----------------------------------------------------
+    // Goes out every day, logged or not — the ask is the closing ritual of
+    // the day, not just a nag about an empty one. What it *says*
     // depends on the night: a milestone crossed, a challenge on its last day,
     // a logging run about to break, or the ordinary question.
     if (user.reminder?.lastSentFor === date) {
@@ -212,7 +236,7 @@ async function runReminders() {
       } else {
         // Reminders are on but no browser is subscribed — leave the day
         // unstamped so a later run can still reach them.
-        skipped++;
+        undelivered++;
       }
     }
 
@@ -244,5 +268,23 @@ async function runReminders() {
     }
   }
 
-  return { checked: users.length, notified, stakes, skipped, digests };
+  return { checked: users.length, due, notified, stakes, skipped, undelivered, digests };
+}
+
+/** The run's shape, mapped onto the shared cronRuns columns. */
+function counts(r: {
+  checked: number;
+  notified: number;
+  stakes: number;
+  skipped: number;
+  undelivered: number;
+  digests: number;
+}) {
+  return {
+    checked: r.checked,
+    notified: r.notified,
+    stakes: r.stakes,
+    skipped: r.skipped + r.undelivered,
+    digests: r.digests,
+  };
 }

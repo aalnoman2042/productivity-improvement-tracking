@@ -57,7 +57,7 @@ const COACH: { icon: string; title: string; text: string }[] = [
   {
     icon: "🔒",
     title: "It never sees your words",
-    text: "Only numbers and tracker names are ever sent — never your notes, never your email. It runs on demand, once every eight hours, and re-reading the last answer costs nothing and works offline.",
+    text: "Only numbers and tracker names are ever sent — never a word you wrote in a note, never your email. It runs on demand, once every eight hours, and re-reading the last answer costs nothing and works offline.",
   },
 ];
 
@@ -84,8 +84,13 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   },
   {
     icon: "🔔",
-    title: "The 11 o'clock question",
-    text: "Every night at 11, PIT asks how your day went — log it while it's fresh. Sunday nights bring a week in review to look forward to.",
+    title: "A question at your hour",
+    text: "Once a day, at a time you choose, PIT asks how your day went — log it while it's fresh. Any tracker can carry its own reminders too. Sunday nights bring a week in review to look forward to.",
+  },
+  {
+    icon: "📚",
+    title: "A shelf for what you read",
+    text: "Books aren't habits, so they get their own page: a wishlist, whatever you're in the middle of with a progress bar and a pace, and the count of what you actually finished this year.",
   },
   {
     icon: "🔒",

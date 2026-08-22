@@ -64,8 +64,9 @@ export async function GET(req: Request) {
 }
 
 /**
- * Delete every entry in a date range. Destructive and unrecoverable, so it
- * asks for three things that a stray tap can't supply on its own:
+ * Delete every entry in a date range, and the notes written about those days.
+ * Destructive and unrecoverable, so it asks for three things that a stray tap
+ * cannot supply on its own:
  * the range, the exact number of days the caller was shown, and the typed
  * phrase. A mismatch between `days` and what's really there means the data
  * changed since they looked — refuse and make them look again.
@@ -127,11 +128,15 @@ export async function POST(req: Request) {
   }
 
   const res = await d.collection("entries").deleteMany(filter);
+  // What was written about those days goes with them: a note left behind
+  // would keep marking a day on the calendar that no longer exists.
+  const notes = await d.collection("dayNotes").deleteMany(filter);
 
   return NextResponse.json({
     ok: true,
     days: dates.length,
     entries: res.deletedCount,
+    notes: notes.deletedCount,
     dates: dates.sort(),
   });
 }

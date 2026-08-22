@@ -1,3 +1,4 @@
+import { MAX_TRACKER_NOTE } from "./notes";
 import { minutesBetween, orderPrayers, type Tracker, type TrackerType } from "./trackers";
 
 /**
@@ -21,6 +22,8 @@ export type Draft = {
   parts: string[];
   /** Clean-streak trackers: how the day went. */
   status: "clean" | "slip" | null;
+  /** What was worth writing down about this tracker, today. */
+  note: string;
 };
 
 export type EntryMeta = {
@@ -35,6 +38,8 @@ export type Entry = {
   trackerId: string;
   value: number;
   meta: EntryMeta;
+  /** Absent on rows read from older caches, which simply had no note. */
+  note?: string | null;
 };
 
 /** Stable empty default, so it doesn't look like a new value every render. */
@@ -48,37 +53,52 @@ export const EMPTY: Draft = {
   checked: false,
   parts: [],
   status: null,
+  note: "",
 };
 
 export function toDraft(type: TrackerType, entry: Entry | undefined): Draft {
   if (!entry) return { ...EMPTY };
+  // Whatever the kind, the note comes back with it — a save that dropped it
+  // would quietly delete words nobody asked it to touch.
+  const base: Draft = { ...EMPTY, note: entry.note ?? "" };
   if (type === "duration") {
     return {
-      ...EMPTY,
+      ...base,
       h: String(Math.floor(entry.value / 60) || ""),
       m: String(Math.round(entry.value % 60) || ""),
     };
   }
   if (type === "sleep") {
     return {
-      ...EMPTY,
+      ...base,
       start: entry.meta?.start ?? "",
       end: entry.meta?.end ?? "",
       quality: entry.meta?.quality ?? null,
     };
   }
-  if (type === "check") return { ...EMPTY, checked: entry.value > 0 };
+  if (type === "check") return { ...base, checked: entry.value > 0 };
   if (type === "prayer") {
-    return { ...EMPTY, parts: orderPrayers(entry.meta?.parts ?? []) };
+    return { ...base, parts: orderPrayers(entry.meta?.parts ?? []) };
   }
   if (type === "streak") {
     // Older entries pre-date the status field; the value still says it.
     return {
-      ...EMPTY,
+      ...base,
       status: entry.meta?.status ?? (entry.value > 0 ? "clean" : "slip"),
     };
   }
-  return { ...EMPTY, num: String(entry.value) };
+  return { ...base, num: String(entry.value) };
+}
+
+/**
+ * The note as it should be sent — trimmed, and null when there's nothing in
+ * it. A note only rides along with something logged: the entry it hangs off
+ * is deleted when the day's value is cleared, and a note with no day behind
+ * it would be a row that no page knows how to show.
+ */
+export function draftNote(dr: Draft | undefined): string | null {
+  const text = (dr?.note ?? "").trim();
+  return text ? text.slice(0, MAX_TRACKER_NOTE) : null;
 }
 
 /** Turn what's typed into the value + meta the API stores. */

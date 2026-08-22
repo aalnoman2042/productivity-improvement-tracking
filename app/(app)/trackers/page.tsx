@@ -684,7 +684,7 @@ export default function TrackersPage() {
                     : "A push at each time, every day this isn't logged yet."}
                 </p>
                 <p className="text-xs text-muted">
-                  Uses the same notifications as the nightly reminder — turn
+                  Uses the same notifications as the daily reminder — turn
                   those on in Account on each device you want nudged.
                 </p>
               </div>

@@ -43,7 +43,7 @@ function sleepAdvice(t: Tracker, s: Summary): Advice[] {
       focus: "Get to bed before 12",
       why: `You're turning in around ${nightLabel(clock.bed)} on average (${clock.nights} nights), up at ${nightLabel(clock.wake)}.`,
       how: late
-        ? "Don't jump straight to midnight — pull it back 30 minutes at a time, week by week, until you're under 12. The 11 PM reminder is your cue to start shutting down."
+        ? "Don't jump straight to midnight — pull it back 30 minutes at a time, week by week, until you're under 12. Your daily reminder is the cue to start shutting down."
         : `You're close — half an hour does it. Screens off by ${nightLabel(clock.bed - 45)} tonight.`,
     });
   }
@@ -221,7 +221,7 @@ export function buildAdvice(stats: Stats | null): Advice[] {
       level: "warn",
       focus: "Log every day first",
       why: `Only ${stats.daysLogged} of ${days} days are filled in — the rest of this page is reading half a story.`,
-      how: "The ⚡ quick log at 11 PM takes under a minute. Blank days can't be judged, fixed or celebrated.",
+      how: "The ⚡ quick log takes under a minute at the end of the day. Blank days can't be judged, fixed or celebrated.",
     });
   }
 

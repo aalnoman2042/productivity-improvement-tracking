@@ -63,6 +63,10 @@ const STEPS: Step[] = [
         label: "A day is 24 hours, strictly",
         text: "Time-based trackers can't add up to more than a day between them. If the numbers don't fit, the app says so instead of quietly accepting a 27-hour Tuesday.",
       },
+      {
+        label: "Words, where numbers run out",
+        text: "At the foot of the day there's a note about the day itself, and a short one you can pin to any tracker you filled in. They come back on the calendar, so a bad week has its reasons attached.",
+      },
     ],
   },
   {
@@ -81,6 +85,10 @@ const STEPS: Step[] = [
       {
         label: "Grades and streaks",
         text: "The report card marks each tracker over its own lifetime, so adding something new never dents the old subjects. Clean streaks count days since the last slip — a day you didn't open the app won't reset a three-month run.",
+      },
+      {
+        label: "And a shelf for books",
+        text: "Books aren't habits, so they get their own page: a wishlist, whatever you're in the middle of with a progress bar, and the count of what you've actually finished this year.",
       },
     ],
   },

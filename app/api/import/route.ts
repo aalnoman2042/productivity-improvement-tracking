@@ -4,6 +4,9 @@ import { dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { isValidDateStr } from "@/lib/dates";
 import { parseMeta } from "@/lib/entryMeta";
+import { clampRead, normalizeStatus, parsePages, parseRating } from "@/lib/books";
+import { parseAuthor, parseBookNote, parseTitle } from "@/lib/bookDoc";
+import { MAX_DAY_NOTE, cleanNote } from "@/lib/notes";
 import { parseGoal } from "@/lib/trackerDoc";
 import {
   TRACKER_TYPES,
@@ -20,12 +23,17 @@ import {
  * a clean restore; restoring into a live one fills the gaps — and either
  * way, nothing that isn't in the file is touched.
  *
+ * Day notes and books ride along the same way, and are optional: a backup
+ * taken before either existed is still a valid backup.
+ *
  * Every entry passes through the same validation as a day typed by hand.
  * An export is just a file, and a file can say anything.
  */
 
 const MAX_TRACKERS = 200;
 const MAX_ENTRIES = 200_000;
+const MAX_DAY_NOTES = 20_000;
+const MAX_BOOKS = 5_000;
 const VALID_TYPES = new Set(TRACKER_TYPES.map((t) => t.value));
 
 export async function POST(req: Request) {
@@ -140,9 +148,73 @@ export async function POST(req: Request) {
     await d.collection("entries").bulkWrite(ops.slice(i, i + 1000));
   }
 
+  // --- What was written about the days themselves ------------------------
+  let notesImported = 0;
+  const inNotes = Array.isArray(body?.dayNotes)
+    ? body.dayNotes.slice(0, MAX_DAY_NOTES)
+    : [];
+  const noteOps: AnyBulkWriteOperation[] = [];
+  for (const n of inNotes) {
+    const date = n?.date;
+    const text = cleanNote(n?.text, MAX_DAY_NOTE);
+    if (!isValidDateStr(date) || !text) continue;
+    noteOps.push({
+      updateOne: {
+        filter: { userId, date },
+        update: {
+          $set: { text, updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        upsert: true,
+      },
+    });
+    notesImported++;
+  }
+  for (let i = 0; i < noteOps.length; i += 1000) {
+    await d.collection("dayNotes").bulkWrite(noteOps.slice(i, i + 1000));
+  }
+
+  // --- The bookshelf ------------------------------------------------------
+  // Matched on title and author, so importing the same backup twice leaves
+  // one copy of each book rather than two.
+  let booksImported = 0;
+  const inBooks = Array.isArray(body?.books) ? body.books.slice(0, MAX_BOOKS) : [];
+  const bookOps: AnyBulkWriteOperation[] = [];
+  for (const b of inBooks) {
+    const title = parseTitle(b?.title);
+    if (!title) continue;
+    const author = parseAuthor(b?.author);
+    const pages = parsePages(b?.pages);
+    bookOps.push({
+      updateOne: {
+        filter: { userId, title, author },
+        update: {
+          $set: {
+            status: normalizeStatus(b?.status),
+            pages,
+            pagesRead: clampRead(b?.pagesRead, pages),
+            rating: parseRating(b?.rating),
+            startedOn: isValidDateStr(b?.startedOn) ? b.startedOn : null,
+            finishedOn: isValidDateStr(b?.finishedOn) ? b.finishedOn : null,
+            note: parseBookNote(b?.note),
+            updatedAt: now,
+          },
+          $setOnInsert: { createdAt: now },
+        },
+        upsert: true,
+      },
+    });
+    booksImported++;
+  }
+  for (let i = 0; i < bookOps.length; i += 1000) {
+    await d.collection("books").bulkWrite(bookOps.slice(i, i + 1000));
+  }
+
   return NextResponse.json({
     ok: true,
     trackers: { created: trackersCreated, matched: trackersMatched },
     entries: { imported: entriesUpserted, skipped: entriesSkipped },
+    dayNotes: { imported: notesImported },
+    books: { imported: booksImported },
   });
 }

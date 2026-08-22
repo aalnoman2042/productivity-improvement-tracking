@@ -122,6 +122,19 @@ export function bucketsForRange(
 
 /* -------------------------- calendar months --------------------------- */
 
+/**
+ * A 24-hour "HH:MM" said the way people say it — "11 PM", "6:30 am".
+ * The input keeps 24-hour time because that's what a time field speaks; the
+ * sentence around it shouldn't have to.
+ */
+export function prettyTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  const suffix = h < 12 ? "am" : "pm";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${hour} ${suffix}` : `${hour}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
 export function isValidMonthStr(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}$/.test(s);
 }

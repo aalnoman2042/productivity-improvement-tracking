@@ -108,7 +108,7 @@ export default function InstallPrompt({
         <span className="text-secondary">
           {" "}
           — it opens instantly, works offline, and it&apos;s what lets the
-          nightly reminder reach you
+          daily reminder reach you
           {needsManual ? <>. In Safari, {steps}.</> : "."}
         </span>
       </p>

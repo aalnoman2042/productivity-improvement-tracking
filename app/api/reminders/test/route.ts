@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { pushConfigured, sendToUser } from "@/lib/push";
-import { prettyDate } from "@/lib/dates";
-import { localDateStr } from "@/lib/reminders";
+import { prettyDate, prettyTime } from "@/lib/dates";
+import { localDateStr, reminderTime } from "@/lib/reminders";
 
 /**
  * Send yourself the reminder right now. Worth having: push either arrives on
@@ -33,9 +33,10 @@ export async function POST() {
   }
 
   const today = localDateStr(new Date(), Number(user?.reminder?.tzOffset ?? 0));
+  const at = prettyTime(reminderTime(user?.reminder?.time));
   const { sent } = await sendToUser(userId, {
     title: "PIT reminder — this is a test",
-    body: `The real one arrives at 11 PM. Tap to log ${prettyDate(today)}.`,
+    body: `The real one arrives at ${at}. Tap to log ${prettyDate(today)}.`,
     url: `/?date=${today}`,
     tag: "pit-test",
   });
