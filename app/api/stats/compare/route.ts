@@ -4,30 +4,39 @@ import { currentUserId } from "@/lib/session";
 import { isValidDateStr, isValidMonthStr, toDateStr } from "@/lib/dates";
 import { toTracker } from "@/lib/trackerDoc";
 import {
-  compareMonths,
+  comparePeriods,
   compareWindows,
-  type MonthChange,
-  type MonthHeadline,
-  type MonthTotals,
-} from "@/lib/monthCompare";
+  type ComparePeriod,
+  type PeriodChange,
+  type PeriodHeadline,
+  type PeriodTotals,
+} from "@/lib/periodCompare";
 import type { Goal, TrackerType } from "@/lib/trackers";
 
 /**
- * This month against the last one, tracker by tracker.
+ * This week against last week, or this month against last month, tracker by
+ * tracker.
  *
  * Two windows of entries, one pass each, and the judging is left to
  * `lib/monthCompare` — including the part that matters most, which is that
  * the two windows are the same length. `?today=` is the client's date, as
  * everywhere else that a date is scoped to the reader rather than the server.
+ *
+ * `?period=week|month` picks the cadence; `?anchor=` is the month (YYYY-MM)
+ * or any date inside the week being asked about.
  */
 
-export type MonthCompare = {
-  month: string;
-  previous: string;
+export type PeriodCompare = {
+  period: ComparePeriod;
+  /** The window's own dates, so the card can name what it compared. */
+  from: string;
+  to: string;
+  previousFrom: string;
+  previousTo: string;
   days: number;
   partial: boolean;
-  headline: MonthHeadline;
-  trackers: MonthChange[];
+  headline: PeriodHeadline;
+  trackers: PeriodChange[];
 };
 
 function meets(value: number, goal: NonNullable<Goal>): boolean {
@@ -39,14 +48,25 @@ export async function GET(req: Request) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const params = new URL(req.url).searchParams;
-  const month = params.get("month");
-  if (!isValidMonthStr(month)) {
-    return NextResponse.json({ error: "month=YYYY-MM required" }, { status: 400 });
+  const period: ComparePeriod = params.get("period") === "week" ? "week" : "month";
+  const anchor = params.get("anchor");
+  const anchorOk =
+    period === "week" ? isValidDateStr(anchor) : isValidMonthStr(anchor);
+  if (!anchorOk) {
+    return NextResponse.json(
+      {
+        error:
+          period === "week"
+            ? "anchor=YYYY-MM-DD required for a week"
+            : "anchor=YYYY-MM required for a month",
+      },
+      { status: 400 }
+    );
   }
   const askedToday = params.get("today");
   const today = isValidDateStr(askedToday) ? askedToday : toDateStr(new Date());
 
-  const window = compareWindows(month, today);
+  const window = compareWindows(anchor as string, today, period);
   const prevDays =
     Math.round(
       (Date.parse(`${window.before.end}T00:00:00Z`) -
@@ -78,7 +98,7 @@ export async function GET(req: Request) {
 
   /** Per-tracker totals, plus the day-level numbers for the headline. */
   function gather(rows: Record<string, unknown>[]) {
-    const totals = new Map<string, MonthTotals>();
+    const totals = new Map<string, PeriodTotals>();
     const days = new Set<string>();
     let minutes = 0;
     let goalsMet = 0;
@@ -128,11 +148,14 @@ export async function GET(req: Request) {
 
   const now = gather(nowRows);
   const before = gather(beforeRows);
-  const empty: MonthTotals = { total: 0, logged: 0, done: 0 };
+  const empty: PeriodTotals = { total: 0, logged: 0, done: 0 };
 
-  const body: MonthCompare = {
-    month,
-    previous: window.before.start.slice(0, 7),
+  const body: PeriodCompare = {
+    period,
+    from: window.now.start,
+    to: window.now.end,
+    previousFrom: window.before.start,
+    previousTo: window.before.end,
     days: window.days,
     partial: window.partial,
     headline: {
@@ -140,7 +163,7 @@ export async function GET(req: Request) {
       minutes: { now: now.minutes, before: before.minutes },
       goals: { now: now.goals, before: before.goals },
     },
-    trackers: compareMonths(
+    trackers: comparePeriods(
       active.map((t) => ({
         id: t.id,
         name: t.name,
@@ -152,7 +175,8 @@ export async function GET(req: Request) {
         before: before.totals.get(t.id) ?? empty,
       })),
       window.days,
-      prevDays
+      prevDays,
+      period
     ),
   };
 

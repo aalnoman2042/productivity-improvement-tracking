@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  compareMonths,
+  comparePeriods,
   compareWindows,
   metricFor,
-  type TrackerMonth,
-} from "../lib/monthCompare";
+  weekStart,
+  type TrackerPeriod,
+} from "../lib/periodCompare";
 import type { TrackerType } from "../lib/trackers";
 
 /**
@@ -42,6 +43,36 @@ describe("compareWindows", () => {
   });
 });
 
+describe("compareWindows, by the week", () => {
+  it("compares a running week to the same days of the last one", () => {
+    // Wednesday 2026-08-19 — three days in, so Mon-Wed against Mon-Wed.
+    const w = compareWindows("2026-08-19", "2026-08-19", "week");
+    expect(w.now).toEqual({ start: "2026-08-17", end: "2026-08-19" });
+    expect(w.before).toEqual({ start: "2026-08-10", end: "2026-08-12" });
+    expect(w.days).toBe(3);
+    expect(w.partial).toBe(true);
+  });
+
+  it("compares a finished week whole", () => {
+    const w = compareWindows("2026-08-10", "2026-08-22", "week");
+    expect(w.now).toEqual({ start: "2026-08-10", end: "2026-08-16" });
+    expect(w.before).toEqual({ start: "2026-08-03", end: "2026-08-09" });
+    expect(w.days).toBe(7);
+    expect(w.partial).toBe(false);
+  });
+
+  it("starts weeks on Monday, and Sunday belongs to the week before it", () => {
+    expect(weekStart("2026-08-17")).toBe("2026-08-17"); // a Monday
+    expect(weekStart("2026-08-23")).toBe("2026-08-17"); // the Sunday after
+    expect(weekStart("2026-08-16")).toBe("2026-08-10"); // the Sunday before
+  });
+
+  it("steps back across a month boundary", () => {
+    const w = compareWindows("2026-09-02", "2026-09-30", "week");
+    expect(w.before.start).toBe("2026-08-24");
+  });
+});
+
 describe("metricFor", () => {
   it("averages time and counts over every day, gaps included", () => {
     expect(metricFor("duration")).toBe("dailyAvg");
@@ -62,7 +93,7 @@ describe("metricFor", () => {
   });
 });
 
-function tracker(over: Partial<TrackerMonth> & { type: TrackerType }): TrackerMonth {
+function tracker(over: Partial<TrackerPeriod> & { type: TrackerType }): TrackerPeriod {
   return {
     id: over.id ?? "t",
     name: over.name ?? "Study",
@@ -75,9 +106,9 @@ function tracker(over: Partial<TrackerMonth> & { type: TrackerType }): TrackerMo
   };
 }
 
-describe("compareMonths", () => {
+describe("comparePeriods", () => {
   it("reads more of a good habit as better, and says the numbers", () => {
-    const [row] = compareMonths(
+    const [row] = comparePeriods(
       [
         tracker({
           type: "duration",
@@ -96,7 +127,7 @@ describe("compareMonths", () => {
   });
 
   it("reads more of a bad habit as worse", () => {
-    const [row] = compareMonths(
+    const [row] = comparePeriods(
       [
         tracker({
           type: "count",
@@ -115,7 +146,7 @@ describe("compareMonths", () => {
   });
 
   it("leaves sleep and weight to say up or down, not good or bad", () => {
-    const rows = compareMonths(
+    const rows = comparePeriods(
       [
         tracker({
           id: "sleep",
@@ -143,7 +174,7 @@ describe("compareMonths", () => {
   });
 
   it("reads a yes/no habit as a share of the days", () => {
-    const [row] = compareMonths(
+    const [row] = comparePeriods(
       [
         tracker({
           type: "check",
@@ -160,7 +191,7 @@ describe("compareMonths", () => {
   });
 
   it("refuses to invent a percentage off nothing", () => {
-    const rows = compareMonths(
+    const rows = comparePeriods(
       [
         tracker({
           id: "new",
@@ -186,8 +217,24 @@ describe("compareMonths", () => {
     expect(by("never").change).toBe("nothing either month");
   });
 
+  it("says week or month, whichever it was asked about", () => {
+    const [row] = comparePeriods(
+      [
+        tracker({
+          type: "duration",
+          now: { total: 300, logged: 3, done: 3 },
+          before: { total: 0, logged: 0, done: 0 },
+        }),
+      ],
+      7,
+      7,
+      "week"
+    );
+    expect(row.change).toBe("new this week");
+  });
+
   it("calls a small move level rather than news", () => {
-    const [row] = compareMonths(
+    const [row] = comparePeriods(
       [
         tracker({
           type: "duration",
@@ -203,7 +250,7 @@ describe("compareMonths", () => {
   });
 
   it("puts the biggest movement first and the uncomparable last", () => {
-    const rows = compareMonths(
+    const rows = comparePeriods(
       [
         tracker({ id: "flat", type: "count", now: { total: 20, logged: 20, done: 20 }, before: { total: 20, logged: 20, done: 20 } }),
         tracker({ id: "never", type: "count" }),
@@ -216,7 +263,7 @@ describe("compareMonths", () => {
   });
 
   it("says nothing about which way a clean streak's rate reads", () => {
-    const [row] = compareMonths(
+    const [row] = comparePeriods(
       [
         tracker({
           type: "streak",

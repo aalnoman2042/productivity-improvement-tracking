@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import InstallSheet from "@/components/InstallSheet";
 import { useInstall } from "@/lib/install";
 import { useStored } from "@/lib/useCached";
 
@@ -34,6 +35,10 @@ export function ShareIcon() {
  * installed is a hard blocker rather than a nicety — on iOS, push is only
  * delivered to installed apps, so there is no point turning reminders on
  * until this is done.
+ *
+ * Both end at the same button. Where the browser has a prompt, it installs;
+ * where it hasn't, it opens `InstallSheet` — never a paragraph of
+ * instructions in place of something to press.
  */
 export default function InstallPrompt({
   variant = "banner",
@@ -43,6 +48,7 @@ export default function InstallPrompt({
   const { installed, canPrompt, needsManual, promptInstall } = useInstall();
   const [dismissed, setDismissed] = useStored<boolean>(DISMISSED_KEY, false);
   const [busy, setBusy] = useState(false);
+  const [showHow, setShowHow] = useState(false);
 
   // Nothing to say: already installed, or this browser can't do it at all.
   if (installed || (!canPrompt && !needsManual)) return null;
@@ -50,17 +56,25 @@ export default function InstallPrompt({
   if (variant === "banner" && dismissed) return null;
 
   const install = async () => {
+    if (!canPrompt) {
+      setShowHow(true);
+      return;
+    }
     setBusy(true);
     const ok = await promptInstall();
     setBusy(false);
     if (ok) setDismissed(true);
   };
 
-  const steps = (
-    <span>
-      tap <ShareIcon /> <strong>Share</strong>, then{" "}
-      <strong>Add to Home Screen</strong>
-    </span>
+  const sheet = showHow ? <InstallSheet onClose={() => setShowHow(false)} /> : null;
+  const action = (
+    <button
+      onClick={install}
+      disabled={busy}
+      className="shrink-0 rounded-lg bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+    >
+      {busy ? "Installing…" : canPrompt ? "Install" : "Show me how"}
+    </button>
   );
 
   if (variant === "block") {
@@ -74,9 +88,9 @@ export default function InstallPrompt({
         <p className="mt-1 text-secondary">
           {needsManual ? (
             <>
-              iPhone only delivers notifications to installed apps, so reminders
-              can&apos;t reach you until this is done — in Safari, {steps}. Then
-              open PIT from the icon and come back here.
+              iPhone only delivers notifications to installed apps, so
+              reminders can&apos;t reach you until this is done. It takes three
+              taps — then open PIT from the icon and come back here.
             </>
           ) : (
             <>
@@ -85,15 +99,8 @@ export default function InstallPrompt({
             </>
           )}
         </p>
-        {canPrompt && (
-          <button
-            onClick={install}
-            disabled={busy}
-            className="mt-3 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
-          >
-            {busy ? "Installing…" : "Install PIT"}
-          </button>
-        )}
+        <div className="mt-3">{action}</div>
+        {sheet}
       </div>
     );
   }
@@ -108,19 +115,11 @@ export default function InstallPrompt({
         <span className="text-secondary">
           {" "}
           — it opens instantly, works offline, and it&apos;s what lets the
-          daily reminder reach you
-          {needsManual ? <>. In Safari, {steps}.</> : "."}
+          daily reminder reach you{needsManual ? ", which iPhone allows only for installed apps." : "."}
         </span>
       </p>
-      {canPrompt && (
-        <button
-          onClick={install}
-          disabled={busy}
-          className="shrink-0 rounded-lg bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
-        >
-          {busy ? "Installing…" : "Install"}
-        </button>
-      )}
+      {action}
+      {sheet}
       <button
         onClick={() => setDismissed(true)}
         className="shrink-0 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-surface-2"

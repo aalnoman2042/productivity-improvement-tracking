@@ -116,7 +116,8 @@ tabs, with a light slide so the page follows the finger.
   bad day are different things and collapsing them hides exactly the gaps
   you're looking for. Tap any day to open it ready to fill in.
   - **📅 This month vs last** sits under the calendar and follows the month
-    picker, so browsing back compares each month to the one before it. Days
+    picker, so browsing back compares each month to the one before it. (The
+    weekly twin of this card is on Status.) Days
     logged, time and goals side by side, then every tracker's average with
     the movement between them ("30m → 1h a day, up 100%"). The comparison
     is deliberately fair: a running month is matched against *the same
@@ -155,7 +156,10 @@ tabs, with a light slide so the page follows the finger.
   days logged, goals hit, what's falling short and what to fix first, then
   every tracker's numbers. It holds History's old slot in the nav — "how am
   I doing?" is the daily question — and links to the calendar for the
-  day-by-day. **Share** renders the summary to a PNG for the phone's share
+  day-by-day. **📅 This week vs last week** sits above the advice — the same
+  card and the same arithmetic as the monthly one on History, only the window
+  differs, so a weekly answer and a monthly one can never be computed two
+  different ways. **Share** renders the summary to a PNG for the phone's share
   sheet — an image says nothing to anyone the user didn't send it to.
 - **Tracker detail** (`/tracker/[id]`) — one habit's whole story: month-by-month
   totals, the last three months day by day, streak and milestone badges, and
@@ -189,6 +193,16 @@ Turn it on per device from the Account page (each phone or computer subscribes
 separately) and use **Send a test** to confirm it arrives. On iPhone, PIT must
 be added to the Home Screen first — iOS only delivers push to installed
 web apps.
+
+**Installing** is one tap wherever the browser allows one (Chrome and friends
+hand over a prompt, which the Install button replays). Where it isn't — every
+iPhone, because Apple gives websites no install API at all — the same button
+opens a sheet with the three taps drawn out: Share ￫ Add to Home Screen ￫ Add.
+It also handles the case that actually defeats people, which is opening a link
+inside Facebook or Instagram's browser, where "Add to Home Screen" does not
+exist: it says so, and offers the link to paste into a real browser. The
+routes are guessed from the user agent in `lib/install.ts` and pinned to real
+user-agent strings in `tests/install.test.ts`.
 
 **The hour is yours to choose.** Account → Daily reminder → *Ask me at*
 stores a local time against your account; 11 PM is what it was before anyone

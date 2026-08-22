@@ -21,6 +21,22 @@ type InstallEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+/**
+ * How this particular browser can be installed to — which decides what the
+ * install sheet shows, because the four routes have nothing in common.
+ *
+ *  - `prompt`      Chrome-likes: one tap, we replay the browser's own dialog.
+ *  - `ios-safari`  the Share sheet, and nothing else. There is no API.
+ *  - `ios-other`   Chrome/Firefox/Edge on iPhone: their Add to Home Screen
+ *                  makes a bookmark Apple won't deliver push to. Safari first.
+ *  - `in-app`      opened inside Facebook, Instagram, Messenger... These
+ *                  webviews have no install route at all, which is the real
+ *                  reason "add it to your home screen" so often fails: the
+ *                  person followed a link from a chat and never left it.
+ *  - `menu`        anything else without a prompt — the browser's own menu.
+ */
+export type InstallRoute = "prompt" | "ios-safari" | "ios-other" | "in-app" | "menu";
+
 export type InstallState = {
   /** Already running as an installed app — nothing to offer. */
   installed: boolean;
@@ -28,9 +44,32 @@ export type InstallState = {
   canPrompt: boolean;
   /** iOS Safari: no prompt exists, so instructions are the only route. */
   needsManual: boolean;
+  /** Which set of instructions this browser needs. */
+  route: InstallRoute;
   /** Show the prompt. Resolves true if they accepted. */
   promptInstall: () => Promise<boolean>;
 };
+
+/** The webviews people actually arrive in, from a link in a chat. */
+const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|Snapchat|WhatsApp|TikTok|MicroMessenger/i;
+
+/** iOS browsers that are Safari underneath but not Safari on top. */
+const IOS_OTHER = /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//;
+
+/**
+ * Work out the route from a user-agent string. Pure and exported so the
+ * unpleasant part — guessing a browser from a string that lies on purpose —
+ * is tested against real user agents rather than reasoned about.
+ */
+export function detectRoute(ua: string, canPrompt: boolean): InstallRoute {
+  // A real prompt beats every guess: if the browser offered one, take it.
+  if (canPrompt) return "prompt";
+  const ios = /iPad|iPhone|iPod/.test(ua);
+  if (IN_APP.test(ua)) return "in-app";
+  if (ios && IOS_OTHER.test(ua)) return "ios-other";
+  if (ios) return "ios-safari";
+  return "menu";
+}
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -116,10 +155,16 @@ export function useInstall(): InstallState {
     return outcome === "accepted";
   }, [deferred]);
 
+  const canPrompt = deferred !== null;
+
   return {
     installed,
-    canPrompt: deferred !== null,
+    canPrompt,
     needsManual: needsManual && !installed,
+    route: detectRoute(
+      typeof navigator === "undefined" ? "" : navigator.userAgent,
+      canPrompt
+    ),
     promptInstall,
   };
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import LifeNow from "@/components/LifeNow";
+import PeriodCompare from "@/components/PeriodCompare";
 import ReportCard from "@/components/ReportCard";
 import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
 import { buildAdvice } from "@/lib/advice";
@@ -298,6 +299,13 @@ export default function StatusPage() {
               hint={goalsTotal > 0 ? `${goalsMet} of ${goalsTotal}` : "no goals set"}
             />
           </div>
+
+          {/* The week against the last one. It sits above the advice because
+              it is the same question at a different altitude — "how is this
+              week going?" — and below the tiles because those are today. The
+              month version of this card lives on the calendar page, where
+              the month picker is. */}
+          <PeriodCompare period="week" anchor={today} />
 
           {/* The advice — not what's happening, but what to do about it,
               biggest win first. Quiet when there's nothing to fix. */}
