@@ -1,5 +1,6 @@
 import { formatValue, typeMeta, type Tracker, type TrackerType } from "./trackers";
 import { nightLabel } from "./clock";
+import { wantMore as direction } from "./direction";
 
 /**
  * What goes with what.
@@ -115,19 +116,9 @@ function fmt(t: Tracker, value: number): string {
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/**
- * More of this is better, unless the tracker says otherwise. The habit flag
- * is the user's clearest statement of direction and outranks the type's
- * default — junk food rising with study time is a cost, not a win. The one
- * exception is a clean-streak tracker: its VALUE counts clean days, so more
- * is better even when the habit it guards is a bad one.
- */
+/** Which way is up for this tracker — the shared rule, in lib/direction. */
 function wantMore(t: Tracker): boolean | null {
-  if (t.type === "streak") return true;
-  if (t.habit === "bad") return false;
-  if (t.goal) return t.goal.direction === "min";
-  if (t.type === "measure") return null; // weight could go either way
-  return true;
+  return direction(t.type as TrackerType, t.habit, t.goal);
 }
 
 /**

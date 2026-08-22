@@ -1,4 +1,5 @@
 import { challengeProgress } from "./challenges";
+import { FLAT_PCT, readTrend } from "./direction";
 import { nightLabel, toNight } from "./clock";
 import { addDays, prettyDate } from "./dates";
 import { BASIS_LABEL, gradeLetter, type ReportCard } from "./report";
@@ -31,7 +32,7 @@ import {
 export const COACH_WINDOW_DAYS = 14;
 
 /** A change smaller than this is noise, not a trend. */
-const FLAT_PCT = 10;
+
 
 /** Day-score points between "steady" and a real move, week on week. */
 const MOMENTUM_STEP = 4;
@@ -172,17 +173,7 @@ function changeLabel(now: number, prev: number, prevDays: number): {
  * matter. Sleep and measurements stay unjudged — more sleep is only better
  * until it isn't, and a weight can move either way on purpose.
  */
-function readTrend(
-  type: TrackerType,
-  habit: "good" | "bad",
-  pct: number | null
-): CoachTrackerFacts["readsAs"] {
-  if (pct === null) return null;
-  if (Math.abs(pct) < FLAT_PCT) return "about the same";
-  const up = pct > 0;
-  if (type === "sleep" || type === "measure") return up ? "up" : "down";
-  return habit === "bad" ? (up ? "worse" : "better") : up ? "better" : "worse";
-}
+
 
 /** Bedtimes and wake times over the window, averaged on the night axis. */
 function sleepClock(rows: CoachEntry[]): CoachTrackerFacts["sleepClock"] {

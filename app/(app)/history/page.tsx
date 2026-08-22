@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useCached } from "@/lib/useCached";
+import MonthCompare from "@/components/MonthCompare";
 import MotivationLine from "@/components/MotivationLine";
 import {
   WEEKDAY_INITIALS,
@@ -246,6 +247,10 @@ export default function HistoryPage() {
               label="goals met"
             />
           </div>
+
+          {/* The month against the one before it. Follows the picker above,
+              so browsing back compares each month to its predecessor. */}
+          <MonthCompare month={month} />
 
           {missed > 0 && (
             <p className="text-sm text-secondary">

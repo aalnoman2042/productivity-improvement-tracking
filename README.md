@@ -115,6 +115,16 @@ tabs, with a light slide so the page follows the finger.
   against your goals. Two channels rather than one, because a blank day and a
   bad day are different things and collapsing them hides exactly the gaps
   you're looking for. Tap any day to open it ready to fill in.
+  - **📅 This month vs last** sits under the calendar and follows the month
+    picker, so browsing back compares each month to the one before it. Days
+    logged, time and goals side by side, then every tracker's average with
+    the movement between them ("30m → 1h a day, up 100%"). The comparison
+    is deliberately fair: a running month is matched against *the same
+    stretch* of the previous one (the 22nd against the 22nd), time and counts
+    are averaged over every day because a gap is part of the answer, sleep
+    and weight only over the days they were recorded, and yes/no habits read
+    as a share of days. Nothing invents a percentage off a zero baseline —
+    those say "new this month" or "stopped this month" instead.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
   ready-made packs. A pack is a kind of person rather than a category, so two
   or three taps cover most of a life: **Essentials**, **Faith & discipline**
