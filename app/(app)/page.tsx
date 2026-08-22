@@ -59,6 +59,17 @@ const UNDO_MS = 10_000;
 const TAP_TYPES: TrackerType[] = ["check", "streak", "scale", "prayer"];
 
 /**
+ * The typed kinds that need a whole row on a phone.
+ *
+ * A count or a measurement is one box — two of them fit side by side on the
+ * narrowest screen, which is what makes the log a grid rather than a column.
+ * Time and sleep are not one box: a stopwatch with an hours and a minutes
+ * field, or two clock pickers and a quality row, squeezed into 160px is worse
+ * than a scroll. So those keep the full width until there is room for two.
+ */
+const WIDE_TYPES: TrackerType[] = ["duration", "sleep"];
+
+/**
  * Send the day's changes, and keep the offline copy in step.
  *
  * Only the trackers in `only` are sent (everything, when it's empty — the
@@ -629,16 +640,20 @@ function TodayLog() {
                         date={date}
                       />
                     )}
-                    {/* The typed kinds go two to a row once there is width
-                        for it — the name above its inputs, so a narrow
-                        column never squeezes a stopwatch and two boxes onto
-                        one line. On a phone it stays a single column. */}
+                    {/* Two to a row, phones included: the name above its
+                        inputs, so a half-width card still reads. The kinds
+                        that carry more than one field take the full row
+                        until there is room for two of them. */}
                     {group.typed.length > 0 && (
-                      <ul className="stagger grid gap-2 sm:grid-cols-2">
+                      <ul className="stagger grid grid-cols-2 gap-2">
                         {group.typed.map((t) => (
                           <li
                             key={t.id}
-                            className="flex flex-col gap-2 rounded-xl border border-edge card p-3 shadow-sm"
+                            className={`flex flex-col gap-2 rounded-xl border border-edge card p-3 shadow-sm ${
+                              WIDE_TYPES.includes(t.type as TrackerType)
+                                ? "col-span-2 sm:col-span-1"
+                                : ""
+                            }`}
                           >
                             <span className="flex min-w-0 items-center gap-2">
                               <span
