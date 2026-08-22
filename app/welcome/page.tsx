@@ -90,7 +90,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   {
     icon: "📚",
     title: "A shelf for what you read",
-    text: "Books aren't habits, so they don't pretend to be trackers — they get a shelf beside them: a wishlist, whatever you're in the middle of with a progress bar and a pace, and the count of what you actually finished this year.",
+    text: "Books aren't habits, so they don't pretend to be trackers — they get a shelf of their own: a wishlist, and the count of what you actually finished this year. The one you're reading sits at the foot of the daily log, where typing the page you reached shows how much of it is left.",
   },
   {
     icon: "🔒",

@@ -16,14 +16,16 @@ import {
 } from "@/lib/books";
 
 /**
- * The bookshelf, living with the trackers.
+ * The bookshelf, living behind a button on the Trackers page.
  *
  * A book is not a habit — it asks its question once and then goes quiet for a
  * fortnight — so it isn't a tracker type, and none of this touches a day's
  * score, streaks or the coach. But it is the same kind of thing to *manage*
- * as a tracker or a challenge: something you set up here and act on for weeks
- * afterwards. So it sits on this page beside them rather than claiming a tab
- * of its own, exactly like 🏆 Challenges.
+ * as a tracker or a challenge: something you set up once and act on for weeks
+ * afterwards. So it lives on the Trackers page rather than claiming a tab of
+ * its own — but *behind a button*, on a view of its own, because that page is
+ * already long and a shelf of forty books at the foot of it helps nobody.
+ * `standalone` is that view: the page owns the heading, so this doesn't.
  *
  * Three shelves and one tap between them. Nothing asks for a date: starting a
  * book stamps today, finishing it stamps today, and `afterStatusChange` in
@@ -78,7 +80,7 @@ function Stars({
   );
 }
 
-export default function Books() {
+export default function Books({ standalone = false }: { standalone?: boolean }) {
   const today = toDateStr(new Date());
   const q = useCached<Book[]>("/api/books", "books");
   const books = useMemo(() => q.data ?? [], [q.data]);
@@ -246,7 +248,9 @@ export default function Books() {
   if (books.length === 0) {
     return adding ? (
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        {!standalone && (
+          <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        )}
         {form}
       </section>
     ) : (
@@ -269,7 +273,9 @@ export default function Books() {
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        {!standalone && (
+          <h2 className="text-sm font-semibold text-secondary">📚 Books</h2>
+        )}
         {!adding && (
           <button
             onClick={() => setAdding(true)}

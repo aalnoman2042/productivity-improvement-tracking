@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
+import { useSearchParams } from "next/navigation";
 import Books from "@/components/Books";
 import Challenges from "@/components/Challenges";
 import MotivationLine from "@/components/MotivationLine";
@@ -101,7 +102,7 @@ function goalLabel(t: Tracker): string | null {
   return `Goal: ${verb} ${amount} / ${t.goal.period}`;
 }
 
-export default function TrackersPage() {
+function TrackersList() {
   const [form, setForm] = useState<Form>(BLANK);
   const [showForm, setShowForm] = useState(false);
   const [customCategory, setCustomCategory] = useState(false);
@@ -115,6 +116,10 @@ export default function TrackersPage() {
   const [checking, setChecking] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [query, setQuery] = useState("");
+  // The shelf is a view of this page rather than a tab of its own, and
+  // `/books` — the address it briefly had — forwards here asking for it.
+  const params = useSearchParams();
+  const [showBooks, setShowBooks] = useState(() => params.get("books") === "1");
 
   const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
   const trackers = trackersQ.data;
@@ -352,6 +357,32 @@ export default function TrackersPage() {
   const field =
     "w-full rounded-md border border-edge bg-transparent px-3 py-2 outline-none focus:border-accent";
 
+  // A page of its own in everything but the URL. The trackers list is long
+  // enough already; a shelf of forty books underneath it would bury both.
+  if (showBooks) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">📚 Books</h1>
+            <p className="mt-1 text-sm text-secondary">
+              What you want to read, what you&apos;re in the middle of, and
+              what you actually finished. Not habits — nothing here touches a
+              day&apos;s score.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowBooks(false)}
+            className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+          >
+            ← Trackers
+          </button>
+        </div>
+        <Books standalone />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -362,7 +393,13 @@ export default function TrackersPage() {
           </p>
         </div>
         {!showForm && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowBooks(true)}
+              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            >
+              📚 Books
+            </button>
             <button
               onClick={() => setShowPacks((v) => !v)}
               className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
@@ -382,11 +419,6 @@ export default function TrackersPage() {
       {/* "This, every day, for N days" — challenges watch a tracker over a
           window, so they live with the trackers they're judged by. */}
       {!showForm && <Challenges trackers={trackers} onTrackerCreated={load} />}
-
-      {/* Books aren't trackers and never touch a day's score — but they are
-          the same kind of thing to set up and keep an eye on, so the shelf
-          lives here rather than costing a whole tab. */}
-      {!showForm && <Books />}
 
       {showPacks && !showForm && (
         <div className="animate-rise-in grid gap-3 sm:grid-cols-2">
@@ -1058,5 +1090,26 @@ function DeleteDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The shelf can be asked for in the address (`/books` forwards here), and
+ * reading the query string is what makes this tree client-rendered — Next
+ * asks for that boundary to be drawn on purpose.
+ */
+export default function TrackersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-2" aria-hidden="true">
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+          <div className="skeleton h-16 w-full rounded-lg" />
+        </div>
+      }
+    >
+      <TrackersList />
+    </Suspense>
   );
 }

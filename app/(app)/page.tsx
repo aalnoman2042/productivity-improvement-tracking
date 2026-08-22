@@ -8,6 +8,7 @@ import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
 import MotivationLine from "@/components/MotivationLine";
 import QuickLog from "@/components/QuickLog";
+import ReadingToday from "@/components/ReadingToday";
 import TapGrid from "@/components/TapGrid";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
@@ -622,6 +623,11 @@ function TodayLog() {
               </div>
             </section>
           ))}
+
+          {/* A bookmark is a thing you move at the end of a day too, and
+              nobody goes to another screen to do it. Renders nothing at all
+              when no book is on the go. */}
+          <ReadingToday />
 
           {/* Words last, after the numbers they explain — but still inside
               the day, not on a page of their own. */}

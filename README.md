@@ -85,6 +85,11 @@ tabs, with a light slide so the page follows the finger.
     enough to hit without looking and Enter to move on — a twelve-tracker day
     becomes a rhythm instead of a scroll. It starts on the first thing not yet
     filled in.
+  - **📖 Reading now** appears at the foot of the day whenever a book is on
+    the go: type the page you reached and the bar shows how much of the book
+    is left ("158 pages to go", "about 10/day, 16 days at this rate"). It is
+    the same page count the shelf keeps, so the two can't drift apart, and
+    the card isn't there at all when nothing is being read.
   - **Notes** sit at the foot of the day: one free-text note about the day
     itself, plus a short note pinned to any tracker you filled in ("woke
     twice", "finished chapter 4"). Both save themselves, and both are read
@@ -115,8 +120,10 @@ tabs, with a light slide so the page follows the finger.
     10/day, 19 to go") → read (a rating, the date). One tap moves a book and
     stamps the dates for you. The headline is the count the shelf exists for:
     how many you have actually read, all time and this year. Nothing here
-    touches a day's score, a streak or the coach. (`/books` forwards here —
-    the shelf briefly had a tab of its own.)
+    touches a day's score, a streak or the coach. It opens from a **📚 Books**
+    button rather than sitting under the list — this page is long enough
+    without a shelf of forty books on the end of it. (`/books` forwards to
+    `/trackers?books=1`, which opens the shelf; it briefly had a tab.)
 - **Status** (`/status`) — where you stand over a week, two weeks or a month:
   days logged, goals hit, what's falling short and what to fix first, then
   every tracker's numbers. It holds History's old slot in the nav — "how am

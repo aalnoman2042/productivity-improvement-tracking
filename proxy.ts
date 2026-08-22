@@ -17,10 +17,11 @@ export default async function proxy(req: NextRequest) {
   }
 
   // The bookshelf briefly had a tab of its own before it moved in with the
-  // trackers. Anything that remembers the old address — a bookmark, an
-  // installed app's cached shell — lands where the shelf actually is.
+  // trackers, behind a button there. Anything that remembers the old address
+  // — a bookmark, an installed app's cached shell — lands on the shelf
+  // itself rather than on the page that hides it.
   if (pathname === "/books") {
-    return NextResponse.redirect(new URL("/trackers", req.url));
+    return NextResponse.redirect(new URL("/trackers?books=1", req.url));
   }
 
   // The pitch used to live at /welcome and is now the home page itself. The
