@@ -474,6 +474,14 @@ function TodayLog() {
   const pct =
     trackers.length > 0 ? Math.round((loggedCount / trackers.length) * 100) : 0;
 
+  // Tomorrow is reachable, but only to plan: a day nobody has lived cannot
+  // be logged, and the server refuses an entry dated past today whatever
+  // this page thinks (`isBeyondToday`). So the page shows the one thing
+  // that *is* about a day before it starts — the list of what has to happen
+  // in it — and nothing else at all.
+  const tomorrow = addDays(today, 1);
+  const planning = date > today;
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -504,14 +512,14 @@ function TodayLog() {
           <input
             type="date"
             value={date}
-            max={today}
+            max={tomorrow}
             onChange={(e) => e.target.value && changeDate(e.target.value)}
             suppressHydrationWarning
             className="min-w-0 flex-1 rounded-lg border border-edge card px-3 py-2 text-center shadow-sm outline-none focus:border-accent"
           />
           <button
             onClick={() => changeDate(addDays(date, 1))}
-            disabled={date >= today}
+            disabled={date >= tomorrow}
             className="rounded-lg border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2 disabled:opacity-40"
             aria-label="Next day"
           >
@@ -528,10 +536,28 @@ function TodayLog() {
           >
             Yesterday
           </button>
+          <button
+            onClick={() => changeDate(tomorrow)}
+            className={chipCls(date === tomorrow)}
+          >
+            Tomorrow
+          </button>
         </div>
       </div>
 
-      {trackersQ.loading ? (
+      {planning ? (
+        /* A day before it starts holds exactly one useful thing: what has to
+           happen in it. No dial, no trackers, no notes, no save bar — there
+           is nothing yet to record, and offering the inputs would invite
+           logging a day that hasn't been lived. */
+        <>
+          <p className="rounded-xl border border-accent/40 bg-accent/5 p-3 text-sm">
+            <strong>Tomorrow hasn&apos;t started.</strong> You can decide now
+            what has to happen in it — the logging waits until the day does.
+          </p>
+          <DayTasks date={date} />
+        </>
+      ) : trackersQ.loading ? (
         <div className="space-y-2">
           <div aria-hidden="true" className="space-y-2">
             <div className="skeleton h-16 w-full rounded-lg" />

@@ -98,6 +98,12 @@ tabs, with a light slide so the page follows the finger.
     is left ("158 pages to go", "about 10/day, 16 days at this rate"). It is
     the same page count the shelf keeps, so the two can't drift apart, and
     the card isn't there at all when nothing is being read.
+  - **Tomorrow** sits beside Today and Yesterday in the day picker, and it is
+    the one day you can open before it starts. It shows the task list and
+    nothing else — no trackers, no dial, no notes — because there is nothing
+    to record about a day nobody has lived yet. Decide it tonight, tick it
+    tomorrow. Logging a future day is refused by the server, not just hidden
+    by the page.
   - **✅ Have to do it today** sits above the trackers — the one part of the
     page that faces forward. Type a thing, tick it when it's done, remove it
     when it isn't a thing any more. Up to twenty a day, they belong to the

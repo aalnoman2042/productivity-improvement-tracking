@@ -4,6 +4,7 @@ import {
   cleanTask,
   inOrder,
   nextOrder,
+  taskHeading,
   taskProgress,
   taskSummary,
   type Task,
@@ -98,5 +99,22 @@ describe("taskSummary", () => {
   it("says so plainly when the day is cleared", () => {
     expect(taskSummary([task("a", 0, true)])).toBe("Done");
     expect(taskSummary([task("a", 0, true), task("b", 1, true)])).toBe("All 2 done");
+  });
+});
+
+describe("taskHeading", () => {
+  const today = "2026-08-23";
+  const tomorrow = "2026-08-24";
+
+  it("names the day it is actually about", () => {
+    expect(taskHeading(today, today, tomorrow)).toBe("Have to do it today");
+    expect(taskHeading(tomorrow, today, tomorrow)).toBe("Have to do it tomorrow");
+    expect(taskHeading("2026-08-22", today, tomorrow)).toBe("Had to do that day");
+  });
+
+  it("does not call next week 'tomorrow'", () => {
+    // Not reachable from the log today, but a heading that lies is a lie
+    // waiting for the day someone links straight to that date.
+    expect(taskHeading("2026-08-30", today, tomorrow)).toBe("Have to do it that day");
   });
 });

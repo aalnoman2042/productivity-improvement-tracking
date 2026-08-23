@@ -61,6 +61,24 @@ export function nextOrder(tasks: Task[]): number {
   return tasks.reduce((max, t) => Math.max(max, t.order), -1) + 1;
 }
 
+/**
+ * What to call the list, given the day it belongs to.
+ *
+ * "Have to do it today" is wrong on every day that isn't today, and the
+ * section is reachable for tomorrow (to plan) and for past days (to look).
+ * The wording carries the tense so the heading never lies about which day
+ * is open.
+ */
+export function taskHeading(date: string, today: string, tomorrow: string): string {
+  if (date === today) return "Have to do it today";
+  if (date === tomorrow) return "Have to do it tomorrow";
+  // A day further out than tomorrow isn't reachable from the log today, but
+  // a heading that says "tomorrow" about next Thursday would be a small lie
+  // waiting for the day someone links straight to it.
+  if (date > today) return "Have to do it that day";
+  return "Had to do that day";
+}
+
 export type TaskProgress = {
   done: number;
   total: number;

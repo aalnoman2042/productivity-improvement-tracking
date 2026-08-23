@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { formatMinutes, isValidDateStr } from "@/lib/dates";
+import { formatMinutes, isBeyondToday, isValidDateStr } from "@/lib/dates";
 import { DAY_MINUTES } from "@/lib/draft";
 import { parseMeta } from "@/lib/entryMeta";
 
@@ -48,6 +48,15 @@ export async function POST(req: Request) {
   const entries = body?.entries;
   if (!isValidDateStr(date) || !Array.isArray(entries)) {
     return NextResponse.json({ error: "Bad body" }, { status: 400 });
+  }
+  // A day that hasn't happened yet cannot have been lived. The daily page
+  // offers tomorrow for *planning* — tasks only — and this is what makes
+  // that safe: the refusal lives on the server, where no client can skip it.
+  if (isBeyondToday(date)) {
+    return NextResponse.json(
+      { error: "That day hasn't happened yet — you can only plan it" },
+      { status: 400 }
+    );
   }
 
   const now = new Date();

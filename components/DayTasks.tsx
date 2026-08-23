@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { addDays, toDateStr } from "@/lib/dates";
 import { cacheSet, post } from "@/lib/sync";
 import { useCached } from "@/lib/useCached";
 import {
@@ -8,6 +9,7 @@ import {
   MAX_TASKS_PER_DAY,
   inOrder,
   nextOrder,
+  taskHeading,
   taskProgress,
   taskSummary,
   type Task,
@@ -38,6 +40,10 @@ export default function DayTasks({ date }: { date: string }) {
   const q = useCached<Day>(`/api/tasks?date=${date}`, key);
   const tasks = inOrder(q.data?.tasks ?? []);
 
+  // Read once, in an initializer: a clock in render is impure, and the
+  // heading only needs to know which day it was opened on.
+  const [today] = useState(() => toDateStr(new Date()));
+  const ahead = date > today;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -107,7 +113,7 @@ export default function DayTasks({ date }: { date: string }) {
   return (
     <section className="rounded-xl border border-edge card p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="font-semibold">✅ Have to do it today</h2>
+        <h2 className="font-semibold">✅ {taskHeading(date, today, addDays(today, 1))}</h2>
         <span
           className={`text-xs ${cleared ? "font-medium text-green-700 dark:text-green-500" : "text-muted"}`}
         >
@@ -151,9 +157,11 @@ export default function DayTasks({ date }: { date: string }) {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Add something you have to do…"
+          placeholder={
+            ahead ? "Add something for that day…" : "Add something you have to do…"
+          }
           maxLength={MAX_TASK}
-          aria-label="Add a task for today"
+          aria-label={ahead ? "Add a task for that day" : "Add a task for today"}
           className="min-w-0 flex-1 rounded-lg border border-edge bg-transparent px-3 py-2 text-sm"
         />
         <button
@@ -169,8 +177,9 @@ export default function DayTasks({ date }: { date: string }) {
 
       {tasks.length === 0 && !error && (
         <p className="mt-2 text-xs text-muted">
-          Just for today, and just for you — none of this counts towards your
-          score, your streaks or anything the coach reads.
+          {ahead
+            ? "Decide it now, tick it then. None of this counts towards your score, your streaks or anything the coach reads."
+            : "Just for you — none of this counts towards your score, your streaks or anything the coach reads."}
         </p>
       )}
     </section>

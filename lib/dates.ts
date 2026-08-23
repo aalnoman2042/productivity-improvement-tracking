@@ -48,6 +48,26 @@ export function addDays(s: string, n: number): string {
   return toDateStr(d);
 }
 
+/**
+ * A day nobody has lived through yet — the server's test for "you can't log
+ * that".
+ *
+ * The awkward part is that the server has no idea what day it is *for the
+ * caller*. Rule: never trust a client's "today" for anything that guards,
+ * but a date-scoped feature is about the reader's clock, not UTC's. So this
+ * allows a full day of slack in both directions of the international date
+ * line — someone in UTC+14 is legitimately a day ahead of the server, and
+ * refusing their evening's log would be a bug they could never explain.
+ *
+ * What it catches is the thing worth catching: a log dated next week. The
+ * daily page can offer tomorrow for *planning* precisely because logging it
+ * is refused here, where the refusal cannot be edited out by a client.
+ */
+export function isBeyondToday(date: string, now: Date = new Date()): boolean {
+  const utcToday = now.toISOString().slice(0, 10);
+  return date > addDays(utcToday, 1);
+}
+
 /** Whole days from `a` to `b` — negative if `b` is earlier. */
 export function daysBetween(a: string, b: string): number {
   const ms = parseDateStr(b).getTime() - parseDateStr(a).getTime();
