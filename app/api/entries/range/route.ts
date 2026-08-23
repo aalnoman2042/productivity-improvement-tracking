@@ -131,12 +131,16 @@ export async function POST(req: Request) {
   // What was written about those days goes with them: a note left behind
   // would keep marking a day on the calendar that no longer exists.
   const notes = await d.collection("dayNotes").deleteMany(filter);
+  // Same reasoning for the to-do list: a day that no longer exists cannot
+  // still have things you were supposed to do on it.
+  const tasks = await d.collection("tasks").deleteMany(filter);
 
   return NextResponse.json({
     ok: true,
     days: dates.length,
     entries: res.deletedCount,
     notes: notes.deletedCount,
+    tasks: tasks.deletedCount,
     dates: dates.sort(),
   });
 }

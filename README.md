@@ -98,6 +98,13 @@ tabs, with a light slide so the page follows the finger.
     is left ("158 pages to go", "about 10/day, 16 days at this rate"). It is
     the same page count the shelf keeps, so the two can't drift apart, and
     the card isn't there at all when nothing is being read.
+  - **✅ Have to do it today** sits above the trackers — the one part of the
+    page that faces forward. Type a thing, tick it when it's done, remove it
+    when it isn't a thing any more. Up to twenty a day, they belong to the
+    day they were written on, and **none of it counts**: no day score, no
+    streak, no grade, and the coach never sees it. A day of ticked boxes
+    with nothing logged is still a day with nothing logged. Ticks save
+    offline like everything else here.
   - **Notes** sit at the foot of the day: one free-text note about the day
     itself, plus a short note pinned to any tracker you filled in ("woke
     twice", "finished chapter 4"). Both save themselves, and both are read
@@ -351,7 +358,7 @@ offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Nine collections, all with `$jsonSchema` validators so the BSON types stay
+Ten collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
 - `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
@@ -365,6 +372,9 @@ honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 - `dayNotes` — `userId`, `date`, `text`: the note about a day itself, unique
   on `(userId, date)`. Its own collection so it survives on a day with nothing
   logged, and so it can't change what any number on that day means.
+- `tasks` — `userId`, `date`, `text`, `done`, `order`: the day's to-do list,
+  many rows per day. Its own collection and deliberately outside the scoring:
+  nothing here reaches a number, a streak or the AI.
 - `books` — `userId`, title, author, `status` (wishlist / reading / finished /
   dropped), `pages`, `pagesRead`, `rating`, `startedOn`, `finishedOn`, note.
 - `weeklyReviews` — one AI review per finished week, unique on

@@ -7,6 +7,7 @@ import { parseMeta } from "@/lib/entryMeta";
 import { clampRead, normalizeStatus, parsePages, parseRating } from "@/lib/books";
 import { parseAuthor, parseBookNote, parseTitle } from "@/lib/bookDoc";
 import { MAX_DAY_NOTE, cleanNote } from "@/lib/notes";
+import { cleanTask } from "@/lib/tasks";
 import { parseGoal } from "@/lib/trackerDoc";
 import {
   TRACKER_TYPES,
@@ -34,6 +35,7 @@ const MAX_TRACKERS = 200;
 const MAX_ENTRIES = 200_000;
 const MAX_DAY_NOTES = 20_000;
 const MAX_BOOKS = 5_000;
+const MAX_TASKS = 20_000;
 const VALID_TYPES = new Set(TRACKER_TYPES.map((t) => t.value));
 
 export async function POST(req: Request) {
@@ -174,6 +176,37 @@ export async function POST(req: Request) {
     await d.collection("dayNotes").bulkWrite(noteOps.slice(i, i + 1000));
   }
 
+  // --- The to-do lists ----------------------------------------------------
+  // Matched on (date, text), so importing the same backup twice leaves one
+  // copy of each task rather than two — the same rule the bookshelf uses,
+  // for the same reason.
+  let tasksImported = 0;
+  const inTasks = Array.isArray(body?.tasks) ? body.tasks.slice(0, MAX_TASKS) : [];
+  const taskOps: AnyBulkWriteOperation[] = [];
+  for (const t of inTasks) {
+    const date = t?.date;
+    const text = cleanTask(t?.text);
+    if (!isValidDateStr(date) || !text) continue;
+    taskOps.push({
+      updateOne: {
+        filter: { userId, date, text },
+        update: {
+          $set: { done: Boolean(t?.done) },
+          $setOnInsert: {
+            order: Number.isFinite(Number(t?.order)) ? Number(t.order) : 0,
+            doneAt: null,
+            createdAt: now,
+          },
+        },
+        upsert: true,
+      },
+    });
+    tasksImported++;
+  }
+  for (let i = 0; i < taskOps.length; i += 1000) {
+    await d.collection("tasks").bulkWrite(taskOps.slice(i, i + 1000));
+  }
+
   // --- The bookshelf ------------------------------------------------------
   // Matched on title and author, so importing the same backup twice leaves
   // one copy of each book rather than two.
@@ -216,5 +249,6 @@ export async function POST(req: Request) {
     entries: { imported: entriesUpserted, skipped: entriesSkipped },
     dayNotes: { imported: notesImported },
     books: { imported: booksImported },
+    tasks: { imported: tasksImported },
   });
 }

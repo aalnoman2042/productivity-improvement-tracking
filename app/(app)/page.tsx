@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DayDial from "@/components/DayDial";
 import DayNotes from "@/components/DayNotes";
+import DayTasks from "@/components/DayTasks";
 import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
 import MotivationLine from "@/components/MotivationLine";
@@ -598,6 +599,13 @@ function TodayLog() {
               </p>
             )}
           </div>
+
+          {/* The one part of this page that faces forward, so it goes above
+              the record of what already happened. At 9am it is the answer to
+              "what was I supposed to do today?"; at 11pm it is the last
+              thing checked before sleeping. Nothing in it counts towards a
+              score — see components/DayTasks. */}
+          <DayTasks date={date} />
 
           {/* One section per category. Taps still come first inside each,
               so most of a section is settled in a few seconds. */}

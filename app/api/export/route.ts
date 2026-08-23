@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const [user, trackerDocs, entryDocs, noteDocs, bookDocs] = await Promise.all([
+  const [user, trackerDocs, entryDocs, noteDocs, bookDocs, taskDocs] = await Promise.all([
     d.collection("users").findOne(
       { _id: userId },
       { projection: { name: 1, email: 1, createdAt: 1 } }
@@ -51,6 +51,7 @@ export async function GET(req: Request) {
     d.collection("entries").find({ userId }).sort({ date: 1 }).toArray(),
     d.collection("dayNotes").find({ userId }).sort({ date: 1 }).toArray(),
     d.collection("books").find({ userId }).sort({ createdAt: 1 }).toArray(),
+    d.collection("tasks").find({ userId }).sort({ date: 1, order: 1 }).toArray(),
   ]);
 
   const trackers = trackerDocs.map(toTracker);
@@ -73,6 +74,15 @@ export async function GET(req: Request) {
         text: String(n.text ?? ""),
       })),
       books: bookDocs.map(toBook),
+      // The to-do list is not part of the record the numbers are drawn from,
+      // but it is still something the account holds — a backup that quietly
+      // dropped it would be a backup that isn't one.
+      tasks: taskDocs.map((t) => ({
+        date: String(t.date),
+        text: String(t.text),
+        done: Boolean(t.done),
+        order: Number(t.order ?? 0),
+      })),
       entries: entryDocs.map((e) => ({
         trackerId: String(e.trackerId),
         tracker: byId.get(String(e.trackerId))?.name ?? null,

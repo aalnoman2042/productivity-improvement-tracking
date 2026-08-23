@@ -214,6 +214,28 @@ const VALIDATORS: Record<string, object> = {
       createdAt: { bsonType: "date" },
     },
   },
+  // "Have to do it today" — one row per task, hung off a date.
+  //
+  // Its own collection and NOT a tracker, for the reason the shelf isn't one
+  // either: a tracker asks the same question every day, and a task is one
+  // thing, once. Nothing here reaches the day score, days logged, a streak
+  // or the AI — a day of ticked boxes with nothing logged is still a day
+  // with nothing logged.
+  tasks: {
+    bsonType: "object",
+    required: ["userId", "date", "text", "done", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      date: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      text: { bsonType: "string", minLength: 1, maxLength: 140 },
+      done: { bsonType: "bool" },
+      order: { bsonType: "number" },
+      // Stamped when it was ticked, cleared when it is un-ticked. Not used
+      // for anything yet; it is the one fact a checkbox destroys.
+      doneAt: { bsonType: ["date", "null"] },
+      createdAt: { bsonType: "date" },
+    },
+  },
   // The week in review, written once and then kept.
   //
   // Its own collection rather than a flag on `aiReviews`, because the two
@@ -359,6 +381,8 @@ async function ensureSchema(d: Db): Promise<void> {
     d.collection("challenges").createIndex({ userId: 1, createdAt: -1 }),
     // One note per day per person — the write is an upsert on exactly this.
     d.collection("dayNotes").createIndex({ userId: 1, date: 1 }, { unique: true }),
+    // Many tasks per day, read a day at a time. Not unique, unlike the note.
+    d.collection("tasks").createIndex({ userId: 1, date: 1 }),
     d.collection("books").createIndex({ userId: 1, createdAt: -1 }),
     d.collection("aiReviews").createIndex({ userId: 1, createdAt: -1 }),
     // One review per week per person — the write is an upsert on exactly this.

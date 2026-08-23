@@ -214,7 +214,16 @@ function enqueue(path: string, body: unknown) {
 }
 
 /** Every write that is *about one day* and could resurrect a deleted one. */
-const DAY_WRITES = ["/api/entries", "/api/entries/increment", "/api/notes"];
+const DAY_WRITES = [
+  "/api/entries",
+  "/api/entries/increment",
+  "/api/notes",
+  // Adding a task carries its date, so a queued one could bring back a day
+  // that was deleted while offline. (Ticking and removing a task address it
+  // by id at /api/tasks/<id> and carry no date, so they can't resurrect a
+  // day — the row they refer to is already gone with it.)
+  "/api/tasks",
+];
 
 /**
  * Forget any queued save for these days. Used after deleting a date range:
