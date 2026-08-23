@@ -33,12 +33,36 @@ export default function StorageReport() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    let live = true;
     fetch("/api/admin/storage")
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then(setData)
-      // The page it sits on has already checked who is asking; a failure
-      // here is the cluster refusing to report, not a permission problem.
-      .catch(() => setFailed(true));
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`storage ${res.status}`);
+        const body = await res.json();
+        // Checked before it is trusted, because this card is rendered inside
+        // someone else's page: a response that isn't the shape this expects
+        // must cost one card, never the whole screen. `dbStats` is a command
+        // a cluster is allowed to refuse, and what comes back then is not
+        // this component's to guess at.
+        if (
+          !body ||
+          typeof body !== "object" ||
+          !body.totals ||
+          !Array.isArray(body.collections)
+        ) {
+          throw new Error("storage: unexpected shape");
+        }
+        return body as Report;
+      })
+      .then((report) => {
+        if (live) setData(report);
+      })
+      .catch((err) => {
+        console.error("Admin storage card:", err);
+        if (live) setFailed(true);
+      });
+    return () => {
+      live = false;
+    };
   }, []);
 
   if (failed) {
@@ -46,8 +70,9 @@ export default function StorageReport() {
       <section className="rounded-xl border border-edge card p-4 shadow-sm">
         <h2 className="font-semibold">💾 Database</h2>
         <p className="mt-1 text-sm text-secondary">
-          Couldn&apos;t read the cluster&apos;s size. Everything else on this
-          page is unaffected.
+          Couldn&apos;t read the cluster&apos;s size — some clusters refuse
+          the command that reports it. Everything else on this page is
+          unaffected, and the reason is in the browser console.
         </p>
       </section>
     );
