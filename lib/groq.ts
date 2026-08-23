@@ -36,8 +36,91 @@ export const DEFAULT_MODEL = "openai/gpt-oss-120b";
  */
 export const LIGHT_MODEL = "openai/gpt-oss-20b";
 
+/**
+ * What to fall back to when the first choice doesn't answer.
+ *
+ * Both directions are real: the big model is the better writer, the small one
+ * is cheaper on a minute that is capped at 8,000 tokens, and either can be
+ * the one that is unavailable. Both were checked against the actual coach
+ * prompt on 2026-08-23 and both return a complete, valid review.
+ *
+ * `qwen/qwen3.6-27b` is deliberately NOT in here: it is in the catalogue and
+ * it fails this prompt outright (HTTP 400, `json_validate_failed`, empty
+ * generation). A fallback that cannot answer is worse than no fallback,
+ * because it turns one clear failure into two slow ones.
+ */
+const FALLBACKS: Record<string, string> = {
+  "openai/gpt-oss-120b": "openai/gpt-oss-20b",
+  "openai/gpt-oss-20b": "openai/gpt-oss-120b",
+};
+
 export type GroqOk = { ok: true; text: string; model: string };
 export type GroqFail = { ok: false; status: number; error: string };
+
+/** What a failed attempt means: worth another model, or worth stopping. */
+export type Attempt = {
+  /** Whether a different model could plausibly do better. */
+  retry: boolean;
+  status: number;
+  error: string;
+};
+
+/**
+ * Read a failure and decide whether the next model in the chain is worth a
+ * try. Pure, so the decision can be tested without a network.
+ *
+ * The one that surprises people is 429: it does NOT retry. Groq's free tier
+ * caps tokens per *minute* across the org, so a second model is asking the
+ * same exhausted budget — measured, not assumed, while probing this app's
+ * own prompts. Retrying there would turn a one-minute wait into two.
+ */
+export function classifyFailure(status: number, body: string): Attempt {
+  if (status === 401 || status === 403) {
+    return {
+      retry: false,
+      status: 502,
+      error: "The AI key was rejected — check GROQ_API_KEY",
+    };
+  }
+
+  if (status === 429) {
+    return {
+      retry: false,
+      status: 502,
+      error: "The free AI quota is catching its breath — try again in a minute",
+    };
+  }
+
+  // The configured model is gone. This is the failure that "try again
+  // shortly" was actively wrong about: retrying the same name never works,
+  // and a model id withdrawn by the provider is a config problem to read
+  // about, not weather to wait out. (It has happened once already —
+  // llama-3.3-70b-versatile.)
+  if (body.includes("model_not_found") || body.includes("does not exist")) {
+    return {
+      retry: true,
+      status: 502,
+      error:
+        "The configured AI model no longer exists at Groq — set GROQ_MODEL to one that does",
+    };
+  }
+
+  // The model could not satisfy the JSON schema, or spent its whole budget
+  // thinking and returned nothing. A different model genuinely may not.
+  if (status === 400 || status === 0) {
+    return {
+      retry: true,
+      status: 502,
+      error: "The AI answer came back unusable — try again",
+    };
+  }
+
+  if (status >= 500 || status === 408) {
+    return { retry: true, status: 502, error: "The AI service had trouble — try again shortly" };
+  }
+
+  return { retry: false, status: 502, error: "The AI service had trouble — try again shortly" };
+}
 
 export type GroqAsk = {
   system: string;
@@ -71,8 +154,38 @@ export async function askGroq(ask: GroqAsk): Promise<GroqOk | GroqFail> {
 
   // An explicit choice wins: it is made for a reason the environment can't
   // know, like a token budget shared by the minute.
-  const model = ask.model || process.env.GROQ_MODEL || DEFAULT_MODEL;
+  const first = ask.model || process.env.GROQ_MODEL || DEFAULT_MODEL;
+  const chain = [first, FALLBACKS[first]].filter(Boolean) as string[];
 
+  let last: Attempt = {
+    retry: false,
+    status: 502,
+    error: "The AI service had trouble — try again shortly",
+  };
+
+  for (const model of chain) {
+    const attempt = await once(apiKey, model, ask);
+    if ("ok" in attempt && attempt.ok) {
+      if (model !== first) {
+        // Worth a line in the log: the primary is unavailable, and the only
+        // other sign of it is a review quietly written by a smaller model.
+        console.warn(`Groq: ${first} unavailable, answered by ${model}`);
+      }
+      return attempt;
+    }
+    last = attempt as Attempt;
+    if (!last.retry) break;
+  }
+
+  return { ok: false, status: last.status, error: last.error };
+}
+
+/** One model, one attempt. Returns the answer, or why it didn't come. */
+async function once(
+  apiKey: string,
+  model: string,
+  ask: GroqAsk
+): Promise<GroqOk | Attempt> {
   try {
     const res = await fetch(GROQ_URL, {
       method: "POST",
@@ -96,15 +209,8 @@ export async function askGroq(ask: GroqAsk): Promise<GroqOk | GroqFail> {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      console.error("Groq error:", res.status, detail.slice(0, 500));
-      return {
-        ok: false,
-        status: 502,
-        error:
-          res.status === 429
-            ? "The free AI quota is catching its breath — try again in a minute"
-            : "The AI service had trouble — try again shortly",
-      };
+      console.error("Groq error:", model, res.status, detail.slice(0, 500));
+      return classifyFailure(res.status, detail);
     }
 
     const data = (await res.json()) as {
@@ -114,18 +220,15 @@ export async function askGroq(ask: GroqAsk): Promise<GroqOk | GroqFail> {
     const text = (data.choices?.[0]?.message?.content ?? "").trim();
     if (!text) {
       // A reasoning model that spends its whole budget thinking answers with
-      // nothing at all. Say so plainly rather than rendering an empty card.
-      return {
-        ok: false,
-        status: 502,
-        error: "The AI came back empty-handed — try again",
-      };
+      // nothing at all — status 0 stands for "answered, but with nothing".
+      console.error("Groq returned an empty generation:", model);
+      return classifyFailure(0, "empty generation");
     }
     return { ok: true, text, model: data.model ?? model };
   } catch (err) {
-    console.error("Groq request failed:", err);
+    console.error("Groq request failed:", model, err);
     return {
-      ok: false,
+      retry: true,
       status: 502,
       error: "Couldn't reach the AI service — check the connection and try again",
     };

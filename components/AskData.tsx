@@ -24,6 +24,9 @@ import { segments, shapeAnswer } from "@/lib/answerFormat";
  * record of, and a question is a conversation.
  */
 
+/** Once there is an answer on screen, these are what a follow-up sounds like. */
+const FOLLOW_UPS = ["Why?", "What should I do about it?", "Is that getting worse?"];
+
 /** Openers, because a blank box is harder to answer than a question is. */
 const SUGGESTIONS = [
   "What is dragging my score down?",
@@ -93,7 +96,14 @@ export default function AskData() {
       const res = await fetch("/api/coach/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, today: toDateStr(new Date()) }),
+        body: JSON.stringify({
+          question: q,
+          today: toDateStr(new Date()),
+          // The last exchange only, so "why?" has something to mean. One is
+          // enough for a follow-up and a growing transcript would eat the
+          // per-minute token budget the answer itself needs.
+          previous: thread[0] ?? null,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -142,9 +152,12 @@ export default function AskData() {
         </button>
       </form>
 
-      {thread.length === 0 && !busy && (
+      {/* Openers before the first answer, follow-ups after one — the second
+          set is the whole point: a short "why?" now carries the exchange
+          above it, so nobody has to retype the question to dig one level. */}
+      {!busy && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((s) => (
+          {(thread.length === 0 ? SUGGESTIONS : FOLLOW_UPS).map((s) => (
             <button
               key={s}
               type="button"
