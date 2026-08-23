@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toDateStr } from "@/lib/dates";
+import { segments, shapeAnswer } from "@/lib/answerFormat";
 
 /**
  * A question box pointed at your own numbers.
@@ -10,6 +11,13 @@ import { toDateStr } from "@/lib/dates";
  * hours. This answers the one you actually have, now — which is the gap the
  * owner named: plenty of data, no way to get a decision out of it without
  * reading six charts and doing the arithmetic yourself.
+ *
+ * The answer arrives as prose and is *set* rather than printed: the opening
+ * sentence is the verdict (the prompt guarantees it comes first), the figures
+ * inside are found and given weight, and the rest is support. See
+ * `lib/answerFormat` — none of it changes a word, it only decides what gets
+ * to be large. A wall of grey text would have been the same problem as the
+ * charts.
  *
  * Answers are not stored. What you asked stays on this screen until you
  * leave it, deliberately: the eight-hour read is the thing the app keeps a
@@ -26,16 +34,60 @@ const SUGGESTIONS = [
 
 type Exchange = { question: string; answer: string };
 
+/** The same words, with the numbers in them allowed to carry weight. */
+function Figures({ text, tone }: { text: string; tone: "lead" | "body" }) {
+  return (
+    <>
+      {segments(text).map((s, i) =>
+        s.number ? (
+          <span
+            key={i}
+            className={
+              tone === "lead"
+                ? "font-bold text-accent"
+                : "font-semibold text-foreground"
+            }
+          >
+            {s.text}
+          </span>
+        ) : (
+          <span key={i}>{s.text}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function Answer({ text }: { text: string }) {
+  const { lead, body } = shapeAnswer(text);
+  return (
+    <div className="space-y-2">
+      {/* The first sentence is the answer — the prompt promises it, so it is
+          set like one instead of being the start of a paragraph. */}
+      <p className="text-base leading-snug font-semibold">
+        <Figures text={lead} tone="lead" />
+      </p>
+      {body.map((paragraph, i) => (
+        <p key={i} className="text-sm leading-relaxed text-secondary">
+          <Figures text={paragraph} tone="body" />
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export default function AskData() {
   const [question, setQuestion] = useState("");
   const [thread, setThread] = useState<Exchange[]>([]);
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState("");
   const [error, setError] = useState("");
 
   async function ask(text: string) {
     const q = text.trim();
     if (!q || busy) return;
     setBusy(true);
+    setAsking(q);
     setError("");
     try {
       const res = await fetch("/api/coach/ask", {
@@ -54,6 +106,7 @@ export default function AskData() {
       setQuestion("");
     } finally {
       setBusy(false);
+      setAsking("");
     }
   }
 
@@ -106,14 +159,45 @@ export default function AskData() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
+      {/* The question being read, in the shape its answer will take — so the
+          card doesn't jump when the words land. */}
+      {busy && (
+        <div className="mt-4 rounded-lg border border-accent/30 bg-accent/5 p-3">
+          <p className="text-xs font-medium text-accent">{asking}</p>
+          <div className="mt-2.5 space-y-2" aria-hidden="true">
+            <div className="skeleton h-4 w-3/4 rounded" />
+            <div className="skeleton h-3 w-full rounded" />
+            <div className="skeleton h-3 w-5/6 rounded" />
+          </div>
+          <span className="sr-only">Reading your numbers…</span>
+        </div>
+      )}
+
       {thread.length > 0 && (
         <ul className="mt-4 space-y-3">
           {thread.map((x, i) => (
-            <li key={i} className="rounded-lg border border-edge bg-surface-2 p-3">
-              <p className="text-xs font-medium text-muted">{x.question}</p>
-              <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
-                {x.answer}
-              </p>
+            <li
+              key={i}
+              className={`animate-fade-in overflow-hidden rounded-lg border ${
+                // The newest answer is the one being read; the ones above it
+                // are history, and shouldn't compete with it for the eye.
+                i === 0 ? "border-accent/40 bg-accent/5" : "border-edge bg-surface-2"
+              }`}
+            >
+              <div className="flex items-start gap-2 border-b border-edge/60 px-3 py-2">
+                <span
+                  aria-hidden="true"
+                  className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[11px] font-bold text-accent"
+                >
+                  ?
+                </span>
+                <p className="min-w-0 text-xs font-medium text-secondary">
+                  {x.question}
+                </p>
+              </div>
+              <div className="px-3 py-2.5">
+                <Answer text={x.answer} />
+              </div>
             </li>
           ))}
         </ul>

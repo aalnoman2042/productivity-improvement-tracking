@@ -42,7 +42,11 @@ RULES
 7. If the question is not about this data at all, say that in one sentence. Do not answer it. You are not a general assistant, and you have nothing but these numbers.
 
 HOW TO ANSWER
-Plain prose, second person, 2 to 5 sentences. No headings, no bullet lists, no markdown, no emoji, no preamble — start with the answer. Lead with the direct answer to what was asked, then the numbers it rests on. If there is an obvious action, one short final sentence may say it. Never restate the question.`;
+Plain prose, second person, 2 to 5 sentences. No headings, no bullet lists, no markdown, no emoji, no preamble. Never restate the question.
+
+Your FIRST SENTENCE is the answer itself and must stand on its own in under 20 words — "Yes, and sleep is the reason." / "No, your study held steady." / "Fridays." It is shown on its own line, larger than the rest, so a sentence that only sets up the real answer wastes it. Keep the numbers OUT of it unless one number IS the answer.
+
+Then, in the sentences after it, the figures it rests on. If there is an obvious action, one short final sentence may say it.`;
 
 /** Long enough for a real question, short of an essay. */
 const MAX_QUESTION = 300;
