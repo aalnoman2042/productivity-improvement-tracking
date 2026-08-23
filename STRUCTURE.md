@@ -146,6 +146,8 @@ auth/               signup, login, logout, me, profile, password, forgot, reset
 admin/users         counts only, for accounts in ADMIN_EMAILS
 admin/storage       collection sizes against the cluster's ceiling — sizes
                     only, no row is ever read
+admin/health        cron health for both jobs, what can receive a push, and
+                    whether the live schema matches the code
 ```
 
 ### Why writes are POST even when they shouldn't be
@@ -292,6 +294,15 @@ What partially fills the gap:
   production. **Synthetic fixtures only — never the owner's rows.**
 
 ---
+
+### Failure is contained
+
+`app/error.tsx` catches anything that throws, which means anything that throws
+takes the **whole screen**. So every card that is *supplementary* to its page
+is wrapped in `components/CardBoundary` and can only ever replace itself with
+a sentence. What is not wrapped is deliberate: the tracker inputs on the daily
+log and the calendar on History are the point of those pages, and hiding them
+quietly would be worse than failing loudly.
 
 ## 12. Invariants — do not regress these
 

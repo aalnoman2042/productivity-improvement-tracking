@@ -17,6 +17,7 @@ import { useCached } from "@/lib/useCached";
 import type { Stats, Summary } from "@/lib/stats";
 import { seriesColor } from "@/lib/palette";
 import Correlations from "@/components/Correlations";
+import CardBoundary from "@/components/CardBoundary";
 import MotivationLine from "@/components/MotivationLine";
 import { nightLabel, shiftLabel } from "@/lib/clock";
 import {
@@ -695,7 +696,9 @@ export default function DashboardPage() {
             />
           </div>
 
-          <Correlations />
+          <CardBoundary title="🔗 Patterns">
+            <Correlations />
+          </CardBoundary>
 
           {!stats.hasEntries && (
             <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-secondary">

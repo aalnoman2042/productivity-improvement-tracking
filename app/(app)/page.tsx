@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import DayDial from "@/components/DayDial";
 import DayNotes from "@/components/DayNotes";
 import DayTasks from "@/components/DayTasks";
+import CardBoundary from "@/components/CardBoundary";
 import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
 import MotivationLine from "@/components/MotivationLine";
@@ -555,7 +556,9 @@ function TodayLog() {
             <strong>Tomorrow hasn&apos;t started.</strong> You can decide now
             what has to happen in it — the logging waits until the day does.
           </p>
-          <DayTasks date={date} />
+          <CardBoundary title="✅ Have to do it today">
+            <DayTasks date={date} />
+          </CardBoundary>
         </>
       ) : trackersQ.loading ? (
         <div className="space-y-2">
@@ -728,11 +731,15 @@ function TodayLog() {
           {/* A bookmark is a thing you move at the end of a day too, and
               nobody goes to another screen to do it. Renders nothing at all
               when no book is on the go. */}
-          <ReadingToday />
+          <CardBoundary title="📖 Reading now">
+            <ReadingToday />
+          </CardBoundary>
 
           {/* Words last, after the numbers they explain — but still inside
               the day, not on a page of their own. */}
-          <DayNotes date={date} trackers={trackers} draft={draft} set={set} />
+          <CardBoundary title="📝 Notes">
+            <DayNotes date={date} trackers={trackers} draft={draft} set={set} />
+          </CardBoundary>
 
           {/* Sits above the save bar so it's the first thing under your thumb
               in the seconds after a save you didn't mean. */}

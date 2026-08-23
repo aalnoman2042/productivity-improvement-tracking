@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminHealth from "@/components/AdminHealth";
 import CardBoundary from "@/components/CardBoundary";
 import StorageReport from "@/components/StorageReport";
 
@@ -51,6 +52,15 @@ export default function AdminPage() {
               goes wrong in there — a refused command, a shape nobody
               expected, a bug — costs this page one card and never the
               accounts below it. */}
+          {/* Is it working, before is it used. Fenced separately from the
+              storage card so one cannot take the other. */}
+          <CardBoundary
+            title="🩺 Health"
+            message="Couldn't read the app's health. Everything else on this page is unaffected."
+          >
+            <AdminHealth />
+          </CardBoundary>
+
           <CardBoundary
             title="💾 Database"
             message="Couldn't read the database's size. Everything else on this page is unaffected."

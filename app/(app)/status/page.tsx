@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AskData from "@/components/AskData";
+import CardBoundary from "@/components/CardBoundary";
 import LoadError from "@/components/LoadError";
 import LifeNow from "@/components/LifeNow";
 import PeriodCompare from "@/components/PeriodCompare";
@@ -235,12 +236,16 @@ export default function StatusPage() {
       )}
 
       {/* The coach reads everything, so it sits above the range picker. */}
-      <LifeNow />
+      <CardBoundary title="🧠 Life right now">
+        <LifeNow />
+      </CardBoundary>
 
       {/* The coach answers the question the app chose; this answers the one
           you have. It sits directly under the card because that is where
           the question occurs to someone — reading the read. */}
-      <AskData />
+      <CardBoundary title="💬 Ask your data">
+        <AskData />
+      </CardBoundary>
 
       {/* Range picker, and the way to show someone */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -322,7 +327,9 @@ export default function StatusPage() {
               week going?" — and below the tiles because those are today. The
               month version of this card lives on the calendar page, where
               the month picker is. */}
-          <PeriodCompare period="week" anchor={today} />
+          <CardBoundary title="📅 This week vs last">
+            <PeriodCompare period="week" anchor={today} />
+          </CardBoundary>
 
           {/* The advice — not what's happening, but what to do about it,
               biggest win first. Quiet when there's nothing to fix. */}
@@ -486,11 +493,15 @@ export default function StatusPage() {
       {/* Weeks that have already been judged, kept. Below the range picker
           for the same reason the report card is: it is not about the range
           being browsed, it is about all of them. */}
-      <WeeklyReviews />
+      <CardBoundary title="📖 Weeks in review">
+        <WeeklyReviews />
+      </CardBoundary>
 
       {/* The ranges above answer "how is this week going?" — this one is the
           whole account graded, so it sits outside the range picker. */}
-      <ReportCard report={report} />
+      <CardBoundary title="🎓 Report card">
+        <ReportCard report={report} />
+      </CardBoundary>
     </div>
   );
 }

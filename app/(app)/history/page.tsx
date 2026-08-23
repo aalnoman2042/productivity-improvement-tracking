@@ -6,6 +6,7 @@ import { useCached } from "@/lib/useCached";
 import PeriodCompare from "@/components/PeriodCompare";
 import MotivationLine from "@/components/MotivationLine";
 import NoteSearch from "@/components/NoteSearch";
+import CardBoundary from "@/components/CardBoundary";
 import LoadError from "@/components/LoadError";
 import {
   WEEKDAY_INITIALS,
@@ -200,7 +201,9 @@ export default function HistoryPage() {
 
       {/* Above the calendar, because "when did I write that?" is a question
           about all of it, not about the month being browsed. */}
-      <NoteSearch />
+      <CardBoundary title="📝 Search your notes">
+        <NoteSearch />
+      </CardBoundary>
 
       <div className="flex items-center gap-2">
         <button
@@ -294,7 +297,9 @@ export default function HistoryPage() {
 
           {/* The month against the one before it. Follows the picker above,
               so browsing back compares each month to its predecessor. */}
-          <PeriodCompare period="month" anchor={month} />
+          <CardBoundary title="📅 This month vs last">
+            <PeriodCompare period="month" anchor={month} />
+          </CardBoundary>
 
           {missed > 0 && (
             <p className="text-sm text-secondary">
