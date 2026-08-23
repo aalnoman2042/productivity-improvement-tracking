@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import CardBoundary from "@/components/CardBoundary";
 import StorageReport from "@/components/StorageReport";
 
 type Row = {
@@ -46,9 +47,16 @@ export default function AdminPage() {
             <p className="text-3xl font-bold tabular-nums">{data.totalUsers}</p>
           </section>
 
-          {/* Its own request, so a cluster that won't report its size costs
-              this page nothing but one card. */}
-          <StorageReport />
+          {/* Fenced: its own request, and now its own failure. Whatever
+              goes wrong in there — a refused command, a shape nobody
+              expected, a bug — costs this page one card and never the
+              accounts below it. */}
+          <CardBoundary
+            title="💾 Database"
+            message="Couldn't read the database's size. Everything else on this page is unaffected."
+          >
+            <StorageReport />
+          </CardBoundary>
 
           <section className="animate-rise-in overflow-x-auto rounded-xl border border-edge card shadow-sm">
             <table className="w-full text-sm">
