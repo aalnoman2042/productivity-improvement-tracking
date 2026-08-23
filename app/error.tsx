@@ -118,12 +118,32 @@ export default function Error({
           </Link>
         </div>
 
-        {/* The digest is the only handle on what actually happened once this
-            is running on Vercel — it matches this screen to a server log. */}
-        {error.digest && (
-          <p className="mt-4 border-t border-edge pt-3 text-xs text-muted">
-            Reference: <span className="font-mono">{error.digest}</span>
-          </p>
+        {/* What actually happened, on the screen rather than in a console
+            nobody has open on a phone.
+            
+            Next redacts a *server* error's message in production and gives a
+            digest instead, which is the right trade — that one matches the
+            screen to a server log. A *client* error keeps its message, and
+            there is nowhere else to read it: this app is one person's, it
+            sends nothing anywhere, and a screenshot is how a fault gets
+            reported. Two rounds of guessing at a fault that showed nothing
+            but "something went wrong" is what earned this line. */}
+        {(error.message || error.digest) && (
+          <details className="mt-4 border-t border-edge pt-3">
+            <summary className="cursor-pointer text-xs text-muted">
+              What went wrong
+            </summary>
+            {error.message && (
+              <p className="mt-2 font-mono text-xs break-words text-secondary">
+                {error.name}: {error.message}
+              </p>
+            )}
+            {error.digest && (
+              <p className="mt-2 text-xs text-muted">
+                Reference: <span className="font-mono">{error.digest}</span>
+              </p>
+            )}
+          </details>
         )}
       </div>
     </div>
