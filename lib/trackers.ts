@@ -36,6 +36,8 @@ export type Tracker = {
   habit?: Habit;
   /** Daily push times "HH:MM" in the owner's local day, or null for none. */
   reminder?: string[] | null;
+  /** "prayer" means those times are recomputed from the sun each day. */
+  reminderMode?: "fixed" | "prayer" | null;
   archived: boolean;
   order: number;
 };

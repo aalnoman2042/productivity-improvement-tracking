@@ -33,6 +33,14 @@ export const RULES = {
   // The AI analysis calls a free external API — the cap protects its quota,
   // not the login box. Counted per user, not per address.
   coach: { limit: 10, windowMs: 60 * 60_000 },
+  // The question box is the one AI feature with no cooldown behind it: a
+  // question you can't ask for eight hours isn't a question box. So this
+  // rule *is* the whole gate, and it is set where a real conversation fits
+  // and a stuck loop doesn't.
+  ask: { limit: 15, windowMs: 60 * 60_000 },
+  // The weekly review writes one row per week; a handful a day is plenty of
+  // room to catch up on missed weeks without emptying the free quota.
+  weekly: { limit: 6, windowMs: 24 * 60 * 60_000 },
 } satisfies Record<string, Rule>;
 
 export type Action = keyof typeof RULES;

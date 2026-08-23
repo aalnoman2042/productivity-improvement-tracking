@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCached } from "@/lib/useCached";
 import PeriodCompare from "@/components/PeriodCompare";
 import MotivationLine from "@/components/MotivationLine";
+import NoteSearch from "@/components/NoteSearch";
 import {
   WEEKDAY_INITIALS,
   addMonths,
@@ -165,6 +166,10 @@ export default function HistoryPage() {
           day to fill it in.
         </p>
       </div>
+
+      {/* Above the calendar, because "when did I write that?" is a question
+          about all of it, not about the month being browsed. */}
+      <NoteSearch />
 
       <div className="flex items-center gap-2">
         <button

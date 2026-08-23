@@ -1,7 +1,8 @@
 import { type Db, type ObjectId } from "mongodb";
 import { db } from "./db";
 import { sendToUser } from "./push";
-import { checkReminders } from "./trackerReminders";
+import { prayerTimesFor, type PrayerPlace } from "./prayerTimes";
+import { checkReminders, localDateFor } from "./trackerReminders";
 
 /**
  * Delivering the per-tracker reminders — "gym at 18:00", namaz at all five
@@ -94,11 +95,32 @@ export async function runTrackerReminders(
   );
   const users = await d
     .collection("users")
-    .find({ _id: { $in: userIds } }, { projection: { "reminder.tzOffset": 1 } })
+    .find(
+      { _id: { $in: userIds } },
+      { projection: { "reminder.tzOffset": 1, "reminder.place": 1 } }
+    )
     .toArray();
   const tzBy = new Map(
     users.map((u) => [String(u._id), Number(u.reminder?.tzOffset ?? NaN)])
   );
+  const placeBy = new Map(
+    users.map((u) => [
+      String(u._id),
+      (u.reminder?.place as PrayerPlace | undefined) ?? null,
+    ])
+  );
+
+  // Today's waqts, worked out once per (person, day) however many prayer
+  // trackers they keep — the arithmetic is cheap but not free, and a poll
+  // runs every fifteen minutes forever.
+  const waqtCache = new Map<string, ReturnType<typeof prayerTimesFor>>();
+  function waqts(userId: string, place: PrayerPlace, date: string) {
+    const key = `${userId} ${date}`;
+    if (!waqtCache.has(key)) {
+      waqtCache.set(key, prayerTimesFor(date, place, tzBy.get(userId)!));
+    }
+    return waqtCache.get(key)!;
+  }
 
   for (const t of trackers) {
     const tzOffset = tzBy.get(String(t.userId));
@@ -108,11 +130,23 @@ export async function runTrackerReminders(
       continue;
     }
 
+    const stored = Array.isArray(t.reminder.times)
+      ? t.reminder.times.map(String)
+      : [];
+
+    // A prayer tracker asks the sun, not the stored list: a waqt moves by an
+    // hour and a half across the year. The stored times stay as the fallback
+    // for the two cases the sun can't cover — no location on file, and the
+    // polar days where there is no true Fajr at all.
+    const place = placeBy.get(String(t.userId));
+    const prayerMode = t.reminder.mode === "prayer" && place;
+    const slots = prayerMode
+      ? waqts(String(t.userId), place, localDateFor(now, tzOffset))
+      : null;
+    const times = slots ? slots.map((s) => s.time) : stored;
+
     const check = checkReminders(
-      {
-        times: Array.isArray(t.reminder.times) ? t.reminder.times.map(String) : [],
-        lastSentFor: t.reminder.lastSentFor ?? null,
-      },
+      { times, lastSentFor: t.reminder.lastSentFor ?? null },
       now,
       tzOffset
     );
@@ -135,9 +169,15 @@ export async function runTrackerReminders(
       continue;
     }
 
+    // Naming the waqt is the difference between "something is due" and
+    // knowing what: the time alone means nothing when it moves every day.
+    const waqt = slots?.find((s) => s.time === check.due)?.label ?? null;
+
     const { sent } = await sendToUser(t.userId, {
-      title: `⏰ ${name}`,
-      body: `You asked for a nudge at ${check.due} — log ${name} when it's done.`,
+      title: waqt ? `🕌 ${waqt} — ${name}` : `⏰ ${name}`,
+      body: waqt
+        ? `${waqt} is in at ${check.due}. Log ${name} once you've prayed.`
+        : `You asked for a nudge at ${check.due} — log ${name} when it's done.`,
       url: "/",
       // One live notification per tracker per day; the next slot replaces it.
       tag: `pit-tracker-${t._id}-${check.date}`,

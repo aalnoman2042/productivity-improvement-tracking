@@ -115,6 +115,10 @@ tabs, with a light slide so the page follows the finger.
   against your goals. Two channels rather than one, because a blank day and a
   bad day are different things and collapsing them hides exactly the gaps
   you're looking for. Tap any day to open it ready to fill in.
+  - **Search everything you have written** sits above the calendar: one box
+    over both kinds of note — the day's own and the ones pinned to a tracker
+    — newest first, with the match marked and the date one tap from the day
+    itself. A note you cannot find again is a note you did not keep.
   - **📅 This month vs last** sits under the calendar and follows the month
     picker, so browsing back compares each month to the one before it. (The
     weekly twin of this card is on Status.) Days
@@ -161,6 +165,14 @@ tabs, with a light slide so the page follows the finger.
   differs, so a weekly answer and a monthly one can never be computed two
   different ways. **Share** renders the summary to a PNG for the phone's share
   sheet — an image says nothing to anyone the user didn't send it to.
+  - **💬 Ask your data** sits under the coach card: a question about your own
+    numbers ("is my sleep hurting my study?"), answered in a few plain
+    sentences from the same facts the coach reads — never from anything you
+    wrote. No cooldown, since a question you can't ask for eight hours isn't
+    a question box.
+  - **📖 Weeks in review** keeps what the coach made of each finished week.
+    The daily read is replaced by the next one; these are written once and
+    kept, so a year of them reads back like a diary the app wrote about you.
 - **Tracker detail** (`/tracker/[id]`) — one habit's whole story: month-by-month
   totals, the last three months day by day, streak and milestone badges, and
   every note ever written on it, searchable. Tracker names link here from
@@ -224,6 +236,30 @@ Two fallbacks mean it is never completely silent: the once-a-day crons in
 `vercel.json`, and the app itself — **opening PIT sends anything already due
 for you**, via `/api/reminders/flush`, at most once every ten minutes and only
 ever for your own account. [DEPLOY.md](./DEPLOY.md) §3b-i covers the setup.
+
+### A time per tracker — and the waqts, properly
+
+Any tracker can carry up to five times of its own ("gym at 18:00"), set on the
+Trackers form. Each slot is due for a three-hour window, sends at most once a
+local day, and goes quiet the moment that tracker is logged — except a namaz
+tracker, where Fajr being logged must not silence Maghrib: those keep asking
+waqt by waqt until all five are in.
+
+**A prayer tracker can follow the sun instead of the clock.** Five fixed times
+are wrong within weeks — in Dhaka, Maghrib moves from 17:16 in December to
+18:48 in June, and Fajr nearly as far. Choose *🕌 Prayer times*, give the app
+a location (a city, or the browser's own), and the five are recomputed from
+the sun every day: the standard solar-position arithmetic in
+[`lib/prayerTimes.ts`](./lib/prayerTimes.ts), with no network call, no API key
+and nothing sent anywhere. Coordinates are rounded to about a neighbourhood
+before they are stored, and the picker shows today's five times as you set it,
+so a wrong answer is visible immediately rather than at Maghrib.
+
+The calculation method (Karachi / Islamic Foundation, MWL, ISNA, Egypt, Umm
+al-Qura) and the Asr school (Hanafi or standard) are both yours to pick;
+the defaults are the subcontinent's. Inside the polar circles there are days
+with no true Fajr or Isha at all — those return nothing rather than a made-up
+time, and the tracker falls back to the times it last had.
 
 ### When you go quiet
 
@@ -315,12 +351,14 @@ offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Eight collections, all with `$jsonSchema` validators so the BSON types stay
+Nine collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
 - `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
-  `reminder` (`enabled`, `tzOffset`, `time`, `lastSentFor`)
-- `trackers` — `userId`, name, type, unit, color, category, goal, archived, order
+  `reminder` (`enabled`, `tzOffset`, `time`, `lastSentFor`, and `place` —
+  the coordinates prayer times are computed from, rounded to a neighbourhood)
+- `trackers` — `userId`, name, type, unit, color, category, goal, archived,
+  order, optional `reminder` (`times`, `mode`, `lastSentFor`)
 - `entries` — `userId`, `trackerId`, `date` (`YYYY-MM-DD`), `value`, optional
   `meta` (sleep times & quality, `parts` for namaz, `status` for streaks),
   `note`, timestamps. Unique on `(userId, trackerId, date)`.
@@ -329,6 +367,11 @@ honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
   logged, and so it can't change what any number on that day means.
 - `books` — `userId`, title, author, `status` (wishlist / reading / finished /
   dropped), `pages`, `pagesRead`, `rating`, `startedOn`, `finishedOn`, note.
+- `weeklyReviews` — one AI review per finished week, unique on
+  `(userId, weekEnd)`: the week's dates, the text, the app-computed snapshot
+  it was written against, and the digest lines. Its own collection because it
+  has the opposite lifetime to the daily read — that one is replaced every
+  eight hours, these are kept.
 - `pushSubs` — one row per subscribed browser: `userId`, `endpoint` (unique),
   `keys`. Rows are deleted automatically when a push service reports the
   endpoint is gone.

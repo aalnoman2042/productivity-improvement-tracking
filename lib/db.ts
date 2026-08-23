@@ -67,6 +67,20 @@ const VALIDATORS: Record<string, object> = {
             bsonType: ["string", "null"],
             pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$",
           },
+          // Where to put the sun for a prayer tracker whose times are
+          // computed rather than typed (`lib/prayerTimes`). Coordinates
+          // only, rounded to a neighbourhood, and never sent anywhere.
+          place: {
+            bsonType: ["object", "null"],
+            required: ["lat", "lon"],
+            properties: {
+              lat: { bsonType: "number", minimum: -90, maximum: 90 },
+              lon: { bsonType: "number", minimum: -180, maximum: 180 },
+              label: { bsonType: ["string", "null"], maxLength: 60 },
+              method: { enum: ["karachi", "mwl", "isna", "egypt", "makkah"] },
+              asr: { enum: ["standard", "hanafi"] },
+            },
+          },
           // The last day-to-log we nagged about, so a re-run can't double-send.
           lastSentFor: { bsonType: ["string", "null"] },
           // The Sunday whose week-in-review has been sent, same idea.
@@ -123,6 +137,10 @@ const VALIDATORS: Record<string, object> = {
             maxItems: 5,
             items: { bsonType: "string", pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
           },
+          // "prayer" recomputes the five times from the sun every day, which
+          // is what a waqt actually is; `times` then holds only the last
+          // computed set, as the fallback for a day with no location on file.
+          mode: { enum: ["fixed", "prayer", null] },
           lastSentFor: { bsonType: ["string", "null"] },
         },
       },
@@ -192,6 +210,29 @@ const VALIDATORS: Record<string, object> = {
       // kept so an old review is never re-read beside newer figures.
       snapshot: { bsonType: ["object", "null"] },
       today: { bsonType: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      model: { bsonType: ["string", "null"] },
+      createdAt: { bsonType: "date" },
+    },
+  },
+  // The week in review, written once and then kept.
+  //
+  // Its own collection rather than a flag on `aiReviews`, because the two
+  // have opposite lifetimes: the daily read is a snapshot that the next one
+  // replaces, this is a record meant to still be readable next year. One row
+  // per week per person, which the unique index enforces.
+  weeklyReviews: {
+    bsonType: "object",
+    required: ["userId", "weekStart", "weekEnd", "text", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      weekStart: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      weekEnd: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      text: { bsonType: "string", maxLength: 10000 },
+      // The week's own numbers, computed by the app — so an old review is
+      // never re-read beside figures it was not written against.
+      snapshot: { bsonType: ["object", "null"] },
+      /** The plain lines the weekly push is built from, kept for the same reason. */
+      digest: { bsonType: ["array", "null"], items: { bsonType: "string" } },
       model: { bsonType: ["string", "null"] },
       createdAt: { bsonType: "date" },
     },
@@ -320,6 +361,10 @@ async function ensureSchema(d: Db): Promise<void> {
     d.collection("dayNotes").createIndex({ userId: 1, date: 1 }, { unique: true }),
     d.collection("books").createIndex({ userId: 1, createdAt: -1 }),
     d.collection("aiReviews").createIndex({ userId: 1, createdAt: -1 }),
+    // One review per week per person — the write is an upsert on exactly this.
+    d
+      .collection("weeklyReviews")
+      .createIndex({ userId: 1, weekEnd: 1 }, { unique: true }),
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
     d.collection("pushSubs").createIndex({ userId: 1 }),

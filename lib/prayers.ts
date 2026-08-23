@@ -15,6 +15,9 @@ export const PRAYERS = [
 
 export const PRAYER_KEYS: readonly string[] = PRAYERS.map((p) => p.key);
 
+/** "fajr" | "dhuhr" | … — the five, as a type rather than five strings. */
+export type PrayerKey = (typeof PRAYERS)[number]["key"];
+
 /** Sort a set of prayer keys back into the order they're prayed in. */
 export function orderPrayers(keys: string[]): string[] {
   const set = new Set(keys);

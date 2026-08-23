@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import AskData from "@/components/AskData";
 import LifeNow from "@/components/LifeNow";
 import PeriodCompare from "@/components/PeriodCompare";
 import ReportCard from "@/components/ReportCard";
 import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
+import WeeklyReviews from "@/components/WeeklyReviews";
 import { buildAdvice } from "@/lib/advice";
 import { prettyDate, toDateStr, type Period } from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
@@ -233,6 +235,11 @@ export default function StatusPage() {
 
       {/* The coach reads everything, so it sits above the range picker. */}
       <LifeNow />
+
+      {/* The coach answers the question the app chose; this answers the one
+          you have. It sits directly under the card because that is where
+          the question occurs to someone — reading the read. */}
+      <AskData />
 
       {/* Range picker, and the way to show someone */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -465,6 +472,11 @@ export default function StatusPage() {
           </section>
         </>
       )}
+
+      {/* Weeks that have already been judged, kept. Below the range picker
+          for the same reason the report card is: it is not about the range
+          being browsed, it is about all of them. */}
+      <WeeklyReviews />
 
       {/* The ranges above answer "how is this week going?" — this one is the
           whole account graded, so it sits outside the range picker. */}

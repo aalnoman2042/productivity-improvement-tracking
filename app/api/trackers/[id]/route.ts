@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
 import { parseGoal, parseHabit } from "@/lib/trackerDoc";
-import { parseReminderTimes } from "@/lib/trackerReminders";
+import { parseReminderMode, parseReminderTimes } from "@/lib/trackerReminders";
+import { parsePlace } from "@/lib/prayerTimes";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -39,7 +40,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     // Fresh times start a fresh day — an edit made after today's push
     // already went out may fire once more today, which beats the opposite
     // failure of a new time staying silent until tomorrow.
-    set.reminder = times ? { times, lastSentFor: null } : null;
+    set.reminder = times
+      ? { times, mode: parseReminderMode(body.reminderMode), lastSentFor: null }
+      : null;
   }
 
   if (Object.keys(set).length === 0) {
@@ -57,11 +60,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
   // A reminder time means nothing without knowing where the user's clock is.
   // The browser sends its offset alongside; it lives on the user because the
   // nightly reminder reads the same field.
+  // A prayer tracker needs one thing more: where they are. Same reasoning,
+  // same place — the sun is a property of the person, not of the tracker.
   const tzOffset = Number(body.tzOffset);
+  const userSet: Record<string, unknown> = {};
   if ("reminder" in body && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 840) {
-    await d
-      .collection("users")
-      .updateOne({ _id: userId }, { $set: { "reminder.tzOffset": tzOffset } });
+    userSet["reminder.tzOffset"] = tzOffset;
+  }
+  const place = parsePlace(body.place);
+  if (place) userSet["reminder.place"] = place;
+  if (Object.keys(userSet).length > 0) {
+    await d.collection("users").updateOne({ _id: userId }, { $set: userSet });
   }
 
   return NextResponse.json({ ok: true });

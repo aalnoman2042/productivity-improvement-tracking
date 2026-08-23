@@ -106,6 +106,14 @@ const STEPS: Step[] = [
         text: "Your day score, the rising-or-slipping arrow and the fortnight of bars are all computed by the app from your own log. The AI supplies the judgement and the words around them, and nothing else.",
       },
       {
+        label: "Ask it anything about your own data",
+        text: "Under the card there's a question box: “is my sleep hurting my study?”, “what's dragging my score down?” It answers from your numbers alone, in a few plain sentences, whenever you wonder.",
+      },
+      {
+        label: "And it keeps your weeks",
+        text: "When a week ends you can have it written up and saved. The daily read is replaced every eight hours; the weekly ones stay, so a year of them reads like a diary the app wrote about you.",
+      },
+      {
         label: "It never sees your words",
         text: "Only numbers and tracker names are ever sent — never your notes. It runs on demand, once every eight hours, and re-reading the last answer is free and works offline.",
       },

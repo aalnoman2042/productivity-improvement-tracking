@@ -34,6 +34,9 @@ export async function GET() {
     // Old accounts have no time on record; they get the hour the reminder
     // always had, so nothing moves under anyone who never asked it to.
     time: reminderTime(user?.reminder?.time),
+    // Where the sun is asked from, for prayer trackers. Null until someone
+    // sets one — the tracker form is where that happens.
+    place: user?.reminder?.place ?? null,
     devices,
     schedule,
     trackerSchedule,

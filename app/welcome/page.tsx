@@ -55,6 +55,16 @@ const COACH: { icon: string; title: string; text: string }[] = [
     text: "What's genuinely working, what's quietly slipping, the one thing to fix first, a concrete step for tonight and two or three moves for the rest of the week. Every point names the habit it's about and stands on a number you can go and check yourself.",
   },
   {
+    icon: "💬",
+    title: "You can ask it something back",
+    text: "A question box under the card, pointed at the same numbers: “is my sleep hurting my study?”, “which day do I fall apart?” It answers in a few plain sentences from your log alone — and says so plainly when the data can’t tell which thing caused the other.",
+  },
+  {
+    icon: "📖",
+    title: "It remembers your weeks",
+    text: "The daily read is replaced by the next one. A finished week gets a review of its own, written once and kept — so a year later you can still read what the app made of you last June.",
+  },
+  {
     icon: "🔒",
     title: "It never sees your words",
     text: "Only numbers and tracker names are ever sent — never a word you wrote in a note, never your email. It runs on demand, once every eight hours, and re-reading the last answer costs nothing and works offline.",

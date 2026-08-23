@@ -66,3 +66,66 @@ describe("parseReview", () => {
       .toBeUndefined();
   });
 });
+
+describe("evidence that leaked the data's own shape", () => {
+  const base = {
+    headline: "Late nights are eating the week",
+    verdict: "Two good weeks undone by a 2 am bedtime.",
+    fix: { what: "Sleep first", tonight: "Lights off by midnight" },
+  };
+
+  it("drops a JSON key pasted in where a phrase was asked for", () => {
+    const review = parseReview(
+      JSON.stringify({
+        ...base,
+        working: [{ point: "Clean streak held", evidence: '"currentCleanDays":14' }],
+      })
+    );
+    expect(review?.working[0].point).toBe("Clean streak held");
+    // The claim survives; the leak does not.
+    expect(review?.working[0].evidence).toBe("");
+  });
+
+  it("keeps evidence that is an actual phrase", () => {
+    const review = parseReview(
+      JSON.stringify({
+        ...base,
+        slipping: [
+          { point: "Sleep fell away", evidence: "5h 20m a night, against 7h 40m the week before" },
+        ],
+      })
+    );
+    expect(review?.slipping[0].evidence).toBe(
+      "5h 20m a night, against 7h 40m the week before"
+    );
+  });
+
+  it("keeps a plain time of day, which is not a leak", () => {
+    const review = parseReview(
+      JSON.stringify({
+        ...base,
+        slipping: [{ point: "Bedtime moved", evidence: "in bed at 2:10 am, seven nights of seven" }],
+      })
+    );
+    expect(review?.slipping[0].evidence).toBe("in bed at 2:10 am, seven nights of seven");
+  });
+});
+
+describe("the one-word state", () => {
+  const base = {
+    headline: "Late nights are eating the week",
+    verdict: "Two good weeks undone by a 2 am bedtime.",
+    fix: { what: "Sleep first", tonight: "Lights off by midnight" },
+  };
+
+  it("takes one of the four", () => {
+    expect(parseReview(JSON.stringify({ ...base, state: "slipping" }))?.state).toBe(
+      "slipping"
+    );
+  });
+
+  it("drops anything else rather than showing a word with no meaning", () => {
+    expect(parseReview(JSON.stringify({ ...base, state: "vibing" }))?.state).toBeUndefined();
+    expect(parseReview(JSON.stringify(base))?.state).toBeUndefined();
+  });
+});

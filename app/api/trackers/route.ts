@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { toTracker, parseGoal, parseHabit } from "@/lib/trackerDoc";
-import { parseReminderTimes } from "@/lib/trackerReminders";
+import { parseReminderMode, parseReminderTimes } from "@/lib/trackerReminders";
+import { parsePlace } from "@/lib/prayerTimes";
 import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
 
 export async function GET() {
@@ -97,18 +98,26 @@ export async function POST(req: Request) {
     habit: parseHabit(body?.habit),
     reminder: (() => {
       const times = parseReminderTimes(body?.reminder);
-      return times ? { times, lastSentFor: null } : null;
+      if (!times) return null;
+      return { times, mode: parseReminderMode(body?.reminderMode), lastSentFor: null };
     })(),
     archived: false,
     order,
     createdAt: new Date(),
   });
 
+  // A reminder time means nothing without knowing where the user's clock is
+  // — and a *prayer* time means nothing without knowing where they are. Both
+  // live on the user, because both schedules read the same fields.
   const tzOffset = Number(body?.tzOffset);
+  const userSet: Record<string, unknown> = {};
   if (body?.reminder && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 840) {
-    await d
-      .collection("users")
-      .updateOne({ _id: userId }, { $set: { "reminder.tzOffset": tzOffset } });
+    userSet["reminder.tzOffset"] = tzOffset;
+  }
+  const place = parsePlace(body?.place);
+  if (place) userSet["reminder.place"] = place;
+  if (Object.keys(userSet).length > 0) {
+    await d.collection("users").updateOne({ _id: userId }, { $set: userSet });
   }
 
   const doc = await d.collection("trackers").findOne({ _id: res.insertedId });

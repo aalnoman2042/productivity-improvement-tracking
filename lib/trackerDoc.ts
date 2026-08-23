@@ -21,6 +21,14 @@ export function toTracker(doc: WithId<Document>) {
     goal: (doc.goal ?? null) as Goal,
     // The client only needs the times of day; lastSentFor is the cron's.
     reminder: (doc.reminder?.times ?? null) as string[] | null,
+    // Whether those times are the ones typed or today's waqts. Sent as its
+    // own field rather than folded into `reminder`, so every caller that
+    // only ever wanted a list of times still gets exactly that.
+    reminderMode: (doc.reminder
+      ? doc.reminder.mode === "prayer"
+        ? "prayer"
+        : "fixed"
+      : null) as "fixed" | "prayer" | null,
     // Trackers from before the field read as "good" — how they always behaved.
     habit: (doc.habit === "bad" ? "bad" : "good") as Habit,
     archived: Boolean(doc.archived),

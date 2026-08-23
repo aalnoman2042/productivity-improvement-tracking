@@ -16,9 +16,23 @@ export type CoachPoint = {
   evidence: string;
 };
 
+/**
+ * The verdict in one word, so the card can be read before it is read.
+ *
+ * Someone opening this at midnight wants "am I alright?" answered before
+ * they parse a paragraph — and a chip they can take in at a glance is worth
+ * more than the three sentences under it. Optional: reviews written before
+ * it existed are still perfectly good reviews.
+ */
+export type CoachState = "thriving" | "steady" | "slipping" | "stalled";
+
+const STATES: CoachState[] = ["thriving", "steady", "slipping", "stalled"];
+
 export type CoachReview = {
   /** One punchy sentence — the whole read in a line. */
   headline: string;
+  /** The one-word verdict, when the model gave a usable one. */
+  state?: CoachState;
   /** 2–3 sentences: what this life looks like right now. */
   verdict: string;
   working: CoachPoint[];
@@ -66,14 +80,31 @@ export type CoachSnapshot = {
 const str = (v: unknown, max: number): string | null =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
 
+/**
+ * Evidence that turned out to be a paste of the data instead of a phrase.
+ *
+ * The prompt forbids it and the model still does it under load —
+ * `"currentCleanDays":14` where "14 days clean" was asked for. Rather than
+ * showing someone the app's own field names as though they were a sentence
+ * about their life, the evidence is dropped and the point stands alone: a
+ * claim without its number reads as a claim, which is honest. A number
+ * wearing a JSON key does not.
+ */
+function cleanEvidence(raw: unknown): string {
+  const text = str(raw, 200);
+  if (!text) return "";
+  const leaked = /"[A-Za-z_][\w]*"\s*:|[{}[\]]|\b[A-Za-z_]\w*\s*:\s*"/.test(text);
+  return leaked ? "" : text;
+}
+
 function points(raw: unknown): CoachPoint[] {
   if (!Array.isArray(raw)) return [];
   const out: CoachPoint[] = [];
   for (const item of raw) {
     if (out.length >= 4) break;
     const point = str((item as Record<string, unknown>)?.point, 200);
-    const evidence = str((item as Record<string, unknown>)?.evidence, 200);
-    if (point) out.push({ point, evidence: evidence ?? "" });
+    const evidence = cleanEvidence((item as Record<string, unknown>)?.evidence);
+    if (point) out.push({ point, evidence });
   }
   return out;
 }
@@ -110,6 +141,9 @@ export function parseReview(raw: string): CoachReview | null {
 
   return {
     headline,
+    // An unrecognised word is dropped rather than shown: the chip's whole
+    // value is that its four states mean the same thing every time.
+    state: STATES.find((s) => s === d.state),
     verdict,
     working: points(d.working),
     slipping: points(d.slipping),

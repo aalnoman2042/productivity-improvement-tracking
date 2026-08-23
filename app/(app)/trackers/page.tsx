@@ -7,9 +7,11 @@ import { useCached } from "@/lib/useCached";
 import { useSearchParams } from "next/navigation";
 import Books from "@/components/Books";
 import Challenges from "@/components/Challenges";
+import PrayerTimesPicker from "@/components/PrayerTimesPicker";
 import MotivationLine from "@/components/MotivationLine";
 import { cacheRemove } from "@/lib/sync";
-import { PERIODS, prettyDate } from "@/lib/dates";
+import { PERIODS, prettyDate, toDateStr } from "@/lib/dates";
+import { prayerTimesFor, type PrayerPlace } from "@/lib/prayerTimes";
 import {
   CATEGORIES,
   TEMPLATE_PACKS,
@@ -51,6 +53,9 @@ type Form = {
   goalDirection: "min" | "max";
   remindOn: boolean;
   remindTimes: string[];
+  /** "prayer" hands the times over to the sun; see lib/prayerTimes. */
+  remindMode: "fixed" | "prayer";
+  place: PrayerPlace | null;
 };
 
 const BLANK: Form = {
@@ -66,6 +71,8 @@ const BLANK: Form = {
   goalDirection: "min",
   remindOn: false,
   remindTimes: ["20:00"],
+  remindMode: "fixed",
+  place: null,
 };
 
 /** Goal targets for time trackers are typed in hours but stored in minutes. */
@@ -79,6 +86,24 @@ function goalFromForm(f: Form): Goal {
     period: f.goalPeriod,
     direction: f.goalDirection,
   };
+}
+
+/**
+ * What goes into the tracker's stored `times`.
+ *
+ * In prayer mode the schedule recomputes the five every day (`lib/prayerTimes`),
+ * so what is stored is only the fallback for a day the sun can't be asked
+ * about — today's waqts are the most sensible thing that could be. Fixed mode
+ * stores exactly what was typed.
+ */
+function remindTimesToSend(f: Form): string[] {
+  if (f.remindMode !== "prayer" || !f.place) return f.remindTimes;
+  const slots = prayerTimesFor(
+    toDateStr(new Date()),
+    f.place,
+    -new Date().getTimezoneOffset()
+  );
+  return slots ? slots.map((s) => s.time) : f.remindTimes;
 }
 
 function goalToForm(t: Tracker): Partial<Form> {
@@ -125,6 +150,13 @@ function TrackersList() {
   );
 
   const trackersQ = useCached<Tracker[]>("/api/trackers", "trackers");
+  // Where this account prays lives on the user, not the tracker — the sun is
+  // a property of the person. The form starts from whatever is on file.
+  const remindersQ = useCached<{ place: PrayerPlace | null }>(
+    "/api/reminders",
+    "reminders"
+  );
+  const place = remindersQ.data?.place ?? null;
   const trackers = trackersQ.data;
   const load = trackersQ.refresh;
 
@@ -140,7 +172,11 @@ function TrackersList() {
   function openAdd() {
     const used = new Set((trackers ?? []).map((t) => t.color.toLowerCase()));
     const free = SERIES_PALETTE.find((p) => !used.has(p.light.toLowerCase()));
-    setForm({ ...BLANK, color: free?.light ?? SERIES_PALETTE[0].light });
+    setForm({
+      ...BLANK,
+      color: free?.light ?? SERIES_PALETTE[0].light,
+      place,
+    });
     setEditingId(null);
     setCustomCategory(false);
     setShowForm(true);
@@ -159,6 +195,8 @@ function TrackersList() {
       habit: t.habit ?? "good",
       remindOn: Boolean(t.reminder?.length),
       remindTimes: t.reminder?.length ? t.reminder : ["20:00"],
+      remindMode: t.reminderMode === "prayer" ? "prayer" : "fixed",
+      place: place,
       ...goalToForm(t),
     } as Form);
     setEditingId(t.id);
@@ -180,7 +218,11 @@ function TrackersList() {
       color: form.color,
       habit: form.habit,
       goal: goalFromForm(form),
-      reminder: form.remindOn ? form.remindTimes : null,
+      reminder: form.remindOn ? remindTimesToSend(form) : null,
+      reminderMode: form.remindMode,
+      // Only sent when it is being used, so an ordinary tracker edit can
+      // never quietly overwrite where someone prays.
+      place: form.remindOn && form.remindMode === "prayer" ? form.place : null,
       // Minutes east of UTC — how the server knows when "18:00" is for you.
       tzOffset: -new Date().getTimezoneOffset(),
     };
@@ -201,6 +243,9 @@ function TrackersList() {
     setShowForm(false);
     setEditingId(null);
     load();
+    // A place saved here changes what the *user* holds, not just the tracker
+    // — so the copy this page is holding has to catch up too.
+    if (payload.place) remindersQ.refresh();
   }
 
   async function addPack(id: string) {
@@ -704,54 +749,101 @@ function TrackersList() {
               Daily reminder
             </label>
             {form.remindOn && (
-              <div className="mt-3 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {form.remindTimes.map((tm, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      <input
-                        type="time"
-                        required
-                        value={tm}
-                        onChange={(e) =>
-                          setF(
-                            "remindTimes",
-                            form.remindTimes.map((x, j) => (j === i ? e.target.value : x))
-                          )
-                        }
-                        className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-                      />
-                      {form.remindTimes.length > 1 && (
+              <div className="mt-3 space-y-3">
+                {/* A waqt is not a clock time. For a namaz tracker the times
+                    can follow the sun instead, which is the only way five
+                    fixed times stay right past next month. */}
+                {form.type === "prayer" && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        { value: "prayer", label: "🕌 Prayer times" },
+                        { value: "fixed", label: "⏰ Times I choose" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setF("remindMode", opt.value)}
+                        className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
+                          form.remindMode === opt.value
+                            ? "border-accent bg-accent/10 text-accent"
+                            : "border-edge text-secondary hover:bg-surface-2"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {form.type === "prayer" && form.remindMode === "prayer" ? (
+                  <>
+                    <PrayerTimesPicker
+                      place={form.place}
+                      onChange={(next) => setF("place", next)}
+                    />
+                    <p className="text-sm text-secondary">
+                      One nudge per waqt, recomputed every day. Each keeps
+                      asking until all five prayers are logged.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {form.remindTimes.map((tm, i) => (
+                        <span key={i} className="flex items-center gap-1">
+                          <input
+                            type="time"
+                            required
+                            value={tm}
+                            onChange={(e) =>
+                              setF(
+                                "remindTimes",
+                                form.remindTimes.map((x, j) =>
+                                  j === i ? e.target.value : x
+                                )
+                              )
+                            }
+                            className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
+                          />
+                          {form.remindTimes.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label="Remove this time"
+                              onClick={() =>
+                                setF(
+                                  "remindTimes",
+                                  form.remindTimes.filter((_, j) => j !== i)
+                                )
+                              }
+                              className="rounded-md px-1.5 py-1 text-sm text-secondary hover:bg-surface-2"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                      {form.remindTimes.length < 5 && (
                         <button
                           type="button"
-                          aria-label="Remove this time"
                           onClick={() =>
-                            setF(
-                              "remindTimes",
-                              form.remindTimes.filter((_, j) => j !== i)
-                            )
+                            setF("remindTimes", [...form.remindTimes, ""])
                           }
-                          className="rounded-md px-1.5 py-1 text-sm text-secondary hover:bg-surface-2"
+                          className="rounded-md border border-edge px-3 py-1.5 text-sm text-secondary hover:bg-surface-2"
                         >
-                          ✕
+                          + Add a time
                         </button>
                       )}
-                    </span>
-                  ))}
-                  {form.remindTimes.length < 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setF("remindTimes", [...form.remindTimes, ""])}
-                      className="rounded-md border border-edge px-3 py-1.5 text-sm text-secondary hover:bg-surface-2"
-                    >
-                      + Add a time
-                    </button>
-                  )}
-                </div>
-                <p className="text-sm text-secondary">
-                  {form.type === "prayer"
-                    ? "One per waqt — up to five. Each fires until that day's prayers are all logged."
-                    : "A push at each time, every day this isn't logged yet."}
-                </p>
+                    </div>
+                    <p className="text-sm text-secondary">
+                      {form.type === "prayer"
+                        ? "One per waqt — up to five. Each fires until that day's prayers are all logged."
+                        : "A push at each time, every day this isn't logged yet."}
+                    </p>
+                  </>
+                )}
+
                 <p className="text-xs text-muted">
                   Uses the same notifications as the daily reminder — turn
                   those on in Account on each device you want nudged.
@@ -889,11 +981,13 @@ function TrackersList() {
                         {typeMeta(t.type as TrackerType).label}
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}
                         {t.reminder?.length
-                          ? ` · ⏰ ${
-                              t.reminder.length === 1
-                                ? t.reminder[0]
-                                : `${t.reminder.length}× daily`
-                            }`
+                          ? t.reminderMode === "prayer"
+                            ? " · 🕌 every waqt"
+                            : ` · ⏰ ${
+                                t.reminder.length === 1
+                                  ? t.reminder[0]
+                                  : `${t.reminder.length}× daily`
+                              }`
                           : ""}
                       </div>
                     </div>

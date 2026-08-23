@@ -102,6 +102,44 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+/**
+ * The verdict before the reading.
+ *
+ * Four words, one colour each — because the first question is "am I alright?"
+ * and making someone parse three sentences to answer it is the thing this
+ * card kept getting wrong.
+ */
+const STATE_LOOK: Record<string, { label: string; className: string }> = {
+  thriving: {
+    label: "Thriving",
+    className: "border-green-700/40 bg-green-700/10 text-green-700 dark:text-green-500",
+  },
+  steady: {
+    label: "Steady",
+    className: "border-accent/40 bg-accent/10 text-accent",
+  },
+  slipping: {
+    label: "Slipping",
+    className: "border-amber-600/40 bg-amber-600/10 text-amber-700 dark:text-amber-500",
+  },
+  stalled: {
+    label: "Stalled",
+    className: "border-red-600/40 bg-red-600/10 text-red-600",
+  },
+};
+
+function StateChip({ state }: { state: string }) {
+  const look = STATE_LOOK[state];
+  if (!look) return null;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${look.className}`}
+    >
+      {look.label}
+    </span>
+  );
+}
+
 /** The window as bars: two weeks of days, tallest is best. */
 function Sparkline({ days }: { days: CoachSnapshot["days"] }) {
   return (
@@ -358,6 +396,11 @@ export default function LifeNow() {
         {review ? (
           <div className="stagger space-y-3.5">
             <div>
+              {review.state && (
+                <div className="mb-2">
+                  <StateChip state={review.state} />
+                </div>
+              )}
               <p className="text-brand-gradient text-lg font-extrabold leading-snug tracking-tight">
                 {review.headline}
               </p>

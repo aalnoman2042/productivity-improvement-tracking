@@ -3,16 +3,9 @@ import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
-import { toTracker } from "@/lib/trackerDoc";
-import { buildReportCard } from "@/lib/report";
-import type { Tracker } from "@/lib/trackers";
-import {
-  buildCoachFacts,
-  type CoachChallengeRow,
-  type CoachEntry,
-} from "@/lib/coachFacts";
+import { gatherCoachFacts } from "@/lib/coachGather";
+import { askGroq, groqConfigured, GROQ_SETUP_ERROR } from "@/lib/groq";
 import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach";
-
 
 /**
  * The AI coach: "what does my life actually look like right now?"
@@ -25,10 +18,7 @@ import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach"
  * Only numbers and tracker names leave the server — no notes, no email.
  */
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-oss-120b"
-
-const SYSTEM = `You are a sharp, warm personal coach reading one person's life-tracking data. Someone should understand their own life in ten seconds of reading you.
+const SYSTEM = `You are a sharp, warm personal coach reading one person's life-tracking data. They are looking at a lot of numbers and cannot tell what any of it MEANS. Your whole job is to turn the data into a decision. Someone should know how they are doing, and what to do tonight, in ten seconds of reading you.
 
 WHAT YOU ARE GIVEN (JSON)
 - rightNow: the latest day score (0-100), the last 7 days' average against the 7 before it, and "momentum" — which way that moved.
@@ -46,6 +36,13 @@ ACCURACY RULES — these outrank style
 6. If few days are logged, that IS the headline finding: say so plainly and keep everything else short. An empty list beats an invented point.
 7. Reporting a number and setting a target are different jobs. Numbers you report are copied exactly. A target is a number to aim at, so it must be BETTER than where they are now — never hand back their current average as the thing to reach for. "You're in bed at 12:45 am, so get there by 11:30" is right; "get to bed by 12:45" is not.
 
+DECIDE, DON'T DESCRIBE — this is what the reader is here for
+8. Every point must carry a judgement or a consequence, not just a figure. "Sleep averaged 5h 30m" is a reading; "5h 30m a night is why your afternoons are collapsing" is a point. If a sentence would still be true of someone doing well, rewrite it.
+9. Pick ONE thing to fix. Not a list, not "focus on sleep and study and prayer" — one, and say plainly why it is first, in terms of what it drags down with it.
+10. "tonight" is an instruction a tired person can obey without thinking: an action, a number and a time. "Phone on the shelf at 11:30, lights off by midnight" — not "try to improve your sleep hygiene".
+11. Each move in "week" must be checkable at the end of the week: a tracker, a number, and how many days. "Study 2h on 4 of the next 5 days" — not "study more consistently".
+12. When the data genuinely doesn't say what is causing what, say the honest version — "these two move together; whether one causes the other, this data can't say" — and never dress a guess as a finding.
+
 HOW TO WRITE
 Second person. Short, plain sentences a tired person gets in one pass. No jargon, no corporate tone, no flattery, no hedging, no therapy-speak. Every point names the tracker it is about and stands on a number. Say what is causing what, not just what the numbers are — the score is the symptom, the habit is the story.
 
@@ -57,12 +54,13 @@ The headline is a sentence with a verb, not a label. "Two strong weeks undone by
 
 Respond with ONLY this JSON object:
 {
+  "state": "one word, exactly one of: thriving | steady | slipping | stalled. thriving = clearly improving and hitting goals. steady = holding, no real movement. slipping = going backwards on something that matters. stalled = barely logging, too little to judge.",
   "headline": "one sentence of 8 to 14 words naming the thing driving all this - the story, not the score",
-  "verdict": "2-3 sentences: what this life looks like right now, and what is driving it",
-  "working": [{"point": "what is genuinely going well, one short sentence", "evidence": "the exact numbers, copied"}],
-  "slipping": [{"point": "what is slipping and what it costs, one short sentence", "evidence": "the exact numbers, copied"}],
+  "verdict": "2-3 sentences. Open with the answer to 'how am I doing?' in plain words, then what is driving it. No preamble, no restating the score.",
+  "working": [{"point": "what is genuinely going well, one short sentence", "evidence": "the numbers in plain English, copied exactly - like '5h 20m a night, against 7h 40m the week before'. NEVER a JSON field name, never a quoted key, never a colon-value pair, never braces"}],
+  "slipping": [{"point": "what is slipping and what it is costing them, one short sentence", "evidence": "the numbers in plain English, copied exactly - like '5h 20m a night, against 7h 40m the week before'. NEVER a JSON field name, never a quoted key, never a colon-value pair, never braces"}],
   "fix": {"what": "the ONE thing to fix first and why it is first", "tonight": "one concrete step for tonight, with a time or a number in it, under 15 words"},
-  "week": ["2-3 moves for the rest of the week; each names a tracker and a number to aim at"]
+  "week": ["2-3 moves for the rest of the week; each names a tracker, a number and how many days"]
 }
 2-3 items each in "working" and "slipping", fewer when the data is thin. No markdown, no emoji, no headings.`;
 
@@ -98,15 +96,8 @@ export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error:
-          "AI analysis isn't set up — add a free GROQ_API_KEY (console.groq.com) to the environment",
-      },
-      { status: 503 }
-    );
+  if (!groqConfigured()) {
+    return NextResponse.json({ error: GROQ_SETUP_ERROR }, { status: 503 });
   }
 
   const body = await req.json().catch(() => null);
@@ -144,109 +135,29 @@ export async function POST(req: Request) {
     }
   }
 
-  /* --------------------------- gather the facts -------------------------- */
-  // `meta` comes along for the ride: bedtimes are the one thing the coach was
-  // most often asked about and had no way of knowing.
-  const [trackerDocs, entryDocs, challengeDocs] = await Promise.all([
-    d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
-    d
-      .collection("entries")
-      .find(
-        { userId, date: { $lte: today } },
-        { projection: { trackerId: 1, date: 1, value: 1, meta: 1, _id: 0 } }
-      )
-      .toArray(),
-    d.collection("challenges").find({ userId }).toArray(),
-  ]);
-
-  const trackers = trackerDocs.map(toTracker) as Tracker[];
-  const entries: CoachEntry[] = entryDocs.map((e) => ({
-    trackerId: String(e.trackerId),
-    date: String(e.date),
-    value: Number(e.value),
-    meta: (e.meta as CoachEntry["meta"]) ?? null,
-  }));
-  if (entries.length === 0) {
+  const gathered = await gatherCoachFacts(d, userId, today);
+  if (!gathered) {
     return NextResponse.json(
       { error: "Nothing logged yet — there's no life on record to analyze" },
       { status: 400 }
     );
   }
+  const { facts, snapshot } = gathered;
 
-  const challengeRows: CoachChallengeRow[] = challengeDocs.map((c) => ({
-    name: String(c.name),
-    trackerId: String(c.trackerId),
-    startDate: String(c.startDate),
-    days: Number(c.days),
-    target: c.target == null ? null : Number(c.target),
-    direction: c.direction === "max" ? "max" : "min",
-  }));
-
-  const report = buildReportCard(trackers, entries, [], today);
-  const { facts, snapshot } = buildCoachFacts(
-    trackers,
-    entries,
-    challengeRows,
-    report,
-    today
-  );
-
-  /* ------------------------------ ask the AI ----------------------------- */
-
-
-  
-
-  let text = "";
-  let model = process.env.GROQ_MODEL || DEFAULT_MODEL;
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: JSON.stringify(facts) },
-        ],
-        max_tokens: 4000,
-        // Low: this is a reading of someone's real numbers, not a piece of
-        // writing — invention is the only failure mode that matters here.
-        temperature: 0.25,
-      reasoning_effort: "low",
-        response_format: { type: "json_object" },
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("Groq error:", res.status, detail.slice(0, 500));
-      return NextResponse.json(
-        {
-          error:
-            res.status === 429
-              ? "The free AI quota is catching its breath — try again in a minute"
-              : "The AI service had trouble — try again shortly",
-        },
-        { status: 502 }
-      );
-    }
-    const data = (await res.json()) as {
-      model?: string;
-      choices?: { message?: { content?: string } }[];
-    };
-    text = (data.choices?.[0]?.message?.content ?? "").trim();
-    model = data.model ?? model;
-  } catch (err) {
-    console.error("Groq request failed:", err);
-    return NextResponse.json(
-      { error: "Couldn't reach the AI service — check the connection and try again" },
-      { status: 502 }
-    );
+  // Once every eight hours is a budget that can afford to think. The effort
+  // is what turns "sleep is down 27%" into "this is why the afternoons are
+  // going", which is the whole reason anyone opens the card.
+  const answer = await askGroq({
+    system: SYSTEM,
+    user: JSON.stringify(facts),
+    json: true,
+    reasoningEffort: "medium",
+  });
+  if (!answer.ok) {
+    return NextResponse.json({ error: answer.error }, { status: answer.status });
   }
-  const review = text ? parseReview(text) : null;
+
+  const review = parseReview(answer.text);
   if (!review) {
     return NextResponse.json(
       { error: "The AI answer came back malformed — try again" },
@@ -259,15 +170,15 @@ export async function POST(req: Request) {
   // numbers this read was written against, not today's recomputed ones.
   await d.collection("aiReviews").insertOne({
     userId,
-    text: text.slice(0, 10000),
+    text: answer.text.slice(0, 10000),
     snapshot,
     today,
-    model,
+    model: answer.model,
     createdAt,
   });
 
   return NextResponse.json(
-    { review, text, snapshot, today, createdAt },
+    { review, text: answer.text, snapshot, today, createdAt },
     { status: 201 }
   );
 }

@@ -36,12 +36,34 @@ export function parseReminderTimes(raw: unknown): string[] | null {
   return times.length > 0 ? times : null;
 }
 
+/**
+ * Where a tracker's times come from. "fixed" is the list as typed; "prayer"
+ * means the list is recomputed from the sun each day (`lib/prayerTimes`),
+ * because a waqt is not a clock time — the stored `times` survive only as
+ * the fallback for a day the sun can't be asked about.
+ */
+export type ReminderMode = "fixed" | "prayer";
+
+export function parseReminderMode(raw: unknown): ReminderMode {
+  return raw === "prayer" ? "prayer" : "fixed";
+}
+
 export type TrackerReminder = {
   /** Local times of day, "HH:MM", sorted. */
   times: string[];
   /** The latest slot handled, `"YYYY-MM-DD HH:MM"` — sent, missed or skipped. */
   lastSentFor?: string | null;
 };
+
+/**
+ * The date it is where the user is. Shared with the schedule's callers
+ * because the times for a day have to be computed for the *same* day this
+ * poll is about — two ideas of "today" three hours apart is how a Fajr
+ * reminder ends up being sent about yesterday.
+ */
+export function localDateFor(now: Date, tzOffset: number): string {
+  return new Date(now.getTime() + tzOffset * 60_000).toISOString().slice(0, 10);
+}
 
 export type ReminderCheck = {
   /** The user's local date this poll is about. */
@@ -71,7 +93,7 @@ export function checkReminders(
   tzOffset: number
 ): ReminderCheck {
   const local = new Date(now.getTime() + tzOffset * 60_000);
-  const date = local.toISOString().slice(0, 10);
+  const date = localDateFor(now, tzOffset);
   const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
   const last = reminder.lastSentFor ?? "";
 
