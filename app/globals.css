@@ -23,10 +23,11 @@
   --grad-brand: linear-gradient(135deg, #2a78d6 0%, #1c5cab 55%, #4a3aa7 100%);
   --grad-card: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
 
-  /* Soft colour wash behind everything — three fixed radial tints. */
-  --wash-1: rgba(42, 120, 214, 0.13);
-  --wash-2: rgba(74, 58, 167, 0.11);
-  --wash-3: rgba(27, 175, 122, 0.09);
+  /* Soft colour wash behind everything — three fixed radial tints. Painted
+     by `body::before`, never on the body itself; see the note down there. */
+  --wash-1: rgba(42, 120, 214, 0.2);
+  --wash-2: rgba(74, 58, 167, 0.17);
+  --wash-3: rgba(27, 175, 122, 0.13);
   --wash-base: #f4f6fa;
 
   /* Categorical series — validated light steps */
@@ -64,9 +65,9 @@
   --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
   --grad-card: linear-gradient(180deg, #1c1c1b 0%, #171716 100%);
 
-  --wash-1: rgba(57, 135, 229, 0.16);
-  --wash-2: rgba(144, 133, 233, 0.13);
-  --wash-3: rgba(25, 158, 112, 0.1);
+  --wash-1: rgba(57, 135, 229, 0.2);
+  --wash-2: rgba(144, 133, 233, 0.16);
+  --wash-3: rgba(25, 158, 112, 0.12);
   --wash-base: #0d0d0d;
 
   --series-1: #3987e5;
@@ -101,7 +102,9 @@
    Page
    ===================================================================== */
 html {
-  background: var(--wash-base);
+  /* The flat floor the wash sits on. It lives here rather than on <body> so
+     the wash layer below can paint above it — see body::before. */
+  background-color: var(--wash-base);
 }
 
 body {
@@ -109,23 +112,41 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  /* Deliberately no background of its own: an opaque body would paint over
+     the fixed wash layer beneath it. */
+  background: transparent;
+}
 
-  /* Static gradients only — cheap to paint, no blur filters or animation,
-     so scrolling stays smooth on a phone. */
+/* =====================================================================
+   The wash — a soft colour field behind the whole app.
+
+   Three radial tints from the theme, so it turns over with dark mode
+   instead of being a picture of one. No image, no blur filter, no
+   animation: three static gradients on one layer, which is about as cheap
+   as a background can be.
+
+   It is a FIXED PSEUDO-ELEMENT rather than `background-attachment: fixed`
+   on <body>, and that is the whole point of this block. The attachment
+   version repaints the gradient on every scroll frame, which is why phones
+   were given `attachment: scroll` to escape it — and that quietly meant the
+   wash scrolled off the top and every screen below the first was flat, on
+   the device the app is mostly used from. (iOS ignores fixed attachment in
+   places regardless, so the installed app never had it either.) A fixed
+   element is composited once and simply stays where it is: visible all the
+   way down every page, phone included, for less work than before.
+   ===================================================================== */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-color: var(--wash-base);
   background-image:
     radial-gradient(60rem 40rem at 12% -10%, var(--wash-1), transparent 60%),
     radial-gradient(50rem 36rem at 92% 4%, var(--wash-2), transparent 62%),
     radial-gradient(46rem 34rem at 50% 108%, var(--wash-3), transparent 60%);
-  background-attachment: fixed;
   background-repeat: no-repeat;
-}
-
-/* Phones: `fixed` attachment forces a repaint on every scroll frame. */
-@media (max-width: 640px) {
-  body {
-    background-attachment: scroll;
-  }
 }
 
 /* Respect the notch / home indicator */
