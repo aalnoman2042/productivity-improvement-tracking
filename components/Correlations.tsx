@@ -1,6 +1,7 @@
 "use client";
 
 import { useCached } from "@/lib/useCached";
+import { useNearViewport } from "@/lib/useNearViewport";
 import { toDateStr } from "@/lib/dates";
 import type { Finding } from "@/lib/correlate";
 
@@ -37,7 +38,19 @@ function impactLabel(f: Finding): string {
  * cause — the footnote saying so is not boilerplate, it's the honest limit of
  * what a daily grid of self-reported numbers can establish.
  */
+/**
+ * Deferred until it is nearly scrolled to. This card sits below every chart
+ * on the dashboard, and `/api/insights/correlations` is the heaviest read in
+ * the app — the pattern engine walks every entry ever logged. Asking for it
+ * while the charts above are still fetching costs the screen that is
+ * actually being looked at, on both ends of the wire.
+ */
 export default function Correlations() {
+  const [ref, near] = useNearViewport<HTMLDivElement>();
+  return <div ref={ref}>{near ? <Patterns /> : null}</div>;
+}
+
+function Patterns() {
   const q = useCached<Response>(
     `/api/insights/correlations?today=${toDateStr(new Date())}`,
     "correlations"

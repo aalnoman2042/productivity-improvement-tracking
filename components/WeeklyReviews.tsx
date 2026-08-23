@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toDateStr } from "@/lib/dates";
 import { useCached } from "@/lib/useCached";
+import { useNearViewport } from "@/lib/useNearViewport";
 import type { CoachReview } from "@/lib/coach";
 
 /**
@@ -111,7 +112,19 @@ function ReviewBody({ entry }: { entry: Entry }) {
   );
 }
 
+/**
+ * The section sits at the very bottom of a long page, and asking the server
+ * for a year of reviews the instant Status opens means that request shares
+ * the connection with the ones painting the top of the screen. It waits
+ * until it is nearly scrolled to — by which time it has usually already
+ * arrived — so the reader never learns it was ever late.
+ */
 export default function WeeklyReviews() {
+  const [ref, near] = useNearViewport<HTMLDivElement>();
+  return <div ref={ref}>{near ? <Reviews /> : null}</div>;
+}
+
+function Reviews() {
   // Read once, in an initializer: which week is over is the reader's clock,
   // and a date that changes under the cache key would refetch for ever.
   const [today] = useState(() => toDateStr(new Date()));
