@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_TASK,
+  carryRange,
   cleanTask,
   inOrder,
   nextOrder,
@@ -116,5 +117,27 @@ describe("taskHeading", () => {
     // Not reachable from the log today, but a heading that lies is a lie
     // waiting for the day someone links straight to that date.
     expect(taskHeading("2026-08-30", today, tomorrow)).toBe("Have to do it that day");
+  });
+});
+
+describe("carryRange", () => {
+  it("looks back two weeks and no further", () => {
+    // A task from March isn't unfinished, it's a thing you decided not to do.
+    expect(carryRange("2026-08-23")).toEqual({
+      from: "2026-08-09",
+      before: "2026-08-23",
+    });
+  });
+
+  it("stops before today, because today isn't over", () => {
+    // Sweeping this afternoon's tasks into tomorrow at 2pm would be the app
+    // giving up on the day on your behalf.
+    const { before } = carryRange("2026-08-23");
+    expect(before).toBe("2026-08-23");
+    expect(before > "2026-08-22").toBe(true);
+  });
+
+  it("crosses a month boundary without help", () => {
+    expect(carryRange("2026-03-05").from).toBe("2026-02-19");
   });
 });

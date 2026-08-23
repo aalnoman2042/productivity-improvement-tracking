@@ -56,7 +56,11 @@ function Day({
       href={`/?date=${date}`}
       aria-disabled={future}
       tabIndex={future ? -1 : undefined}
-      title={`${prettyDate(date)} — ${future ? "not yet" : dayLabel(day, trackers)}`}
+      title={`${prettyDate(date)} — ${future ? "not yet" : dayLabel(day, trackers)}${
+        (day?.tasks?.total ?? 0) > 0
+          ? ` · ${day!.tasks.done}/${day!.tasks.total} done from the list`
+          : ""
+      }`}
       className={`relative flex aspect-square items-center justify-center rounded-md border text-sm tabular-nums transition-transform ${
         future
           ? "pointer-events-none border-transparent text-muted opacity-30"
@@ -88,6 +92,22 @@ function Day({
           className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500"
         />
       )}
+      {/* And a tick for a day that had a list. Filled once everything on it
+          was done, hollow while something was still owed — the one thing a
+          square can say about a to-do list without counting it as anything.
+          Bottom-left, so it never sits under the note's dot. */}
+      {(day?.tasks?.total ?? 0) > 0 && (
+        <span
+          aria-hidden="true"
+          className={`absolute bottom-0.5 left-1 text-[9px] leading-none ${
+            day!.tasks.done === day!.tasks.total
+              ? "text-green-700 dark:text-green-500"
+              : "text-muted"
+          }`}
+        >
+          ✓
+        </span>
+      )}
     </Link>
   );
 }
@@ -105,6 +125,16 @@ function Legend() {
       <span className="flex items-center gap-1.5">
         <span className="h-4 w-4 rounded-md border border-dashed border-edge" />
         not logged
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        wrote something
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden="true" className="text-[10px] leading-none text-green-700 dark:text-green-500">
+          ✓
+        </span>
+        had a list
       </span>
       <span className="flex items-center gap-1">
         goals met

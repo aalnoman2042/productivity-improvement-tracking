@@ -11,7 +11,7 @@
  * API calls are never cached here — the pages hold their own copy of the last
  * response and know when it's stale, which the service worker can't.
  */
-const CACHE = "pit-v6";
+const CACHE = "pit-v7";
 const OFFLINE_FALLBACK = "/";
 
 /**
@@ -35,7 +35,16 @@ const isVersioned = (url, request) =>
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(["/", "/dashboard", "/history", "/trackers"]))
+    // The four bottom-nav tabs, and the calendar behind Status. This list
+    // drifted once already: it kept /history — which stopped being a tab —
+    // and never gained /status, which took its slot. Offline, that meant the
+    // most-read screen in the app was the one with nothing to fall back on.
+    // If the nav changes, this changes with it (and CACHE gets a new name).
+    caches
+      .open(CACHE)
+      .then((cache) =>
+        cache.addAll(["/", "/dashboard", "/status", "/trackers", "/history"])
+      )
   );
   self.skipWaiting();
 });

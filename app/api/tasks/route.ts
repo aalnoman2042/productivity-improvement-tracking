@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { isValidDateStr } from "@/lib/dates";
-import { MAX_TASKS_PER_DAY, cleanTask, inOrder, nextOrder, type Task } from "@/lib/tasks";
+import {
+  MAX_TASKS_PER_DAY,
+  carryRange,
+  cleanTask,
+  inOrder,
+  nextOrder,
+  type Task,
+} from "@/lib/tasks";
 
 /**
  * The day's to-do list — "have to do it today".
@@ -31,13 +38,33 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "date=YYYY-MM-DD required" }, { status: 400 });
   }
 
-  const d = await db();
-  const docs = await d
-    .collection("tasks")
-    .find({ userId, date }, { projection: { text: 1, done: 1, order: 1 } })
-    .toArray();
+  // "Today" is the caller's, not the server's — which day is over is a fact
+  // about their clock. Falls back to the day being read, which makes the
+  // leftovers count zero rather than wrong.
+  const today = new URL(req.url).searchParams.get("today");
+  const { from, before } = carryRange(isValidDateStr(today) ? today : date);
 
-  return NextResponse.json({ date, tasks: inOrder(docs.map(toTask)) });
+  const d = await db();
+  const [docs, leftovers] = await Promise.all([
+    d
+      .collection("tasks")
+      .find({ userId, date }, { projection: { text: 1, done: 1, order: 1 } })
+      .toArray(),
+    // Unfinished, on days that are already over, inside the window. Counted
+    // rather than listed: the offer is "bring them here", not a second list
+    // to read.
+    d.collection("tasks").countDocuments({
+      userId,
+      done: false,
+      date: { $gte: from, $lt: before },
+    }),
+  ]);
+
+  return NextResponse.json({
+    date,
+    tasks: inOrder(docs.map(toTask)),
+    leftovers: date >= before ? leftovers : 0,
+  });
 }
 
 /** Add one. Body: { date, text }. */

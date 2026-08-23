@@ -1,3 +1,5 @@
+import { addDays } from "./dates";
+
 /**
  * The things you have to do today.
  *
@@ -77,6 +79,27 @@ export function taskHeading(date: string, today: string, tomorrow: string): stri
   // waiting for the day someone links straight to it.
   if (date > today) return "Have to do it that day";
   return "Had to do that day";
+}
+
+/**
+ * How far back to look for things left undone.
+ *
+ * Two weeks, not for ever. A task from March is not "unfinished", it is a
+ * thing you decided not to do — and a button offering to drag it into today
+ * would be the app nagging on behalf of a person who has already moved on.
+ */
+export const CARRY_WINDOW_DAYS = 14;
+
+/**
+ * Which days can have leftovers: the ones that are **over**.
+ *
+ * Today is still being lived, so its unfinished tasks are not leftovers,
+ * they are simply not done yet — sweeping them into tomorrow at 2pm would
+ * be the app giving up on the afternoon. So the window ends the day before
+ * today, whatever day the list being filled belongs to.
+ */
+export function carryRange(today: string): { from: string; before: string } {
+  return { from: addDays(today, -CARRY_WINDOW_DAYS), before: today };
 }
 
 export type TaskProgress = {

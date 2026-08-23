@@ -364,7 +364,7 @@ offline cache and queue, so nothing resurrects them later.
 
 ## Data model (MongoDB)
 
-Ten collections, all with `$jsonSchema` validators so the BSON types stay
+Twelve collections, all with `$jsonSchema` validators so the BSON types stay
 honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
 
 - `users` — email (unique), name, scrypt `passwordHash`, `createdAt`, optional
@@ -388,6 +388,11 @@ honest (`ObjectId` refs, `Date` timestamps, numeric values, real booleans):
   it was written against, and the digest lines. Its own collection because it
   has the opposite lifetime to the daily read — that one is replaced every
   eight hours, these are kept.
+- `challenges` — "this tracker, every day, for N days": `userId`, `trackerId`,
+  `startDate`, `days`, `target`, `direction`. Owns no entries, so deleting one
+  costs nothing but the challenge.
+- `aiReviews` — the daily coach read, with the app-computed snapshot it was
+  written against. The newest is the one shown; older rows are history.
 - `pushSubs` — one row per subscribed browser: `userId`, `endpoint` (unique),
   `keys`. Rows are deleted automatically when a push service reports the
   endpoint is gone.

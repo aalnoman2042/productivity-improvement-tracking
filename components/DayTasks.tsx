@@ -33,11 +33,19 @@ import {
  * up whenever it can.
  */
 
-type Day = { date: string; tasks: Task[] };
+/** The caller's own day. Read at call time, never during render. */
+const todayStr = () => toDateStr(new Date());
+
+type Day = {
+  date: string;
+  tasks: Task[];
+  /** Unfinished, on days that are already over, within the fortnight. */
+  leftovers?: number;
+};
 
 export default function DayTasks({ date }: { date: string }) {
   const key = `tasks:${date}`;
-  const q = useCached<Day>(`/api/tasks?date=${date}`, key);
+  const q = useCached<Day>(`/api/tasks?date=${date}&today=${todayStr()}`, key);
   const tasks = inOrder(q.data?.tasks ?? []);
 
   // Read once, in an initializer: a clock in render is impure, and the
@@ -98,6 +106,24 @@ export default function DayTasks({ date }: { date: string }) {
     }
   }
 
+  /**
+   * Move what was left undone onto this day — on purpose, by a tap. An app
+   * that rolls work forward at midnight builds a list nobody chose.
+   */
+  async function carry() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await post("/api/tasks/carry", { date, today });
+      await q.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't move those");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(task: Task) {
     apply(tasks.filter((t) => t.id !== task.id));
     try {
@@ -109,6 +135,7 @@ export default function DayTasks({ date }: { date: string }) {
   }
 
   const { cleared } = taskProgress(tasks);
+  const leftovers = q.data?.leftovers ?? 0;
 
   return (
     <section className="rounded-xl border border-edge card p-4 shadow-sm">
@@ -120,6 +147,25 @@ export default function DayTasks({ date }: { date: string }) {
           {taskSummary(tasks)}
         </span>
       </div>
+
+      {/* Only ever an offer. The count is of days that are over — this
+          afternoon's unfinished tasks are not leftovers, they are simply
+          not done yet. */}
+      {leftovers > 0 && (
+        <button
+          type="button"
+          onClick={() => void carry()}
+          disabled={busy}
+          className="mt-3 flex w-full items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-left text-sm hover:bg-amber-500/15 disabled:opacity-40"
+        >
+          <span aria-hidden="true">↩</span>
+          <span className="min-w-0 flex-1">
+            <strong className="tabular-nums">{leftovers}</strong>{" "}
+            {leftovers === 1 ? "thing" : "things"} left undone earlier
+          </span>
+          <span className="shrink-0 font-medium text-accent">Bring here</span>
+        </button>
+      )}
 
       {tasks.length > 0 && (
         <ul className="mt-3 space-y-1">

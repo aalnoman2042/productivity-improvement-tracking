@@ -13,6 +13,15 @@ export type MonthDay = {
   notes: { tracker: string; note: string }[];
   /** The note about the day itself, if one was written. */
   dayNote: string | null;
+  /**
+   * What was on the day's list, and how much of it got done.
+   *
+   * Shown on the calendar and counted nowhere else: a task never reaches the
+   * score, the goals or the streak. The square marks it for the same reason
+   * it marks a note — it is something you put on that day, and a calendar
+   * that hides it makes you open days to find out.
+   */
+  tasks: { total: number; done: number };
 };
 
 export type MonthSummary = {

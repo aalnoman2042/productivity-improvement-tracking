@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const { start, end } = monthRange(month);
   const d = await db();
 
-  const [trackerDocs, rows, noteRows] = await Promise.all([
+  const [trackerDocs, rows, noteRows, taskRows] = await Promise.all([
     d.collection("trackers").find({ userId }).toArray(),
     d
       .collection("entries")
@@ -50,10 +50,27 @@ export async function GET(req: Request) {
         { projection: { date: 1, text: 1, _id: 0 } }
       )
       .toArray(),
+    // The to-do list is not part of what the numbers are drawn from, but it
+    // is part of what a day held — so the calendar can mark it.
+    d
+      .collection("tasks")
+      .find(
+        { userId, date: { $gte: start, $lte: end } },
+        { projection: { date: 1, done: 1, _id: 0 } }
+      )
+      .toArray(),
   ]);
   const dayNotes = new Map(
     noteRows.map((n) => [String(n.date), String(n.text ?? "")])
   );
+  const taskCounts = new Map<string, { total: number; done: number }>();
+  for (const row of taskRows) {
+    const key = String(row.date);
+    const slot = taskCounts.get(key) ?? { total: 0, done: 0 };
+    slot.total += 1;
+    if (row.done) slot.done += 1;
+    taskCounts.set(key, slot);
+  }
 
   const trackers = trackerDocs.map(toTracker);
   const active = trackers.filter((t) => !t.archived);
@@ -115,6 +132,7 @@ export async function GET(req: Request) {
       minutes: slot?.minutes ?? 0,
       notes: slot?.notes ?? [],
       dayNote: dayNotes.get(date) ?? null,
+      tasks: taskCounts.get(date) ?? { total: 0, done: 0 },
     });
 
     run = logged > 0 ? run + 1 : 0;
