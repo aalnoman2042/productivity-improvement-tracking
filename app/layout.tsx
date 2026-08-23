@@ -60,6 +60,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col">
+        {/* Every screen puts a header, a logo, four tabs and three buttons
+            before its content. Without this, reaching the page by keyboard
+            means tabbing past all of it, on every navigation. Off-screen
+            until focused, which is the only time it is any use. */}
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         {children}
         <ServiceWorker />
         <Analytics />

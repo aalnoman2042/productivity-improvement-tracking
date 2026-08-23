@@ -291,6 +291,33 @@ button:active:not(:disabled) {
 }
 
 /* =====================================================================
+   Skip to content.
+
+   Off-screen until it is focused, which is the only moment it earns its
+   place. Every screen begins with a header, a logo, four tabs and three
+   buttons; without this, arriving at the page by keyboard costs all of them
+   on every single navigation.
+   ===================================================================== */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 50%;
+  z-index: 50;
+  transform: translate(-50%, -200%);
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transition: transform 140ms ease;
+}
+.skip-link:focus {
+  transform: translate(-50%, 0);
+}
+
+/* =====================================================================
    Animations
    ===================================================================== */
 @keyframes fade-in {

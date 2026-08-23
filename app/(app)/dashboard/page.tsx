@@ -1,5 +1,6 @@
 "use client";
 
+import LoadError from "@/components/LoadError";
 import { memo, useMemo, useState } from "react";
 import Link from "next/link";
 import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
@@ -603,15 +604,11 @@ export default function DashboardPage() {
 
       {stats === null ? (
         statsQ.error ? (
-          <div className="rounded-lg border border-dashed border-edge p-8 text-center">
-            <p className="text-sm text-secondary">{statsQ.error}</p>
-            <button
-              onClick={() => void statsQ.refresh()}
-              className="mt-3 rounded-md border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
-            >
-              Try again
-            </button>
-          </div>
+          <LoadError
+            what="your stats"
+            message={statsQ.error}
+            onRetry={() => void statsQ.refresh()}
+          />
         ) : (
           <div className="space-y-4">
             <div aria-hidden="true" className="space-y-4">

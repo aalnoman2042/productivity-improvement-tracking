@@ -12,7 +12,12 @@ export default function AppLayout({
       <SwipeNav />
       {/* The credit line lives on the Account page only — every other screen
           is for your data, not for the byline. */}
-      <main className="app-main mx-auto w-full max-w-5xl flex-1 px-3 py-5 sm:px-4 sm:py-6">
+      <main
+        id="main"
+        // -mt-* would fight the sticky header; the offset is what stops the
+        // header covering the top of the page when the skip link jumps here.
+        className="app-main mx-auto w-full max-w-5xl flex-1 scroll-mt-20 px-3 py-5 sm:px-4 sm:py-6"
+      >
         {children}
       </main>
     </>

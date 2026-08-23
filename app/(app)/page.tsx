@@ -462,7 +462,10 @@ function TodayLog() {
       : state === "saved"
         ? { text: "✓ Saved", tone: "text-green-700 dark:text-green-500" }
         : state === "queued"
-          ? { text: "✓ Saved on device — will sync", tone: "text-amber-700" }
+          ? {
+            text: "✓ Saved on device — will sync",
+            tone: "text-amber-700 dark:text-amber-500",
+          }
           : state === "error"
             ? { text: error || "Could not save", tone: "text-red-600" }
             : null;
@@ -573,6 +576,10 @@ function TodayLog() {
               )}
               {statusLine && (
                 <span
+                  // The page saves itself; whether that worked is not
+                  // something a reader should have to be watching to learn.
+                  role="status"
+                  aria-live="polite"
                   className={`ml-auto animate-fade-in text-sm font-medium ${statusLine.tone}`}
                 >
                   {statusLine.text}
@@ -733,7 +740,11 @@ function TodayLog() {
               </span>
             )}
             {statusLine && (
-              <span className={`animate-fade-in text-sm font-medium ${statusLine.tone}`}>
+              <span
+                role="status"
+                aria-live="polite"
+                className={`animate-fade-in text-sm font-medium ${statusLine.tone}`}
+              >
                 {statusLine.text}
               </span>
             )}

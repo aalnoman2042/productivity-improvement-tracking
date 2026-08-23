@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AskData from "@/components/AskData";
+import LoadError from "@/components/LoadError";
 import LifeNow from "@/components/LifeNow";
 import PeriodCompare from "@/components/PeriodCompare";
 import ReportCard from "@/components/ReportCard";
@@ -265,6 +266,15 @@ export default function StatusPage() {
           <div className="skeleton h-40 rounded-lg" />
           <div className="skeleton h-40 rounded-lg" />
         </div>
+      ) : !stats && statsQ.error ? (
+        // Before this branch existed, a failed request fell through to
+        // "Nothing logged in this range yet" — which is not a slow screen or
+        // an empty one, it is the app telling someone they did nothing.
+        <LoadError
+          what="your status"
+          message={statsQ.error}
+          onRetry={() => void statsQ.refresh()}
+        />
       ) : !stats || !stats.hasEntries ? (
         <p className="rounded-xl border border-edge card p-4 text-sm text-muted">
           Nothing logged in this range yet.{" "}

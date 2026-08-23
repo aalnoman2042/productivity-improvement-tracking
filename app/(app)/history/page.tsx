@@ -6,6 +6,7 @@ import { useCached } from "@/lib/useCached";
 import PeriodCompare from "@/components/PeriodCompare";
 import MotivationLine from "@/components/MotivationLine";
 import NoteSearch from "@/components/NoteSearch";
+import LoadError from "@/components/LoadError";
 import {
   WEEKDAY_INITIALS,
   addMonths,
@@ -208,6 +209,14 @@ export default function HistoryPage() {
           <div className="skeleton h-72 w-full rounded-lg" aria-hidden="true" />
           <MotivationLine />
         </div>
+      ) : !data && q.error ? (
+        // No cached copy and the request failed: without this the calendar
+        // renders as an empty month, which reads as "you logged nothing".
+        <LoadError
+          what="your month"
+          message={q.error}
+          onRetry={() => void q.refresh()}
+        />
       ) : (
         <>
           <section className="rounded-xl border border-edge card p-3 shadow-sm sm:p-4">
