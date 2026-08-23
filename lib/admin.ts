@@ -3,14 +3,32 @@ import { db } from "./db";
 import { currentUserId } from "./session";
 
 /**
- * Who gets the admin overview. Add an email here and that account is an
- * admin everywhere at once — the doorway on the Account page, the /admin
- * page, and its API all read this one list.
+ * Who gets the admin overview — the doorway on the Account page, the /admin
+ * page and its API all read this one answer.
+ *
+ * **Prefer the environment variable.** This file is committed to a public
+ * repository, so an address written here is a published address; one set as
+ * `ADMIN_EMAILS` in Vercel is not. The variable takes a comma-separated
+ * list and replaces this default entirely, which also means an admin can be
+ * added or removed without a deploy.
  */
-export const ADMIN_EMAILS = ["abdullahalnoman2042@gmail.com"];
+const FALLBACK_ADMIN_EMAILS = ["abdullahalnoman2042@gmail.com"];
+
+export function adminEmails(): string[] {
+  const configured = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.length > 0 ? configured : FALLBACK_ADMIN_EMAILS;
+}
+
+/** Kept for anything that imports the list; reads the same answer. */
+export const ADMIN_EMAILS = FALLBACK_ADMIN_EMAILS;
 
 export function isAdminEmail(email: unknown): boolean {
-  return typeof email === "string" && ADMIN_EMAILS.includes(email.toLowerCase());
+  return (
+    typeof email === "string" && adminEmails().includes(email.toLowerCase())
+  );
 }
 
 /**

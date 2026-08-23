@@ -65,6 +65,17 @@ export default function StorageReport() {
     };
   }, []);
 
+  // Computed before any early return, and that is not a style preference.
+  // With `const used = …` declared *after* the two early returns below and
+  // read from the JSX, the React Compiler emitted a build where the binding
+  // was out of scope by the time it was read: production threw
+  // "ReferenceError: used is not defined" while dev, lint, tsc and the build
+  // were all perfectly clean. A component body the compiler memoises should
+  // compute what it needs before it starts returning early.
+  const used = data ? usedBytes(data.totals) : 0;
+  const room = headroom(used, data?.limitBytes ?? 0);
+  const tone = TONE[room.level];
+
   if (failed) {
     return (
       <section className="rounded-xl border border-edge card p-4 shadow-sm">
@@ -85,10 +96,6 @@ export default function StorageReport() {
       </div>
     );
   }
-
-  const used = usedBytes(data.totals);
-  const room = headroom(used, data.limitBytes);
-  const tone = TONE[room.level];
 
   return (
     <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
