@@ -233,7 +233,7 @@ export default function Books({ standalone = false }: { standalone?: boolean }) 
         <button
           type="button"
           onClick={() => setAdding(false)}
-          className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
+          className="rounded-lg border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
         >
           Cancel
         </button>

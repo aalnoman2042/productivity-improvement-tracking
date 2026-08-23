@@ -280,7 +280,16 @@ button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-/* Comfortable tap targets on touch devices */
+/* =====================================================================
+   Comfortable tap targets on touch devices.
+
+   Deliberately NOT `a`, though half this app's buttons are links. It reads
+   like a free win and isn't: a link inside a flex row is a flex item, not an
+   inline box, so a floor would apply to every tracker name in the Status
+   list and every book on the shelf — stretching dense rows on precisely the
+   device the rule was meant to help. Button-shaped links get their height
+   from their own padding instead.
+   ===================================================================== */
 @media (pointer: coarse) {
   button,
   select,
@@ -289,6 +298,20 @@ button:active:not(:disabled) {
     min-height: 40px;
   }
 }
+
+/* =====================================================================
+   The radius scale, which now has one rule instead of a convention.
+
+   Radius follows HEIGHT, for every control: py-2 or taller is a full-size
+   button and takes `rounded-lg`; py-1 / py-1.5 is a chip and takes
+   `rounded-md`. Card surfaces are `rounded-xl`, and the two hero cards
+   (the coach card, the welcome page's coach section) are `rounded-2xl`.
+
+   Before this was written down, fourteen full-size secondary buttons were
+   `rounded-md` while the primary sitting beside them in the same row was
+   `rounded-lg` — a Cancel and a Save with different corners, which is the
+   kind of thing nobody reports and everybody sees.
+   ===================================================================== */
 
 /* =====================================================================
    Skip to content.

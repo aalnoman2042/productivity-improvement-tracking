@@ -96,7 +96,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="mx-auto max-w-xl space-y-5">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Account</h1>
         <p className="mt-1 text-sm text-secondary">
@@ -261,7 +261,7 @@ export default function SettingsPage() {
               </a>
               <a
                 href="/api/export?format=json"
-                className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
+                className="rounded-lg border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2"
               >
                 Download JSON
               </a>

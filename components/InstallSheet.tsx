@@ -205,7 +205,7 @@ export default function InstallSheet({ onClose }: { onClose: () => void }) {
         {(route === "in-app" || route === "ios-other") && (
           <button
             onClick={copyLink}
-            className="mt-4 w-full rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            className="mt-4 w-full rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
           >
             {copied ? "✓ Link copied — paste it in Safari" : "Copy the link"}
           </button>

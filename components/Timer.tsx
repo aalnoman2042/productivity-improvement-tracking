@@ -126,7 +126,7 @@ export default function Timer({
         type="button"
         onClick={stop}
         disabled={busy}
-        className="animate-pulse-ring flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-sm font-medium text-white tabular-nums hover:bg-red-700 disabled:opacity-50"
+        className="animate-pulse-ring flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-sm font-medium text-white tabular-nums hover:bg-red-700 disabled:opacity-40"
         title="Stop and add this time"
       >
         <span className="h-2 w-2 rounded-xs bg-white" />
@@ -143,7 +143,7 @@ export default function Timer({
       type="button"
       onClick={start}
       disabled={blocked}
-      className="shrink-0 rounded-md border border-edge px-2.5 py-1.5 text-sm text-secondary hover:bg-background disabled:opacity-30"
+      className="shrink-0 rounded-md border border-edge px-2.5 py-1.5 text-sm text-secondary hover:bg-background disabled:opacity-40"
       title={blocked ? "Another timer is running" : "Start timer"}
     >
       ▶ Timer

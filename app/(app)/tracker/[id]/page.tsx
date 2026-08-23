@@ -210,7 +210,7 @@ export default function TrackerDetailPage() {
 
   if (!tracker) {
     return (
-      <p className="mx-auto max-w-xl rounded-xl border border-edge card p-4 text-sm text-muted">
+      <p className="mx-auto max-w-xl rounded-xl border border-edge card p-4 shadow-sm text-sm text-muted">
         This tracker doesn&apos;t exist (or isn&apos;t yours).{" "}
         <Link href="/trackers" className="font-medium text-accent underline">
           Back to trackers

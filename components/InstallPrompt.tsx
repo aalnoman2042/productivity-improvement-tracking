@@ -71,7 +71,7 @@ export default function InstallPrompt({
     <button
       onClick={install}
       disabled={busy}
-      className="shrink-0 rounded-lg bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+      className="shrink-0 rounded-md bg-brand-gradient px-4 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
     >
       {busy ? "Installing…" : canPrompt ? "Install" : "Show me how"}
     </button>

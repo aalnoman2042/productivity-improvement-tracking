@@ -358,7 +358,7 @@ export default function LifeNow() {
             onClick={analyze}
             disabled={busy || coolingDown}
             title={coolingDown ? "The coach reads your life once every 8 hours" : undefined}
-            className="shrink-0 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/30 backdrop-blur hover:bg-white/25 disabled:opacity-60"
+            className="shrink-0 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/30 backdrop-blur hover:bg-white/25 disabled:opacity-40"
           >
             {busy ? (
               <span className="flex items-center gap-2">

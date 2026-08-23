@@ -177,7 +177,7 @@ export default function QuickLog({
         <button
           onClick={back}
           disabled={i === 0}
-          className="rounded-md border border-edge px-4 py-3 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-30"
+          className="rounded-lg border border-edge px-4 py-3 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
         >
           ← Back
         </button>

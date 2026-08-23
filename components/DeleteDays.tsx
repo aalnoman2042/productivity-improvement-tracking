@@ -188,7 +188,7 @@ export default function DeleteDays({
         <button
           onClick={check}
           disabled={busy || from > to}
-          className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
+          className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
         >
           {busy && !summary ? "Checking…" : "Check this range"}
         </button>

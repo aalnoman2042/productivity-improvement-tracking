@@ -175,7 +175,7 @@ export default function HistoryPage() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setMonth(addMonths(month, -1))}
-          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2"
+          className="rounded-lg border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2"
           aria-label="Previous month"
         >
           ←
@@ -189,7 +189,7 @@ export default function HistoryPage() {
         <button
           onClick={() => setMonth(addMonths(month, 1))}
           disabled={atLatest}
-          className="rounded-md border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2 disabled:opacity-30"
+          className="rounded-lg border border-edge card px-3 py-2 shadow-sm hover:bg-surface-2 disabled:opacity-40"
           aria-label="Next month"
         >
           →
@@ -197,7 +197,7 @@ export default function HistoryPage() {
         {!atLatest && (
           <button
             onClick={() => setMonth(thisMonth)}
-            className="rounded-md border border-edge px-3 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            className="rounded-lg border border-edge px-3 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
           >
             This month
           </button>

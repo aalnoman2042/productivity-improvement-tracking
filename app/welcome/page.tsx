@@ -122,7 +122,7 @@ export default function WelcomePage() {
         </span>
         <Link
           href="/login"
-          className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+          className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
         >
           Sign in
         </Link>

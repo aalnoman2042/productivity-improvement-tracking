@@ -324,7 +324,7 @@ export default function ReminderSettings() {
               disabled={busy}
               className={
                 on
-                  ? "rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
+                  ? "rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
                   : "rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
               }
             >
@@ -335,14 +335,14 @@ export default function ReminderSettings() {
                 <button
                   onClick={sendTest}
                   disabled={busy}
-                  className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
+                  className="rounded-lg border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
                 >
                   Send a test
                 </button>
                 <button
                   onClick={sendDigest}
                   disabled={busy}
-                  className="rounded-md border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
+                  className="rounded-lg border border-edge px-4 py-2 text-sm text-secondary hover:bg-surface-2 disabled:opacity-40"
                 >
                   Send my week in review
                 </button>

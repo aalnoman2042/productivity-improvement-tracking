@@ -166,7 +166,7 @@ export default function WeeklyReviews() {
           <button
             onClick={write}
             disabled={busy}
-            className="ml-auto shrink-0 rounded-lg bg-brand-gradient px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
+            className="ml-auto shrink-0 rounded-md bg-brand-gradient px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
           >
             {busy ? "Reading the week…" : "Write it"}
           </button>

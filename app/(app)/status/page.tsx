@@ -276,7 +276,7 @@ export default function StatusPage() {
           onRetry={() => void statsQ.refresh()}
         />
       ) : !stats || !stats.hasEntries ? (
-        <p className="rounded-xl border border-edge card p-4 text-sm text-muted">
+        <p className="rounded-xl border border-edge card p-4 shadow-sm text-sm text-muted">
           Nothing logged in this range yet.{" "}
           <Link href="/" className="font-medium text-accent underline">
             Log a few days

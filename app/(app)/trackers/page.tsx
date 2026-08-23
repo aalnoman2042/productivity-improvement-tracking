@@ -422,7 +422,7 @@ function TrackersList() {
           </div>
           <button
             onClick={() => setShowChallenges(false)}
-            className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
           >
             ← Trackers
           </button>
@@ -446,7 +446,7 @@ function TrackersList() {
           </div>
           <button
             onClick={() => setShowBooks(false)}
-            className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+            className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
           >
             ← Trackers
           </button>
@@ -457,7 +457,7 @@ function TrackersList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Trackers</h1>
@@ -469,19 +469,19 @@ function TrackersList() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowChallenges(true)}
-              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+              className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
             >
               🏆 Challenges
             </button>
             <button
               onClick={() => setShowBooks(true)}
-              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+              className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
             >
               📚 Books
             </button>
             <button
               onClick={() => setShowPacks((v) => !v)}
-              className="rounded-md border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
+              className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-surface-2"
             >
               Ready-made packs
             </button>
@@ -561,7 +561,7 @@ function TrackersList() {
                   type="button"
                   disabled={Boolean(editingId)}
                   onClick={() => setF("type", t.value)}
-                  className={`rounded-md border p-2.5 text-left disabled:opacity-50 ${
+                  className={`rounded-md border p-2.5 text-left disabled:opacity-40 ${
                     form.type === t.value
                       ? "border-accent bg-accent/5"
                       : "border-edge hover:bg-surface-2"
@@ -623,7 +623,7 @@ function TrackersList() {
                 onChange={(e) => setF("unit", e.target.value)}
                 placeholder="glasses, kg, ×"
                 disabled={hasFixedUnit(form.type)}
-                className={`${field} disabled:opacity-50`}
+                className={`${field} disabled:opacity-40`}
               />
             </div>
           </div>
@@ -901,7 +901,7 @@ function TrackersList() {
               </span>
               <button
                 onClick={() => setQuery("")}
-                className="shrink-0 rounded-md border border-edge px-3 py-2 text-sm text-secondary hover:bg-surface-2"
+                className="shrink-0 rounded-lg border border-edge px-3 py-2 text-sm text-secondary hover:bg-surface-2"
               >
                 Clear
               </button>
@@ -925,7 +925,7 @@ function TrackersList() {
           </p>
           <button
             onClick={() => setQuery("")}
-            className="mt-3 rounded-md border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
+            className="mt-3 rounded-lg border border-edge px-4 py-2 text-sm font-medium hover:bg-surface-2"
           >
             Show all {total}
           </button>
@@ -1200,7 +1200,7 @@ function DeleteDialog({
             <button
               onClick={onArchive}
               disabled={busy}
-              className="rounded-md border border-edge px-4 py-2.5 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
+              className="rounded-lg border border-edge px-4 py-2.5 text-sm font-medium text-secondary hover:bg-surface-2 disabled:opacity-40"
             >
               Archive instead
             </button>
