@@ -190,6 +190,12 @@ tabs, with a light slide so the page follows the finger.
   totals, the last three months day by day, streak and milestone badges, and
   every note ever written on it, searchable. Tracker names link here from
   Trackers, Stats and Status.
+- **Admin** (`/admin`) — for accounts listed in `lib/admin.ts` only; a 404
+  for everyone else. Every account with its tracker and logged-day counts,
+  and **what the database is holding**: total size against the cluster's
+  ceiling, then every collection by size with its rows, data and indexes.
+  Sizes only — no row is read to produce it, and no account's data is
+  readable from the page.
 - **Account** (`/settings`) — profile, password, the daily reminder (and
   the hour it arrives), and your data: CSV/JSON download and backup import.
 
