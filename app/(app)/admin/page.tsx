@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import StorageReport from "@/components/StorageReport";
 
 type Row = {
   id: string;
@@ -31,9 +30,8 @@ export default function AdminPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
         <p className="mt-1 text-sm text-secondary">
-          Every account, counted, and what the database is holding. Names,
-          numbers and sizes only — nobody&apos;s actual data is readable from
-          here.
+          Every account, counted. Names and numbers only — nobody&apos;s
+          actual data is readable from here.
         </p>
       </div>
 
@@ -45,10 +43,6 @@ export default function AdminPage() {
             <p className="text-sm text-secondary">Users</p>
             <p className="text-3xl font-bold tabular-nums">{data.totalUsers}</p>
           </section>
-
-          {/* Its own request, so a cluster that won't report its size costs
-              this page nothing but one card. */}
-          <StorageReport />
 
           <section className="animate-rise-in overflow-x-auto rounded-xl border border-edge card shadow-sm">
             <table className="w-full text-sm">

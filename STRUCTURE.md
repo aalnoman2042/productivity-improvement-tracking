@@ -144,8 +144,6 @@ cron/               reminders, tracker-reminders  (CRON_SECRET, polled externall
 export/ import/     JSON + CSV backup, and the way back in
 auth/               signup, login, logout, me, profile, password, forgot, reset
 admin/users         counts only, for accounts in ADMIN_EMAILS
-admin/storage       collection sizes and how close the cluster is to its
-                    ceiling — sizes only, no row is ever read
 ```
 
 ### Why writes are POST even when they shouldn't be
