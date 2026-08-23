@@ -37,7 +37,7 @@ export const RULES = {
   // question you can't ask for eight hours isn't a question box. So this
   // rule *is* the whole gate, and it is set where a real conversation fits
   // and a stuck loop doesn't.
-  ask: { limit: 15, windowMs: 60 * 60_000 },
+  ask: { limit: 10, windowMs: 60 * 60_000 },
   // The weekly review writes one row per week; a handful a day is plenty of
   // room to catch up on missed weeks without emptying the free quota.
   weekly: { limit: 6, windowMs: 24 * 60 * 60_000 },
