@@ -198,6 +198,20 @@ export default function TrackerDetailPage() {
     );
   }, [entries, noteQuery]);
 
+  // Computed before the early returns below, not after them: a `const`
+  // declared after an early return and read from the JSX can be emitted out
+  // of scope by the React Compiler — a production-only ReferenceError that
+  // no local check shows. `npm run check:shape` is what found this one.
+  const cat = tracker ? categoryMeta(tracker.category) : null;
+  const goalText =
+    tracker && tracker.goal
+      ? `${tracker.goal.direction === "min" ? "At least" : "At most"} ${formatValue(
+          tracker.goal.target,
+          type,
+          tracker.unit
+        )} per ${tracker.goal.period}`
+      : null;
+
   if (q.loading && !q.data) {
     return (
       <div className="mx-auto max-w-xl space-y-3">
@@ -219,15 +233,6 @@ export default function TrackerDetailPage() {
     );
   }
 
-  const cat = categoryMeta(tracker.category);
-  const goalText = tracker.goal
-    ? `${tracker.goal.direction === "min" ? "At least" : "At most"} ${formatValue(
-        tracker.goal.target,
-        type,
-        tracker.unit
-      )} per ${tracker.goal.period}`
-    : null;
-
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <div>
@@ -246,7 +251,7 @@ export default function TrackerDetailPage() {
           )}
         </div>
         <p className="mt-1 text-sm text-secondary">
-          {cat.icon} {cat.label} · {typeMeta(type).label}
+          {cat?.icon} {cat?.label} · {typeMeta(type).label}
           {goalText && <> · {goalText}</>}
           {" · "}
           <Link href="/trackers" className="text-accent hover:underline">

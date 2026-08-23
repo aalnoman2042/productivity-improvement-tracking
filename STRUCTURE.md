@@ -144,6 +144,8 @@ cron/               reminders, tracker-reminders  (CRON_SECRET, polled externall
 export/ import/     JSON + CSV backup, and the way back in
 auth/               signup, login, logout, me, profile, password, forgot, reset
 admin/users         counts only, for accounts in ADMIN_EMAILS
+admin/storage       collection sizes against the cluster's ceiling — sizes
+                    only, no row is ever read
 ```
 
 ### Why writes are POST even when they shouldn't be
@@ -321,6 +323,12 @@ What partially fills the gap:
 
 Before pushing: `npm test`, `npm run lint`, `npx tsc --noEmit`,
 `npm run build:local`. All four must be clean.
+
+`npm run lint` also runs `check:shape`, which enforces the one React Compiler
+rule nothing else catches: **in a component, compute everything before the
+first early return.** A `const` declared after one and read from the JSX can
+be emitted out of scope — a `ReferenceError` that appears only in production,
+on code that dev, ESLint, `tsc` and `next build` all call clean.
 
 Environment lives in Vercel's project settings (and `.env.local` for
 development). Adding a variable requires a redeploy to take effect. The
