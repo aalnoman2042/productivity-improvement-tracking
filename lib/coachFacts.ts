@@ -5,6 +5,7 @@ import { addDays, prettyDate } from "./dates";
 import { BASIS_LABEL, gradeLetter, type ReportCard } from "./report";
 import { dayFactsFrom, dayScore } from "./score";
 import { streakInfo } from "./streak";
+import { targetProgress } from "./targets";
 import type { CoachSnapshot } from "./coach";
 import {
   categoryMeta,
@@ -65,6 +66,14 @@ export type CoachDay = {
   goalsMet: string;
   trackersLogged: string;
   sleep: string | null;
+  /**
+   * A day deliberately taken off.
+   *
+   * Without this the model reads a chosen Sunday as a collapse — an empty
+   * day looks identical to a day somebody gave up on, and the coach's whole
+   * job is to say which is which.
+   */
+  plannedRestDay?: true;
 };
 
 export type CoachTrackerFacts = {
@@ -96,6 +105,22 @@ export type CoachTrackerFacts = {
     nightsPastMidnight: number;
     latestBedtime: string;
   } | null;
+  /**
+   * A number with a date on it — the one thing in here that is about the
+   * future. Every field is pre-computed (`lib/targets`) for the same reason
+   * every other field is: asked to work out a rate and a date, the model
+   * invents both. `atThisRate` is null when nothing has moved, and that
+   * absence is itself the finding.
+   */
+  target: {
+    aim: string;
+    reached: string;
+    remaining: string;
+    daysLeft: number;
+    neededPerDay: string | null;
+    atThisRate: string | null;
+    readsAs: "reached" | "on track" | "behind" | "not moving" | "deadline passed";
+  } | null;
 };
 
 export type CoachFacts = {
@@ -122,6 +147,11 @@ export type CoachFacts = {
     subjects: { category: string; grade: string; pct: number }[];
   };
   last14Days: CoachDay[];
+  /**
+   * Days off, taken on purpose. Counted separately from days missed, because
+   * they are the opposite thing: one is a decision, the other is a drift.
+   */
+  plannedRestDays: { count: number; days: string[] };
   trackers: CoachTrackerFacts[];
   challenges: {
     name: string;
@@ -174,6 +204,48 @@ function changeLabel(now: number, prev: number, prevDays: number): {
  * until it isn't, and a weight can move either way on purpose.
  */
 
+
+/**
+ * What a tracker's target looks like from here, in words the model can quote.
+ *
+ * The verdict is decided here rather than there for the reason every verdict
+ * in this file is: asked whether a pace will arrive in time, a model compares
+ * two dates it has just invented. `targetProgress` compares two it did not.
+ */
+function targetFacts(
+  t: Tracker,
+  type: TrackerType,
+  entries: CoachEntry[],
+  today: string
+): CoachTrackerFacts["target"] {
+  if (!t.target) return null;
+
+  const points = entries
+    .filter((e) => e.trackerId === t.id)
+    .map((e) => ({ date: e.date, value: e.value }));
+  const p = targetProgress(t.target, points, today);
+  const shown = (v: number) => formatValue(v, type, t.unit);
+
+  return {
+    aim: `${t.target.kind === "total" ? "add up to" : "get to"} ${shown(
+      p.target
+    )} by ${prettyDate(p.by)}`,
+    reached: shown(p.current),
+    remaining: shown(p.remaining),
+    daysLeft: p.daysLeft,
+    neededPerDay: p.needPerDay === null ? null : `${shown(p.needPerDay)} a day`,
+    atThisRate: p.projected === null ? null : prettyDate(p.projected),
+    readsAs: p.done
+      ? "reached"
+      : p.over
+        ? "deadline passed"
+        : p.projected === null
+          ? "not moving"
+          : p.onTrack
+            ? "on track"
+            : "behind",
+  };
+}
 
 /** Bedtimes and wake times over the window, averaged on the night axis. */
 function sleepClock(rows: CoachEntry[]): CoachTrackerFacts["sleepClock"] {
@@ -236,8 +308,11 @@ export function buildCoachFacts(
   entries: CoachEntry[],
   challenges: CoachChallengeRow[],
   report: ReportCard,
-  today: string
+  today: string,
+  /** Days taken off on purpose — see `lib/rest`. */
+  restDays: Iterable<string> = []
 ): { facts: CoachFacts; snapshot: CoachSnapshot } {
+  const rest = new Set(restDays);
   const since = addDays(today, -(COACH_WINDOW_DAYS - 1));
   const splitAt = addDays(today, -6); // the last 7 days start here
   const active = trackers.filter((t) => !t.archived);
@@ -266,6 +341,7 @@ export function buildCoachFacts(
       goalsMet: `${facts.goalsMet}/${facts.goalsTotal}`,
       trackersLogged: `${facts.logged}/${facts.trackers}`,
       sleep: facts.sleep === null ? null : hoursLabel(facts.sleep),
+      ...(rest.has(date) ? { plannedRestDay: true as const } : {}),
     });
   }
 
@@ -358,6 +434,7 @@ export function buildCoachFacts(
 
     const graded = grades.get(t.id);
     return {
+      target: targetFacts(t, type, entries, today),
       name: t.name,
       kind: typeMeta(type).label,
       category: categoryMeta(t.category).label,
@@ -407,7 +484,8 @@ export function buildCoachFacts(
         direction: c.direction,
         values,
       },
-      today
+      today,
+      rest
     );
     return {
       name: c.name,
@@ -448,6 +526,10 @@ export function buildCoachFacts(
       })),
     },
     last14Days,
+    plannedRestDays: {
+      count: last14Days.filter((d) => d.plannedRestDay).length,
+      days: last14Days.filter((d) => d.plannedRestDay).map((d) => d.day),
+    },
     trackers: trackerFacts,
     challenges: challengeFacts,
   };

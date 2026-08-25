@@ -38,7 +38,7 @@ export async function gatherCoachFacts(
 ): Promise<Gathered | null> {
   // `meta` comes along for the ride: bedtimes are the one thing the coach was
   // most often asked about and had no way of knowing.
-  const [trackerDocs, entryDocs, challengeDocs] = await Promise.all([
+  const [trackerDocs, entryDocs, challengeDocs, restDocs] = await Promise.all([
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     d
       .collection("entries")
@@ -48,6 +48,12 @@ export async function gatherCoachFacts(
       )
       .toArray(),
     d.collection("challenges").find({ userId }).toArray(),
+    // Days taken off on purpose. They carry no data — that is the point —
+    // but without them the coach reads a chosen week off as a collapse.
+    d
+      .collection("restDays")
+      .find({ userId, date: { $lte: today } }, { projection: { date: 1, _id: 0 } })
+      .toArray(),
   ]);
 
   const trackers = trackerDocs.map(toTracker) as Tracker[];
@@ -68,13 +74,18 @@ export async function gatherCoachFacts(
     direction: c.direction === "max" ? "max" : "min",
   }));
 
-  const report = buildReportCard(trackers, entries, [], today);
+  const rest = restDocs.map((r) => String(r.date));
+  // The report card is where the coach's streak comes from, so it needs the
+  // rest days too — otherwise the card on screen and the model's idea of the
+  // same run would disagree.
+  const report = buildReportCard(trackers, entries, [], today, rest);
   const { facts, snapshot } = buildCoachFacts(
     trackers,
     entries,
     challenges,
     report,
-    today
+    today,
+    rest
   );
 
   return { facts, snapshot, report, trackers };

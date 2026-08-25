@@ -109,13 +109,27 @@ function points(raw: unknown): CoachPoint[] {
   return out;
 }
 
-/** Short, concrete lines — anything longer is a paragraph pretending. */
+/**
+ * Short, concrete lines — anything longer is a paragraph pretending.
+ *
+ * A line may arrive wrapped in an object. The prompt asks for plain strings
+ * and gpt-oss gives them; Gemini answers the same prompt with
+ * `[{"move": "..."}]`, which is a defensible reading of "a list of moves"
+ * and would otherwise silently empty the section. Two providers, one shape:
+ * unwrap the object rather than argue with either of them in the prompt.
+ */
 function moves(raw: unknown): string[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out: string[] = [];
   for (const item of raw) {
     if (out.length >= 3) break;
-    const line = str(item, 180);
+    const wrapped =
+      item && typeof item === "object"
+        ? (item as Record<string, unknown>).move ??
+          (item as Record<string, unknown>).text ??
+          (item as Record<string, unknown>).point
+        : item;
+    const line = str(wrapped, 180);
     if (line) out.push(line);
   }
   return out.length > 0 ? out : undefined;

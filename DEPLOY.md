@@ -245,7 +245,7 @@ stay inside its limits, but the limits belong to the services under it.
 | Atlas storage | 512 MB (M0) | The owner's own account uses ~1.4 MB of documents+indexes. 2,000 accounts logging for a year will not fit — plan on **M10 or larger**, and watch the 💾 Database card on /admin, which turns amber at 70%. |
 | Atlas connections | ~500 on shared tiers | Instances × `MONGO_POOL_SIZE`. If pages start failing to load under load, that is what "too many connections" looks like — lower the pool or move up a tier. |
 | Atlas CPU | shared, throttled | M0 is a shared box. Sustained traffic gets throttled, and throttling looks like a slow app, not an error. |
-| Groq (the AI) | ~1,000 requests **per day, per key**, 8,000 tokens/minute | This is per *key*, not per person: 2,000 people cannot each have a daily read. Either buy a paid tier, or accept that the AI is first-come-first-served each day (which is what the budget above makes it). |
+| Groq (the AI) | ~1,000 requests **per day, per key**, 8,000 tokens/minute — Google's free tier now sits behind it as a second, separate allowance (`GEMINI_API_KEY`) | This is per *key*, not per person: 2,000 people cannot each have a daily read. Either buy a paid tier, or accept that the AI is first-come-first-served each day (which is what the budget above makes it). |
 | Vercel | Hobby | Hobby is for non-commercial use and has its own concurrency and cron limits. A real crowd belongs on Pro. |
 | Web push | free | The one part that genuinely scales; sending is per-device and cheap. |
 

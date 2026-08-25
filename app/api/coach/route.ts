@@ -4,7 +4,7 @@ import { currentUserId } from "@/lib/session";
 import { aiBudget, hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
 import { gatherCoachFacts } from "@/lib/coachGather";
-import { askGroq, groqConfigured, GROQ_SETUP_ERROR } from "@/lib/groq";
+import { askAI, aiConfigured, AI_SETUP_ERROR } from "@/lib/ai";
 import { COACH_COOLDOWN_MS, parseReview, type CoachSnapshot } from "@/lib/coach";
 
 /**
@@ -23,8 +23,9 @@ const SYSTEM = `You are a sharp, warm personal coach reading one person's life-t
 WHAT YOU ARE GIVEN (JSON)
 - rightNow: the latest day score (0-100), the last 7 days' average against the 7 before it, and "momentum" — which way that moved.
 - allTime: the report card — overall grade, graded subjects, logging history.
-- last14Days: every day in the window with its score, goals met, trackers logged and sleep.
-- trackers: each one with its goal, its grade, the last 7 days against the 7 before, and "readsAs" — whether that change is better or worse FOR THIS HABIT. Sleep trackers also carry average bedtime and wake time; clean-streak trackers carry the streak.
+- last14Days: every day in the window with its score, goals met, trackers logged and sleep. A day marked "plannedRestDay" was taken off ON PURPOSE.
+- plannedRestDays: how many of those there were, and which.
+- trackers: each one with its goal, its grade, the last 7 days against the 7 before, and "readsAs" — whether that change is better or worse FOR THIS HABIT. Sleep trackers also carry average bedtime and wake time; clean-streak trackers carry the streak. Some carry a "target": a number to reach by a date, already worked out.
 - challenges: any challenge under way.
 
 ACCURACY RULES — these outrank style
@@ -35,6 +36,9 @@ ACCURACY RULES — these outrank style
 5. Never contradict "momentum" or a grade — those are computed, not opinions.
 6. If few days are logged, that IS the headline finding: say so plainly and keep everything else short. An empty list beats an invented point.
 7. Reporting a number and setting a target are different jobs. Numbers you report are copied exactly. A target is a number to aim at, so it must be BETTER than where they are now — never hand back their current average as the thing to reach for. "You're in bed at 12:45 am, so get there by 11:30" is right; "get to bed by 12:45" is not.
+
+13. A planned rest day is a decision, not a lapse. Never call one a missed day, a gap, a slip or a broken streak, and never count it among days not logged. If someone took days off on purpose and kept everything else up, that is a person managing their week — say so. A day that is simply blank is a different thing, and you may still name it.
+14. A "target" is the only place you may talk about the future, and you may not do the arithmetic for it. Copy "reached", "remaining", "neededPerDay" and "atThisRate" exactly as given. "readsAs" is the verdict: behind means the pace does not arrive in time, not moving means there is nothing to project from — in that case say there is no pace yet, never guess a date. A target that reads "behind" with weeks left is a better thing to write about than any weekly change, because it is the one number that is still decidable.
 
 DECIDE, DON'T DESCRIBE — this is what the reader is here for
 8. Every point must carry a judgement or a consequence, not just a figure. "Sleep averaged 5h 30m" is a reading; "5h 30m a night is why your afternoons are collapsing" is a point. If a sentence would still be true of someone doing well, rewrite it.
@@ -96,8 +100,8 @@ export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!groqConfigured()) {
-    return NextResponse.json({ error: GROQ_SETUP_ERROR }, { status: 503 });
+  if (!aiConfigured()) {
+    return NextResponse.json({ error: AI_SETUP_ERROR }, { status: 503 });
   }
 
   const body = await req.json().catch(() => null);
@@ -154,7 +158,7 @@ export async function POST(req: Request) {
   // Once every eight hours is a budget that can afford to think. The effort
   // is what turns "sleep is down 27%" into "this is why the afternoons are
   // going", which is the whole reason anyone opens the card.
-  const answer = await askGroq({
+  const answer = await askAI({
     system: SYSTEM,
     user: JSON.stringify(facts),
     json: true,

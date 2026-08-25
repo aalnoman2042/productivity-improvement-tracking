@@ -129,3 +129,38 @@ describe("the one-word state", () => {
     expect(parseReview(JSON.stringify(base))?.state).toBeUndefined();
   });
 });
+
+describe("a second provider's idea of the same JSON", () => {
+  /**
+   * Found by probing, not by reasoning: given the identical prompt, gpt-oss
+   * returns `week` as strings and Gemini returns `[{"move": "..."}]`. Both
+   * are defensible readings of "a list of moves", and the card must not go
+   * empty because of which one answered.
+   */
+  it("unwraps a move that arrived inside an object", () => {
+    const review = parseReview(
+      JSON.stringify({
+        headline: "Sleep is what's dragging the week",
+        verdict: "Short nights, falling scores.",
+        fix: { what: "Sleep", tonight: "Lights out by midnight" },
+        week: [{ move: "Log Sleep on all of the next 5 days" }, { move: "Study 2h on 4 days" }],
+      })
+    );
+    expect(review?.week).toEqual([
+      "Log Sleep on all of the next 5 days",
+      "Study 2h on 4 days",
+    ]);
+  });
+
+  it("still takes plain strings, which is what the prompt asks for", () => {
+    const review = parseReview(
+      JSON.stringify({
+        headline: "Steady week",
+        verdict: "Holding.",
+        fix: { what: "Nothing", tonight: "Sleep by 11" },
+        week: ["Study 2h on 4 of the next 5 days"],
+      })
+    );
+    expect(review?.week).toEqual(["Study 2h on 4 of the next 5 days"]);
+  });
+});

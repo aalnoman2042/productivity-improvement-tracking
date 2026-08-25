@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classifyFailure } from "../lib/groq";
+import { chooseProviders, classifyFailure } from "../lib/ai";
 
 /**
- * The fallback chain is only as good as this decision, and it is the one
- * part of talking to Groq that can be tested without a network.
+ * The fallback chain is only as good as these two decisions, and they are the
+ * parts of talking to a model that can be tested without a network: what a
+ * failure means, and who gets asked in what order.
  */
 
 describe("classifyFailure", () => {
@@ -14,6 +15,33 @@ describe("classifyFailure", () => {
     const attempt = classifyFailure(429, "Rate limit reached ... TPM: Limit 8000");
     expect(attempt.retry).toBe(false);
     expect(attempt.error).toMatch(/catching its breath/);
+  });
+
+  it("but DOES try the other provider on a spent quota", () => {
+    // The whole reason a second provider exists: a cap belongs to one key,
+    // and the other one has an allowance of its own. This is the case a
+    // second model could never answer.
+    expect(classifyFailure(429, "Rate limit reached").otherProvider).toBe(true);
+  });
+
+  it("lets a rejected key fall through to the other provider", () => {
+    // One misconfigured key must not take the whole feature down.
+    expect(classifyFailure(401, "invalid api key").otherProvider).toBe(true);
+  });
+
+  it("names the key of the provider that actually refused", () => {
+    expect(classifyFailure(403, "denied", "gemini").error).toMatch(/GEMINI_API_KEY/);
+    expect(classifyFailure(403, "denied", "groq").error).toMatch(/GROQ_API_KEY/);
+  });
+
+  it("recognises a withdrawn model in Google's wording too", () => {
+    const attempt = classifyFailure(
+      404,
+      '{"error":{"status":"NOT_FOUND","message":"models/gemini-9 is not found"}}',
+      "gemini"
+    );
+    expect(attempt.retry).toBe(true);
+    expect(attempt.error).toMatch(/GEMINI_MODEL/);
   });
 
   it("does NOT try another model when the key is rejected", () => {
@@ -74,5 +102,40 @@ describe("classifyFailure", () => {
     for (const status of [400, 401, 404, 429, 500, 418, 0]) {
       expect(classifyFailure(status, "").status).toBe(502);
     }
+  });
+});
+
+describe("chooseProviders", () => {
+  it("asks nobody when nothing is configured", () => {
+    expect(chooseProviders({})).toEqual([]);
+  });
+
+  it("uses whichever key exists", () => {
+    expect(chooseProviders({ groqKey: "g" })).toEqual(["groq"]);
+    expect(chooseProviders({ geminiKey: "k" })).toEqual(["gemini"]);
+  });
+
+  it("puts Groq first by default — it is the one this app was measured on", () => {
+    expect(chooseProviders({ groqKey: "g", geminiKey: "k" })).toEqual([
+      "groq",
+      "gemini",
+    ]);
+  });
+
+  it("honours a stated preference without dropping the other", () => {
+    // "Prefer" is not "only": a spent quota has to have somewhere to go.
+    expect(
+      chooseProviders({ groqKey: "g", geminiKey: "k", preferred: "gemini" })
+    ).toEqual(["gemini", "groq"]);
+  });
+
+  it("ignores a preference for a provider with no key", () => {
+    expect(chooseProviders({ groqKey: "g", preferred: "gemini" })).toEqual(["groq"]);
+  });
+
+  it("ignores a preference that isn't a provider", () => {
+    expect(
+      chooseProviders({ groqKey: "g", geminiKey: "k", preferred: "anthropic" })
+    ).toEqual(["groq", "gemini"]);
   });
 });

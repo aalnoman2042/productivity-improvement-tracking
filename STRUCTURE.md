@@ -28,9 +28,9 @@ installs to a phone's home screen. One person owns it; a few friends use it.
 | Database | MongoDB Atlas | Schema enforced by `$jsonSchema` validators |
 | Auth | JWT in an httpOnly cookie | `jose`, scrypt password hashing |
 | Charts | Recharts | Lazily imported *and* lazily mounted |
-| AI | Groq (free tier) | `openai/gpt-oss-120b` / `-20b` |
+| AI | Groq **and** Google, both free tiers | `lib/ai.ts` is one door: gpt-oss-120b/20b, falling through to gemini-3.5-flash/-lite when a quota, a key or a model fails. A daily cap belongs to a *key*, so the answer to "quota spent" is another provider, not another model. |
 | Push | Web Push (VAPID) | Plus polled cron for scheduling |
-| Tests | Vitest | Pure `lib/` logic only — see §11 |
+| Tests | Vitest | Pure `lib/` logic, **and now route handlers** — see §11 |
 | Layout | Two rules in `globals.css` | `.page-width` (header, page and footer share one width, growing at 1280/1536px) and `.card-stack` (a stack of cards on a phone, two columns on a big screen). The daily log uses a plain grid instead — it has `position: sticky` bars, and sticky inside multi-column is unreliable. |
 | Hosting | Vercel | Every push to `main` auto-deploys |
 
@@ -312,10 +312,16 @@ schedule that needs polling more often says so.
 
 ## 11. Testing, and its honest limits
 
-437 tests, one spec per `lib/` module, all pure. `npm test`.
+479 tests. `npm test`.
 
-**What is not covered, stated plainly:** not one of the ~47 route handlers
-has a test. Every bug that has actually mattered on this project was found by
+**What used to be missing, and now partly isn't.** For most of this
+project's life not one route handler had a test, and the reason was mundane:
+a `route.ts` imports `@/lib/...` and vitest had no alias for `@`, so every
+attempt failed at resolution rather than at an assertion. `vitest.config.mts`
+adds the alias and `tests/helpers/fakeDb.ts` is just enough MongoDB to run a
+handler; `/api/entries`, `/api/rest` and `/api/catchup` have tests, including
+a regression for the note-wiping bug below. The rest of the handlers still
+don't. Every bug that has actually mattered on this project was found by
 probing by hand — a prompt leaking JSON field names, a model withdrawn by the
 provider, a validator whose backslashes were eaten on the way to disk. A unit
 test could not have caught any of them.

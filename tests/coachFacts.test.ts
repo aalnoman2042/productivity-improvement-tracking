@@ -72,9 +72,9 @@ function entries(): CoachEntry[] {
   return rows;
 }
 
-function build(rows = entries()) {
-  const report = buildReportCard(TRACKERS, rows, [], TODAY);
-  return buildCoachFacts(TRACKERS, rows, [], report, TODAY);
+function build(rows = entries(), rest: string[] = [], trackers = TRACKERS) {
+  const report = buildReportCard(trackers, rows, [], TODAY, rest);
+  return buildCoachFacts(trackers, rows, [], report, TODAY, rest);
 }
 
 const find = (facts: ReturnType<typeof build>["facts"], name: string) =>
@@ -154,5 +154,93 @@ describe("buildCoachFacts", () => {
     expect(study.readsAs).toBeNull();
     expect(snapshot.momentum).toBeNull();
     expect(snapshot.daysLogged).toBe(7);
+  });
+});
+
+/**
+ * The two things the coach could not see until the day they were added —
+ * and the reason each is a correctness problem rather than a nicety: without
+ * them the model reads a chosen day off as a collapse, and has no honest way
+ * to answer "will I get there?".
+ */
+describe("what the coach can see about a rest day", () => {
+  const RESTED = ["2026-08-09", "2026-08-10"];
+
+  /** The same fortnight, with nothing logged on those two days. */
+  const withGap = () => entries().filter((e) => !RESTED.includes(e.date));
+
+  it("marks the days that were taken off on purpose", () => {
+    const { facts } = build(withGap(), RESTED);
+    const off = facts.last14Days.filter((d) => d.plannedRestDay);
+    expect(off.map((d) => d.date)).toEqual(RESTED);
+    expect(facts.plannedRestDays.count).toBe(2);
+    expect(facts.plannedRestDays.days).toEqual(["Sunday 9 Aug", "Monday 10 Aug"]);
+  });
+
+  it("leaves an ordinary blank day unmarked — a gap is not a decision", () => {
+    const { facts } = build(withGap(), []);
+    expect(facts.last14Days.some((d) => d.plannedRestDay)).toBe(false);
+    expect(facts.plannedRestDays.count).toBe(0);
+  });
+
+  it("keeps the logging run whole across them", () => {
+    const rested = build(withGap(), RESTED);
+    const abandoned = build(withGap(), []);
+    // Same days logged either way — a flag can never add to a count...
+    expect(rested.snapshot.daysLogged).toBe(abandoned.snapshot.daysLogged);
+    // ...but the run the model is told about steps over the chosen days.
+    expect(rested.facts.rightNow.loggingStreak).toBe(12);
+    expect(abandoned.facts.rightNow.loggingStreak).toBe(4);
+  });
+});
+
+describe("what the coach can see about a target", () => {
+  const withTarget = (over: Partial<NonNullable<Tracker["target"]>> = {}) =>
+    TRACKERS.map((t) =>
+      t.id === "study"
+        ? {
+            ...t,
+            target: {
+              kind: "total" as const,
+              value: 3600,
+              by: "2026-09-14",
+              from: "2026-08-01",
+              ...over,
+            },
+          }
+        : t
+    );
+
+  it("hands over the aim, the pace and the date it lands on", () => {
+    const { facts } = build(entries(), [], withTarget());
+    const study = find(facts, "Self study");
+    expect(study.target).not.toBeNull();
+    expect(study.target!.aim).toBe("add up to 60h by Monday 14 Sep");
+    expect(study.target!.reached).toBe("21h");
+    expect(study.target!.remaining).toBe("39h");
+    // 21h over 14 days is 90 minutes a day; 2,340 minutes left is 26 days.
+    expect(study.target!.atThisRate).toBe("Wednesday 9 Sep");
+    expect(study.target!.readsAs).toBe("on track");
+  });
+
+  it("says a pace that misses the date misses it", () => {
+    const { facts } = build(entries(), [], withTarget({ by: "2026-08-20" }));
+    expect(find(facts, "Self study").target!.readsAs).toBe("behind");
+  });
+
+  it("refuses a date when nothing has moved", () => {
+    const { facts } = build(
+      entries().filter((e) => e.trackerId !== "study"),
+      [],
+      withTarget()
+    );
+    const study = find(facts, "Self study");
+    expect(study.target!.atThisRate).toBeNull();
+    expect(study.target!.readsAs).toBe("not moving");
+  });
+
+  it("is null on every tracker that isn't walking towards anything", () => {
+    const { facts } = build(entries(), [], withTarget());
+    expect(find(facts, "Junk food").target).toBeNull();
   });
 });

@@ -4,7 +4,7 @@ import { currentUserId } from "@/lib/session";
 import { aiBudget, hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
 import { gatherCoachFacts } from "@/lib/coachGather";
-import { askGroq, groqConfigured, GROQ_SETUP_ERROR } from "@/lib/groq";
+import { askAI, aiConfigured, AI_SETUP_ERROR } from "@/lib/ai";
 import { parseReview, type CoachSnapshot } from "@/lib/coach";
 import { buildDigest } from "@/lib/digest";
 import {
@@ -35,8 +35,9 @@ WHAT YOU ARE GIVEN (JSON)
 - week: the Monday-to-Sunday dates this review covers, and plain lines the app already computed about it.
 - data.rightNow: the day score at the end of the week, the last 7 days' average against the 7 before, and "momentum".
 - data.allTime: the report card — overall grade, graded subjects, logging history.
-- data.last14Days: this week day by day, and the week before it, with scores, goals met and sleep.
-- data.trackers: each with its goal, grade, this week against the week before, and "readsAs" — whether that change is better or worse FOR THIS HABIT.
+- data.last14Days: this week day by day, and the week before it, with scores, goals met and sleep. "plannedRestDay" marks a day taken off ON PURPOSE.
+- data.plannedRestDays: how many of those, and which.
+- data.trackers: each with its goal, grade, this week against the week before, and "readsAs" — whether that change is better or worse FOR THIS HABIT. Some carry a "target": a number to reach by a date, already worked out.
 - data.challenges: any challenge under way.
 
 ACCURACY RULES — these outrank style
@@ -47,6 +48,9 @@ ACCURACY RULES — these outrank style
 5. Never contradict "momentum" or a grade — those are computed, not opinions.
 6. If the week was barely logged, that IS the review. Say it in one line and stop; a summary of nothing is worse than nothing.
 7. A target must be BETTER than where they are now — never hand back their current average as the thing to aim for.
+
+7a. A planned rest day is a decision, not a lapse — never write it up as a missed day or a broken run. A week with two chosen days off and everything else held is a week that went well, and the record should say that.
+7b. A "target" is worked out for you: copy "reached", "remaining", "neededPerDay" and "atThisRate" exactly, and take "readsAs" as the verdict. Never work out a date yourself, and never give one when it says "not moving". In a record read months later, "eight weeks out and the pace says December" is the line that will still mean something.
 
 WHAT MAKES THIS A WEEK AND NOT A DAY
 8. Judge the week as a whole against the week before it. The story is the direction, not any single day.
@@ -119,8 +123,8 @@ export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!groqConfigured()) {
-    return NextResponse.json({ error: GROQ_SETUP_ERROR }, { status: 503 });
+  if (!aiConfigured()) {
+    return NextResponse.json({ error: AI_SETUP_ERROR }, { status: 503 });
   }
 
   const body = await req.json().catch(() => null);
@@ -189,7 +193,7 @@ export async function POST(req: Request) {
     .split("\n")
     .filter((line) => line.trim() && !line.startsWith("Tap to see"));
 
-  const answer = await askGroq({
+  const answer = await askAI({
     system: SYSTEM,
     user: JSON.stringify({
       week: { start: week.start, end: week.end, lines: digestLines },
