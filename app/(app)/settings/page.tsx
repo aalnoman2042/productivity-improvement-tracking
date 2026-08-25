@@ -7,6 +7,8 @@ import Footer from "@/components/Footer";
 import ImportBackup from "@/components/ImportBackup";
 import PasswordInput from "@/components/PasswordInput";
 import ReminderSettings from "@/components/ReminderSettings";
+import TimeValueSettings from "@/components/TimeValueSettings";
+import CardBoundary from "@/components/CardBoundary";
 import { APP_VERSION } from "@/lib/version";
 
 type Me = { id: string; name: string; email: string; admin?: boolean };
@@ -198,6 +200,16 @@ export default function SettingsPage() {
               which is in the nav — Account is back to being about the
               account. */}
           <ReminderSettings />
+
+          {/* One number, and the Stats page prices every tracked hour with
+              it. Fenced: a card about money must not be able to take the
+              password form down with it. */}
+          <CardBoundary
+            title="⏳ The price of an hour"
+            message="Couldn't load this setting. Everything else on this page is unaffected."
+          >
+            <TimeValueSettings />
+          </CardBoundary>
 
           <form
             onSubmit={changePassword}

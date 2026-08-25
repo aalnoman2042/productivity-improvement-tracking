@@ -60,6 +60,17 @@ const VALIDATORS: Record<string, object> = {
       resetExpires: { bsonType: ["date", "null"] },
       // Stamped into every session; changing the password orphans old tokens.
       passwordChangedAt: { bsonType: ["date", "null"] },
+      // What an hour of this person's life is worth to them, so the app can
+      // price the time they spend (`lib/timeValue`). Absent for everyone who
+      // never set one, and the whole feature is invisible until they do.
+      timeValue: {
+        bsonType: ["object", "null"],
+        required: ["perMinute", "currency"],
+        properties: {
+          perMinute: { bsonType: "number", minimum: 0, maximum: 10000 },
+          currency: { bsonType: "string", maxLength: 4 },
+        },
+      },
       // Nightly "did you log today?" push. The cron decides *when* it fires;
       // tzOffset only decides *which day* the reminder is about.
       reminder: {

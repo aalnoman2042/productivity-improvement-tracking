@@ -114,7 +114,7 @@ enforcing and compares it to the code.
 
 | Collection | Key fields | Unique on |
 |---|---|---|
-| `users` | email, passwordHash, `reminder{enabled,tzOffset,time,place}` | email |
+| `users` | email, passwordHash, `reminder{enabled,tzOffset,time,place}`, `timeValue{perMinute,currency}` | email |
 | `trackers` | name, type, unit, color, category, goal, `target{kind,value,by}`, habit, `reminder{times,mode}` | — |
 | `entries` | trackerId, date, value, `meta`, note | (userId, trackerId, date) |
 | `dayNotes` | date, text | (userId, date) |
@@ -312,7 +312,7 @@ schedule that needs polling more often says so.
 
 ## 11. Testing, and its honest limits
 
-479 tests. `npm test`.
+503 tests. `npm test`.
 
 **What used to be missing, and now partly isn't.** For most of this
 project's life not one route handler had a test, and the reason was mundane:
@@ -377,7 +377,11 @@ quietly would be worse than failing loudly.
 14. **A projection is drawn from movement that happened.** No movement, or
     movement away from the target, means no arrival date at all — the card
     says so rather than printing something reassuring (`lib/targets`).
-15. **The catch-up screen offers taps only.** Reconstructing a yes/no from
+15. **An hour is only priced at a price its owner set,** and what counts
+    as time badly spent is only ever the habit flag they set too. The app
+    never decides either. Sleep is priced in the total and judged in
+    neither column — see `lib/timeValue`.
+16. **The catch-up screen offers taps only.** Reconstructing a yes/no from
     memory is honest; typing last Tuesday's sleep is invention, and this app
     would rather keep a gap than gain a made-up number.
 

@@ -17,6 +17,7 @@ import { useCached } from "@/lib/useCached";
 import type { Stats, Summary } from "@/lib/stats";
 import { seriesColor } from "@/lib/palette";
 import Correlations from "@/components/Correlations";
+import TimeWorth from "@/components/TimeWorth";
 import CardBoundary from "@/components/CardBoundary";
 import MotivationLine from "@/components/MotivationLine";
 import { nightLabel, shiftLabel } from "@/lib/clock";
@@ -803,6 +804,17 @@ export default function DashboardPage() {
               ))}
             </section>
           )}
+
+          {/* The foot of the page, and deliberately last: every card above
+              says how much you did, and this one says what it was worth.
+              Fenced like the rest — a price nobody set must cost this page
+              nothing at all. */}
+          <CardBoundary
+            title="⏳ What your time was worth"
+            message="Couldn't price your time. Everything else on this page is unaffected."
+          >
+            <TimeWorth period={period} />
+          </CardBoundary>
         </>
       )}
     </div>
