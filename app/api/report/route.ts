@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const [trackerDocs, entryDocs, challengeDocs] = await Promise.all([
+  const [trackerDocs, entryDocs, challengeDocs, restDocs] = await Promise.all([
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     // Every entry ever, but only the three fields the grading reads.
     d
@@ -37,6 +37,12 @@ export async function GET(req: Request) {
       )
       .toArray(),
     d.collection("challenges").find({ userId }).toArray(),
+    // Days taken off on purpose. They add nothing to any count — they only
+    // stop a run reading a planned Sunday as the week it fell apart.
+    d
+      .collection("restDays")
+      .find({ userId, date: { $lte: today } }, { projection: { date: 1, _id: 0 } })
+      .toArray(),
   ]);
 
   const entries: ReportEntry[] = entryDocs.map((e) => ({
@@ -53,6 +59,12 @@ export async function GET(req: Request) {
   }));
 
   return NextResponse.json(
-    buildReportCard(trackerDocs.map(toTracker), entries, challenges, today)
+    buildReportCard(
+      trackerDocs.map(toTracker),
+      entries,
+      challenges,
+      today,
+      restDocs.map((r) => String(r.date))
+    )
   );
 }

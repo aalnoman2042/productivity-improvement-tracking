@@ -218,6 +218,9 @@ const DAY_WRITES = [
   "/api/entries",
   "/api/entries/increment",
   "/api/notes",
+  // A rest day is a flag on a date, so a queued one could bring back a day
+  // that was deleted while offline.
+  "/api/rest",
   // Adding a task carries its date, so a queued one could bring back a day
   // that was deleted while offline. (Ticking and removing a task address it
   // by id at /api/tasks/<id> and carry no date, so they can't resurrect a

@@ -1,4 +1,4 @@
-import { addDays, prettyDate } from "./dates";
+import { prettyDate } from "./dates";
 import { crossedRecently } from "./milestones";
 
 /**
@@ -102,8 +102,10 @@ export function lapseMessage(days: number, lastDate: string | null): Stake {
   return {
     kind: "plain",
     title: `${days} days quiet`,
-    body: `Nothing since ${prettyDate(lastDate)}. Even one tracker tonight keeps the record honest.`,
-    url: "/",
+    body: `Nothing since ${prettyDate(lastDate)}. The blank days are in one list — taps, or mark them off.`,
+    // A gap of a few days is the one this app can actually close, so this
+    // message lands on the screen built for it rather than on today's log.
+    url: "/catchup",
   };
 }
 
@@ -111,18 +113,11 @@ export function lapseMessage(days: number, lastDate: string | null): Stake {
  * Consecutive days with something logged, ending today — or ending yesterday
  * when today is still blank, which is the case the reminder exists for.
  *
- * Same rule as the report card's `currentStreak`: today not being filled in
- * yet doesn't end the run, because the day isn't over.
+ * Re-exported rather than written here: the report card needs the same
+ * answer, and a planned rest day has to step over the gap in both. One
+ * definition lives in `lib/rest`.
  */
-export function loggingRun(logged: Set<string>, today: string): number {
-  let n = 0;
-  let cursor = logged.has(today) ? today : addDays(today, -1);
-  while (logged.has(cursor)) {
-    n++;
-    cursor = addDays(cursor, -1);
-  }
-  return n;
-}
+export { loggingRun } from "./rest";
 
 /** The generic ask — the wording the reminder has always used. */
 function plain(date: string): Stake {

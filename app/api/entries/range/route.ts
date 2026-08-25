@@ -134,6 +134,9 @@ export async function POST(req: Request) {
   // Same reasoning for the to-do list: a day that no longer exists cannot
   // still have things you were supposed to do on it.
   const tasks = await d.collection("tasks").deleteMany(filter);
+  // And the days marked off: a rest day is a statement about a day that
+  // existed, so it goes when the day does.
+  const rests = await d.collection("restDays").deleteMany(filter);
 
   return NextResponse.json({
     ok: true,
@@ -141,6 +144,7 @@ export async function POST(req: Request) {
     entries: res.deletedCount,
     notes: notes.deletedCount,
     tasks: tasks.deletedCount,
+    rests: rests.deletedCount,
     dates: dates.sort(),
   });
 }

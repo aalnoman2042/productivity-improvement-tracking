@@ -42,7 +42,8 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const [user, trackerDocs, entryDocs, noteDocs, bookDocs, taskDocs] = await Promise.all([
+  const [user, trackerDocs, entryDocs, noteDocs, bookDocs, taskDocs, restDocs] =
+    await Promise.all([
     d.collection("users").findOne(
       { _id: userId },
       { projection: { name: 1, email: 1, createdAt: 1 } }
@@ -52,6 +53,7 @@ export async function GET(req: Request) {
     d.collection("dayNotes").find({ userId }).sort({ date: 1 }).toArray(),
     d.collection("books").find({ userId }).sort({ createdAt: 1 }).toArray(),
     d.collection("tasks").find({ userId }).sort({ date: 1, order: 1 }).toArray(),
+    d.collection("restDays").find({ userId }).sort({ date: 1 }).toArray(),
   ]);
 
   const trackers = trackerDocs.map(toTracker);
@@ -82,6 +84,13 @@ export async function GET(req: Request) {
         text: String(t.text),
         done: Boolean(t.done),
         order: Number(t.order ?? 0),
+      })),
+      // Days taken off on purpose. They hold no data at all, and that is
+      // exactly why they have to travel: restore without them and every
+      // planned rest reads as the week somebody quit.
+      restDays: restDocs.map((r) => ({
+        date: String(r.date),
+        reason: (r.reason as string | null) ?? null,
       })),
       entries: entryDocs.map((e) => ({
         trackerId: String(e.trackerId),

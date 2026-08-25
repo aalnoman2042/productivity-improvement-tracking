@@ -1,4 +1,5 @@
 import { addDays } from "./dates";
+import { NO_REST } from "./rest";
 import type { TrackerType } from "./trackers";
 
 /**
@@ -34,6 +35,9 @@ export type ChallengeRow = Challenge & {
   } | null;
   /** Logged values within [startDate, end], keyed by date. */
   values: Record<string, number>;
+  /** Days inside the window that were deliberately taken off. Sent with the
+   * row so the page can judge a window without a second request. */
+  rest?: string[];
 };
 
 /** The durations offered as one-tap chips; any length can still be typed. */
@@ -80,6 +84,9 @@ export type ChallengeProgress = {
   /** Days that failed for good. Today isn't counted against you while it
    * can still be logged — only once the day is over. */
   missed: number;
+  /** Days inside the window that were marked as a planned rest: not met,
+   * not missed. A rest bridges a challenge; it never completes a day of it. */
+  rested: number;
   /** Today is inside the window and already met. */
   todayMet: boolean;
   /** Nothing missed so far. */
@@ -92,7 +99,13 @@ export function challengeProgress(
   c: Pick<Challenge, "startDate" | "days" | "target" | "direction"> & {
     values: Record<string, number>;
   },
-  today: string
+  today: string,
+  /**
+   * Days taken off on purpose. A rest day inside the window is neither met
+   * nor missed — the run survives it, and nothing is credited for it, so
+   * `pct` still counts only the days the thing actually happened.
+   */
+  rest: ReadonlySet<string> = NO_REST
 ): ChallengeProgress {
   const end = challengeEnd(c);
 
@@ -103,6 +116,7 @@ export function challengeProgress(
       dayNumber: 0,
       met: 0,
       missed: 0,
+      rested: 0,
       todayMet: false,
       perfect: true,
       pct: 0,
@@ -112,6 +126,7 @@ export function challengeProgress(
   const over = today > end;
   let met = 0;
   let missed = 0;
+  let rested = 0;
   let dayNumber = 0;
   let todayMet = false;
 
@@ -124,6 +139,8 @@ export function challengeProgress(
       continue;
     }
     if (dayMet(c, c.values[d])) met++;
+    // A day taken off on purpose is not a day the challenge fell over.
+    else if (rest.has(d)) rested++;
     else missed++;
   }
   if (over) dayNumber = c.days;
@@ -137,6 +154,7 @@ export function challengeProgress(
     dayNumber,
     met,
     missed,
+    rested,
     todayMet,
     perfect: missed === 0,
     pct: Math.round((met / c.days) * 100),

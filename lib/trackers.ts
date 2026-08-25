@@ -1,3 +1,5 @@
+import type { Target } from "./targets";
+
 export type TrackerType =
   | "duration"
   | "sleep"
@@ -38,6 +40,13 @@ export type Tracker = {
   reminder?: string[] | null;
   /** "prayer" means those times are recomputed from the sun each day. */
   reminderMode?: "fixed" | "prayer" | null;
+  /**
+   * A number to reach by a date — "70 kg by December", "20 books this year".
+   * The daily `goal` above is a habit; this is an ambition, and they are
+   * kept apart because one is judged every night and the other only when it
+   * lands. See `lib/targets`.
+   */
+  target?: Target | null;
   archived: boolean;
   order: number;
 };

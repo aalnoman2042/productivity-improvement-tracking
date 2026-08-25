@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
 import { useCached } from "@/lib/useCached";
+import type { Target } from "@/lib/targets";
 import { useSearchParams } from "next/navigation";
 import Books from "@/components/Books";
 import Challenges from "@/components/Challenges";
@@ -51,6 +52,11 @@ type Form = {
   goalTarget: string;
   goalPeriod: "day" | "week";
   goalDirection: "min" | "max";
+  /** A number to reach by a date — the ambition, not the daily habit. */
+  targetOn: boolean;
+  targetKind: "total" | "level";
+  targetValue: string;
+  targetBy: string;
   remindOn: boolean;
   remindTimes: string[];
   /** "prayer" hands the times over to the sun; see lib/prayerTimes. */
@@ -69,6 +75,10 @@ const BLANK: Form = {
   goalTarget: "",
   goalPeriod: "day",
   goalDirection: "min",
+  targetOn: false,
+  targetKind: "total",
+  targetValue: "",
+  targetBy: "",
   remindOn: false,
   remindTimes: ["20:00"],
   remindMode: "fixed",
@@ -85,6 +95,38 @@ function goalFromForm(f: Form): Goal {
     target: isTime ? Math.round(raw * 60) : raw,
     period: f.goalPeriod,
     direction: f.goalDirection,
+  };
+}
+
+/**
+ * A target as the form holds it. Time trackers are typed in hours here for
+ * the same reason goals are — nobody thinks in 6,000 minutes — and stored in
+ * minutes, so every number in the database means one thing.
+ */
+function targetFromForm(f: Form): Target | null {
+  if (!f.targetOn) return null;
+  const raw = parseFloat(f.targetValue);
+  if (!Number.isFinite(raw) || raw < 0) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.targetBy)) return null;
+  const isTime = f.type === "duration" || f.type === "sleep";
+  return {
+    kind: f.targetKind,
+    value: isTime ? Math.round(raw * 60) : raw,
+    by: f.targetBy,
+    // Counted from the day it was set: a total target that swallowed a year
+    // of history would be finished before it began.
+    from: f.targetKind === "total" ? toDateStr(new Date()) : null,
+  };
+}
+
+function targetToForm(t: Tracker): Partial<Form> {
+  if (!t.target) return { targetOn: false, targetValue: "", targetBy: "" };
+  const isTime = t.type === "duration" || t.type === "sleep";
+  return {
+    targetOn: true,
+    targetKind: t.target.kind,
+    targetValue: String(isTime ? t.target.value / 60 : t.target.value),
+    targetBy: t.target.by,
   };
 }
 
@@ -115,6 +157,17 @@ function goalToForm(t: Tracker): Partial<Form> {
     goalPeriod: t.goal.period,
     goalDirection: t.goal.direction,
   };
+}
+
+/** The ambition, said the way the list says the goal. */
+function targetLabel(t: Tracker): string | null {
+  if (!t.target) return null;
+  const isTime = t.type === "duration" || t.type === "sleep";
+  const amount = isTime
+    ? `${Math.round((t.target.value / 60) * 10) / 10}h`
+    : `${t.target.value}${t.unit ? " " + t.unit : ""}`;
+  const verb = t.target.kind === "total" ? "" : "to ";
+  return `🎯 ${verb}${amount} by ${prettyDate(t.target.by)}`;
 }
 
 function goalLabel(t: Tracker): string | null {
@@ -198,6 +251,7 @@ function TrackersList() {
       remindMode: t.reminderMode === "prayer" ? "prayer" : "fixed",
       place: place,
       ...goalToForm(t),
+      ...targetToForm(t),
     } as Form);
     setEditingId(t.id);
     setCustomCategory(false);
@@ -218,6 +272,7 @@ function TrackersList() {
       color: form.color,
       habit: form.habit,
       goal: goalFromForm(form),
+      target: targetFromForm(form),
       reminder: form.remindOn ? remindTimesToSend(form) : null,
       reminderMode: form.remindMode,
       // Only sent when it is being used, so an ordinary tracker edit can
@@ -739,6 +794,77 @@ function TrackersList() {
             )}
           </div>
 
+          {/* The other kind of number: one with a date on it. A daily goal
+              asks "did you today?"; this asks "will you get there?" — and the
+              answer is drawn from your own pace, never a wish. Hidden for the
+              types where it means nothing: a yes/no tracker has no level to
+              reach, and a clean streak's target is the streak. */}
+          <div
+            className={`rounded-md border border-edge p-3 ${
+              form.type === "streak" || form.type === "check" ? "hidden" : ""
+            }`}
+          >
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={form.targetOn}
+                onChange={(e) => setF("targetOn", e.target.checked)}
+              />
+              Aiming at something by a date
+            </label>
+            {form.targetOn && (
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { value: "total", label: "Add up to" },
+                      { value: "level", label: "Get to" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setF("targetKind", opt.value)}
+                      className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
+                        form.targetKind === opt.value
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-edge text-secondary hover:bg-surface-2"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    inputMode="decimal"
+                    value={form.targetValue}
+                    onChange={(e) => setF("targetValue", e.target.value)}
+                    placeholder="0"
+                    aria-label="Target"
+                    className="w-24 rounded-md border border-edge bg-transparent px-2 py-1.5 text-right"
+                  />
+                  <span className="text-sm text-secondary">
+                    {isTimeType ? "hours" : form.unit || "×"}
+                  </span>
+                  <span className="text-sm text-secondary">by</span>
+                  <input
+                    type="date"
+                    value={form.targetBy}
+                    onChange={(e) => setF("targetBy", e.target.value)}
+                    aria-label="By when"
+                    className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <p className="text-xs text-muted">
+                  {form.targetKind === "total"
+                    ? "Counts from today onwards — 20 books this year, 100 hours before the exam."
+                    : "The reading itself — 70 kg by December. Which way is up is worked out from where you start."}
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="rounded-md border border-edge p-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
@@ -980,6 +1106,7 @@ function TrackersList() {
                       <div className="text-xs text-muted">
                         {typeMeta(t.type as TrackerType).label}
                         {goalLabel(t) ? ` · ${goalLabel(t)}` : ""}
+                        {targetLabel(t) ? ` · ${targetLabel(t)}` : ""}
                         {t.reminder?.length
                           ? t.reminderMode === "prayer"
                             ? " · 🕌 every waqt"

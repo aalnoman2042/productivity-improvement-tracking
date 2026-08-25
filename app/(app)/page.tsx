@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import DayDial from "@/components/DayDial";
 import DayNotes from "@/components/DayNotes";
 import DayTasks from "@/components/DayTasks";
+import RestDay from "@/components/RestDay";
 import CardBoundary from "@/components/CardBoundary";
 import DeleteDays from "@/components/DeleteDays";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -544,6 +545,15 @@ function TodayLog() {
             Tomorrow
           </button>
         </div>
+
+        {/* A day you meant to take off. Not offered for a day that hasn't
+            started — you cannot have rested through it yet. It records
+            nothing and moves no number; see components/RestDay. */}
+        {!planning && (
+          <CardBoundary title="🌙 Rest day">
+            <RestDay date={date} />
+          </CardBoundary>
+        )}
       </div>
 
       {planning ? (

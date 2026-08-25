@@ -1,5 +1,6 @@
 import { addDays, bucketOf, bucketsForRange, daysBetween } from "./dates";
 import { challengeProgress } from "./challenges";
+import { bestRun, loggingRun } from "./rest";
 import { categoryMeta, type Goal } from "./trackers";
 
 /**
@@ -239,7 +240,9 @@ export function buildReportCard(
   trackers: ReportTracker[],
   entries: ReportEntry[],
   challenges: ReportChallenge[],
-  today: string
+  today: string,
+  /** Days taken off on purpose — they bridge a run rather than ending it. */
+  restDays: Iterable<string> = []
 ): ReportCard {
   const empty: ReportCard = {
     hasData: false,
@@ -272,24 +275,13 @@ export function buildReportCard(
   const firstDate = sorted[0];
   const spanDays = daysBetween(firstDate, today) + 1;
 
-  // Longest run of consecutive logged days, ever.
-  let bestStreak = 0;
-  let run = 0;
-  let prev: string | null = null;
-  for (const d of sorted) {
-    run = prev !== null && addDays(prev, 1) === d ? run + 1 : 1;
-    if (run > bestStreak) bestStreak = run;
-    prev = d;
-  }
-
-  // And the run that's alive right now. Today not being logged yet doesn't
-  // break it — the day isn't over.
-  let currentStreak = 0;
-  let cursor = dates.has(today) ? today : addDays(today, -1);
-  while (dates.has(cursor)) {
-    currentStreak++;
-    cursor = addDays(cursor, -1);
-  }
+  // Longest run of logged days ever, and the one alive right now — both
+  // from `lib/rest`, so a planned rest day is stepped over here exactly as
+  // it is in tonight's reminder. Today not being logged yet doesn't break a
+  // run either: the day isn't over.
+  const rest = new Set(restDays);
+  const bestStreak = bestRun(sorted, rest);
+  const currentStreak = loggingRun(dates, today, rest);
 
   const durationIds = new Set(
     trackers.filter((t) => t.type === "duration").map((t) => t.id)

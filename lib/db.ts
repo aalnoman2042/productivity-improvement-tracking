@@ -127,6 +127,23 @@ const VALIDATORS: Record<string, object> = {
           direction: { enum: ["min", "max"] },
         },
       },
+      // A number to reach by a date, which is a different question from the
+      // daily goal above: "total" adds up (20 books this year), "level" is
+      // arrived at (70 kg by December). Null on almost every tracker.
+      target: {
+        bsonType: ["object", "null"],
+        required: ["kind", "value", "by"],
+        properties: {
+          kind: { enum: ["total", "level"] },
+          value: { bsonType: "number", minimum: 0 },
+          by: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          // When the count started. Null means "from the first day logged".
+          from: {
+            bsonType: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+          },
+        },
+      },
       // Good habits are built up, bad ones cut down — growth on a bad one
       // reads as falling behind. Absent on old rows, which read as "good".
       habit: { enum: ["good", "bad", null] },
@@ -346,6 +363,20 @@ const VALIDATORS: Record<string, object> = {
       updatedAt: { bsonType: ["date", "null"] },
     },
   },
+  // A day taken off on purpose. Deliberately its own collection and not a
+  // flag on an entry: there is no entry — that is the whole point. It marks
+  // a day the reader chose to skip, so a run can step over it (`lib/rest`),
+  // and it can never add to a count.
+  restDays: {
+    bsonType: "object",
+    required: ["userId", "date", "createdAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      date: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      reason: { bsonType: ["string", "null"], maxLength: 120 },
+      createdAt: { bsonType: "date" },
+    },
+  },
   // Attempt counters for the routes reachable without a session. `_id` is
   // "action:subject" and rows delete themselves once the window has passed.
   rateLimits: {
@@ -417,6 +448,8 @@ async function ensureSchema(d: Db): Promise<void> {
     d.collection("dayNotes").createIndex({ userId: 1, date: 1 }, { unique: true }),
     // Many tasks per day, read a day at a time. Not unique, unlike the note.
     d.collection("tasks").createIndex({ userId: 1, date: 1 }),
+    // One rest day per date per person — the write is an upsert on this.
+    d.collection("restDays").createIndex({ userId: 1, date: 1 }, { unique: true }),
     d.collection("books").createIndex({ userId: 1, createdAt: -1 }),
     d.collection("aiReviews").createIndex({ userId: 1, createdAt: -1 }),
     // One review per week per person — the write is an upsert on exactly this.

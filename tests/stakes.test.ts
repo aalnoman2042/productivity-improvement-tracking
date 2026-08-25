@@ -161,7 +161,9 @@ describe("lapseMessage", () => {
     const m = lapseMessage(3, "2026-08-19");
     expect(m.title).toContain("3 days");
     expect(m.body).toContain("19 Aug");
-    expect(m.url).toBe("/");
+    // A short gap is the one that can still be closed, so this one lands on
+    // the catch-up screen rather than on today's log.
+    expect(m.url).toBe("/catchup");
   });
 
   it("softens as the gap grows instead of shouting louder", () => {

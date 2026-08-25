@@ -7,6 +7,7 @@ import { parseMeta } from "@/lib/entryMeta";
 import { clampRead, normalizeStatus, parsePages, parseRating } from "@/lib/books";
 import { parseAuthor, parseBookNote, parseTitle } from "@/lib/bookDoc";
 import { parseComments } from "@/lib/bookComments";
+import { cleanRestReason } from "@/lib/rest";
 import { MAX_DAY_NOTE, cleanNote } from "@/lib/notes";
 import { cleanTask } from "@/lib/tasks";
 import { parseGoal } from "@/lib/trackerDoc";
@@ -177,6 +178,31 @@ export async function POST(req: Request) {
     await d.collection("dayNotes").bulkWrite(noteOps.slice(i, i + 1000));
   }
 
+  // --- Days taken off on purpose ------------------------------------------
+  let restsImported = 0;
+  const inRest = Array.isArray(body?.restDays)
+    ? body.restDays.slice(0, MAX_DAY_NOTES)
+    : [];
+  const restOps: AnyBulkWriteOperation[] = [];
+  for (const r of inRest) {
+    const date = r?.date;
+    if (!isValidDateStr(date)) continue;
+    restOps.push({
+      updateOne: {
+        filter: { userId, date },
+        update: {
+          $set: { reason: cleanRestReason(r?.reason) },
+          $setOnInsert: { createdAt: now },
+        },
+        upsert: true,
+      },
+    });
+    restsImported++;
+  }
+  for (let i = 0; i < restOps.length; i += 1000) {
+    await d.collection("restDays").bulkWrite(restOps.slice(i, i + 1000));
+  }
+
   // --- The to-do lists ----------------------------------------------------
   // Matched on (date, text), so importing the same backup twice leaves one
   // copy of each task rather than two — the same rule the bookshelf uses,
@@ -250,6 +276,7 @@ export async function POST(req: Request) {
     trackers: { created: trackersCreated, matched: trackersMatched },
     entries: { imported: entriesUpserted, skipped: entriesSkipped },
     dayNotes: { imported: notesImported },
+    restDays: { imported: restsImported },
     books: { imported: booksImported },
     tasks: { imported: tasksImported },
   });

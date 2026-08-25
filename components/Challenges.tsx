@@ -346,7 +346,9 @@ export default function Challenges({
       {challenges.length > 0 && (
         <ul className="stagger space-y-2">
           {challenges.map((c) => {
-            const p = challengeProgress(c, today);
+            // A day marked off on purpose is not a day this fell over — the
+            // rest days ride along with the row for exactly this.
+            const p = challengeProgress(c, today, new Set(c.rest ?? []));
             const barColor =
               p.status === "completed"
                 ? "bg-green-700"

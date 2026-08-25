@@ -95,6 +95,18 @@ async function gatherStake(
 
   const loggedDates = new Set(windowRows.map((e) => String(e.date)));
 
+  // A planned rest day bridges the logging run rather than ending it — so
+  // tonight's message must not tell somebody their streak is about to break
+  // over a day they deliberately took off.
+  const restRows = await d
+    .collection("restDays")
+    .find(
+      { userId, date: { $gte: since, $lte: date } },
+      { projection: { date: 1, _id: 0 } }
+    )
+    .toArray();
+  const rest = new Set(restRows.map((r) => String(r.date)));
+
   const streaks = trackerDocs
     .filter((t) => t.type === "streak")
     .map((t) => {
@@ -123,7 +135,8 @@ async function gatherStake(
         direction: c.direction === "max" ? "max" : "min",
         values,
       },
-      date
+      date,
+      rest
     );
     return {
       name: String(c.name),
@@ -137,7 +150,7 @@ async function gatherStake(
   return {
     date,
     loggedToday: loggedDates.has(date),
-    loggingStreak: loggingRun(loggedDates, date),
+    loggingStreak: loggingRun(loggedDates, date, rest),
     streaks,
     challenges,
   };

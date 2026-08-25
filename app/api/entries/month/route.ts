@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const { start, end } = monthRange(month);
   const d = await db();
 
-  const [trackerDocs, rows, noteRows, taskRows] = await Promise.all([
+  const [trackerDocs, rows, noteRows, taskRows, restRows] = await Promise.all([
     d.collection("trackers").find({ userId }).toArray(),
     d
       .collection("entries")
@@ -59,7 +59,17 @@ export async function GET(req: Request) {
         { projection: { date: 1, done: 1, _id: 0 } }
       )
       .toArray(),
+    // Days deliberately taken off. Nothing about them is a number; the
+    // square says so and the month's run steps over them.
+    d
+      .collection("restDays")
+      .find(
+        { userId, date: { $gte: start, $lte: end } },
+        { projection: { date: 1, _id: 0 } }
+      )
+      .toArray(),
   ]);
+  const rested = new Set(restRows.map((r) => String(r.date)));
   const dayNotes = new Map(
     noteRows.map((n) => [String(n.date), String(n.text ?? "")])
   );
@@ -133,9 +143,13 @@ export async function GET(req: Request) {
       notes: slot?.notes ?? [],
       dayNote: dayNotes.get(date) ?? null,
       tasks: taskCounts.get(date) ?? { total: 0, done: 0 },
+      rest: rested.has(date),
     });
 
-    run = logged > 0 ? run + 1 : 0;
+    // A planned rest neither extends the run nor ends it — same rule as
+    // `lib/rest`, which is what every other run in the app is measured by.
+    if (logged > 0) run += 1;
+    else if (!rested.has(date)) run = 0;
     if (run > bestRun) bestRun = run;
   }
 

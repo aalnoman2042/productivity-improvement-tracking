@@ -22,6 +22,14 @@ export type MonthDay = {
    * that hides it makes you open days to find out.
    */
   tasks: { total: number; done: number };
+  /**
+   * A day taken off on purpose.
+   *
+   * It counts towards nothing — not days logged, not a goal, not the score.
+   * It is drawn so an empty square can say *why* it is empty, and so the
+   * month's run can step over it the way `lib/rest` does everywhere else.
+   */
+  rest: boolean;
 };
 
 export type MonthSummary = {

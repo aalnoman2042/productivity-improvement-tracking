@@ -1,5 +1,6 @@
 import type { Document, WithId } from "mongodb";
 import type { Goal, Habit } from "./trackers";
+import { parseTarget, type Target } from "./targets";
 
 /**
  * Converting a stored tracker to the shape the client sees, and validating a
@@ -31,10 +32,15 @@ export function toTracker(doc: WithId<Document>) {
       : null) as "fixed" | "prayer" | null,
     // Trackers from before the field read as "good" — how they always behaved.
     habit: (doc.habit === "bad" ? "bad" : "good") as Habit,
+    // Null on every tracker that isn't walking towards anything, which is
+    // most of them: a target is the exception, not the default.
+    target: parseTarget(doc.target) as Target | null,
     archived: Boolean(doc.archived),
     order: Number(doc.order ?? 0),
   };
 }
+
+export { parseTarget } from "./targets";
 
 /** Validate an incoming habit flag; anything unclear is "good". */
 export function parseHabit(raw: unknown): Habit {

@@ -7,6 +7,7 @@ import PeriodCompare from "@/components/PeriodCompare";
 import MotivationLine from "@/components/MotivationLine";
 import NoteSearch from "@/components/NoteSearch";
 import CardBoundary from "@/components/CardBoundary";
+import YearPixels from "@/components/YearPixels";
 import LoadError from "@/components/LoadError";
 import {
   WEEKDAY_INITIALS,
@@ -57,7 +58,7 @@ function Day({
       href={`/?date=${date}`}
       aria-disabled={future}
       tabIndex={future ? -1 : undefined}
-      title={`${prettyDate(date)} — ${future ? "not yet" : dayLabel(day, trackers)}${
+      title={`${prettyDate(date)} — ${future ? "not yet" : day?.rest ? "a day off, on purpose" : dayLabel(day, trackers)}${
         (day?.tasks?.total ?? 0) > 0
           ? ` · ${day!.tasks.done}/${day!.tasks.total} done from the list`
           : ""
@@ -92,6 +93,17 @@ function Day({
           aria-hidden="true"
           className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500"
         />
+      )}
+      {/* A day taken off on purpose. Bottom-right, out of the way of the
+          note's dot and the list's tick — an empty square that says why it
+          is empty, and counts for exactly nothing. */}
+      {day?.rest && (
+        <span
+          aria-hidden="true"
+          className="absolute right-1 bottom-0.5 text-[9px] leading-none"
+        >
+          🌙
+        </span>
       )}
       {/* And a tick for a day that had a list. Filled once everything on it
           was done, hollow while something was still owed — the one thing a
@@ -201,6 +213,12 @@ export default function HistoryPage() {
 
       {/* Above the calendar, because "when did I write that?" is a question
           about all of it, not about the month being browsed. */}
+      {/* The whole year in one look, under the month you are reading. Not a
+          grade and not a streak — the shape of the record itself. */}
+      <CardBoundary title="🟩 The year, a day at a time">
+        <YearPixels />
+      </CardBoundary>
+
       <CardBoundary title="📝 Search your notes">
         <NoteSearch />
       </CardBoundary>

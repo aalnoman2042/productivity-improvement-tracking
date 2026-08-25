@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { toTracker, parseGoal, parseHabit } from "@/lib/trackerDoc";
+import { toTracker, parseGoal, parseHabit, parseTarget } from "@/lib/trackerDoc";
 import { parseReminderMode, parseReminderTimes } from "@/lib/trackerReminders";
 import { parsePlace } from "@/lib/prayerTimes";
 import { TEMPLATE_PACKS, TRACKER_TYPES, normalizeCategory } from "@/lib/trackers";
@@ -95,6 +95,7 @@ export async function POST(req: Request) {
     color,
     category,
     goal: parseGoal(body?.goal),
+    target: parseTarget(body?.target),
     habit: parseHabit(body?.habit),
     reminder: (() => {
       const times = parseReminderTimes(body?.reminder);

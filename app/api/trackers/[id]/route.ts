@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
-import { parseGoal, parseHabit } from "@/lib/trackerDoc";
+import { parseGoal, parseHabit, parseTarget } from "@/lib/trackerDoc";
 import { parseReminderMode, parseReminderTimes } from "@/lib/trackerReminders";
 import { parsePlace } from "@/lib/prayerTimes";
 
@@ -34,6 +34,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (typeof body.archived === "boolean") set.archived = body.archived;
   if ("goal" in body) set.goal = parseGoal(body.goal);
+  if ("target" in body) set.target = parseTarget(body.target);
   if ("habit" in body) set.habit = parseHabit(body.habit);
   if ("reminder" in body) {
     const times = parseReminderTimes(body.reminder);

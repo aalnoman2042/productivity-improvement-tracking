@@ -73,6 +73,7 @@ app/
     tracker/[id]/   one tracker's whole story
     settings/       account, reminders, data
     admin/          owner-only counts, health, and the 🔔 nudge
+    catchup/        the blank days, in one list, answerable in taps
   start/            first-run tour (signed in, outside the app shell)
   welcome/          the signed-out pitch, served at / by a proxy rewrite
   login|signup|forgot|reset/
@@ -84,7 +85,13 @@ app/
 components/         client components; presentation and interaction
 lib/                pure logic, shared helpers, and the database
                     (e.g. nudge.ts — how one hand-sent push is worded;
-                     bookComments.ts — what you made of a book, as you went)
+                     bookComments.ts — what you made of a book, as you went;
+                     rest.ts — what a run may step over, and the one
+                       definition of a run in the codebase;
+                     catchup.ts — which days are blank, and never today;
+                     targets.ts — a number with a date on it, and the
+                       arrival date your own pace implies;
+                     pixels.ts — a year laid out as calendar weeks)
 tests/              vitest specs, one per lib module
 scripts/            one-off tools (icons, VAPID keys, demo seed, db check)
 public/sw.js        the service worker
@@ -99,7 +106,7 @@ there even when only two routes need it. Components render; they don't decide.
 
 ## 5. Data model
 
-Twelve collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
+Thirteen collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
 so the BSON types stay honest (real `ObjectId` refs, real `Date`s, real
 booleans). Collections self-create on first write — there is never any manual
 Atlas work. `npm run check:db` reads back what the cluster is actually
@@ -108,7 +115,7 @@ enforcing and compares it to the code.
 | Collection | Key fields | Unique on |
 |---|---|---|
 | `users` | email, passwordHash, `reminder{enabled,tzOffset,time,place}` | email |
-| `trackers` | name, type, unit, color, category, goal, habit, `reminder{times,mode}` | — |
+| `trackers` | name, type, unit, color, category, goal, `target{kind,value,by}`, habit, `reminder{times,mode}` | — |
 | `entries` | trackerId, date, value, `meta`, note | (userId, trackerId, date) |
 | `dayNotes` | date, text | (userId, date) |
 | `tasks` | date, text, done, order | — (many per day) |
@@ -116,9 +123,16 @@ enforcing and compares it to the code.
 | `challenges` | trackerId, startDate, days, target, direction | — |
 | `aiReviews` | text, snapshot, today, model | — (latest wins) |
 | `weeklyReviews` | weekStart, weekEnd, text, snapshot, digest | (userId, weekEnd) |
+| `restDays` | date, reason | (userId, date) |
 | `pushSubs` | endpoint, keys | endpoint |
 | `rateLimits` | count, resetAt | `_id` = `action:subject` (TTL) |
 | `cronRuns` | job, startedAt, result | — (TTL, 30 days) |
+
+`restDays` is the odd one out and the point of it: a row there records
+that a day was **deliberately** empty. It adds to nothing — not days logged,
+not the score, not a grade — and the only thing it changes is that a *run*
+may step over it (`lib/rest`). A planned Sunday is not the week you quit,
+and an app that cannot tell them apart teaches you to log a lie.
 
 **The three that deliberately touch no number** — `dayNotes`, `tasks` and
 `books` (comments included: they are added and removed, never edited, each
@@ -298,7 +312,7 @@ schedule that needs polling more often says so.
 
 ## 11. Testing, and its honest limits
 
-381 tests, one spec per `lib/` module, all pure. `npm test`.
+437 tests, one spec per `lib/` module, all pure. `npm test`.
 
 **What is not covered, stated plainly:** not one of the ~47 route handlers
 has a test. Every bug that has actually mattered on this project was found by
@@ -351,6 +365,15 @@ quietly would be worse than failing loudly.
 12. **Reminders off means the app stops asking, not that the device is
     gone.** The subscription survives the switch; only unregistering the
     device ends delivery entirely.
+13. **A rest day bridges a run; it never lengthens one.** It is a flag with
+    no value attached, so it cannot add to days logged, a score, a grade or
+    a challenge's `met` — it can only stop a gap reading as a collapse.
+14. **A projection is drawn from movement that happened.** No movement, or
+    movement away from the target, means no arrival date at all — the card
+    says so rather than printing something reassuring (`lib/targets`).
+15. **The catch-up screen offers taps only.** Reconstructing a yes/no from
+    memory is honest; typing last Tuesday's sleep is invention, and this app
+    would rather keep a gap than gain a made-up number.
 
 ---
 

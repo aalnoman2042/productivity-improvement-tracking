@@ -57,6 +57,18 @@ export async function GET() {
     )
     .toArray();
 
+  // Every rest day from the earliest challenge onwards, so the client can
+  // judge a window without a second request. A day off is not a day the
+  // challenge fell over.
+  const firstStart = docs
+    .map((c) => String(c.startDate))
+    .reduce((a, b) => (a < b ? a : b));
+  const restRows = await d
+    .collection("restDays")
+    .find({ userId, date: { $gte: firstStart } }, { projection: { date: 1, _id: 0 } })
+    .toArray();
+  const restDates = restRows.map((r) => String(r.date));
+
   const rows = docs.map((c) => {
     const start = String(c.startDate);
     const end = challengeEnd({ startDate: start, days: Number(c.days) });
@@ -89,6 +101,7 @@ export async function GET() {
           }
         : null,
       values,
+      rest: restDates.filter((day) => day >= start && day <= end),
     };
   });
 

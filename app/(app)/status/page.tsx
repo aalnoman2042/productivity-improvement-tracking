@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import AskData from "@/components/AskData";
 import CardBoundary from "@/components/CardBoundary";
+import CatchupCard from "@/components/CatchupCard";
+import Targets from "@/components/Targets";
 import LoadError from "@/components/LoadError";
 import LifeNow from "@/components/LifeNow";
 import PeriodCompare from "@/components/PeriodCompare";
@@ -237,6 +239,12 @@ export default function StatusPage() {
         </p>
       )}
 
+      {/* Days that got away, and the one screen that closes them. Silent
+          unless there are at least two — see components/CatchupCard. */}
+      <CardBoundary title="🗓 Catch up">
+        <CatchupCard />
+      </CardBoundary>
+
       {/* The coach reads everything, so it sits above the range picker. */}
       <CardBoundary title="🧠 Life right now">
         <LifeNow />
@@ -247,6 +255,12 @@ export default function StatusPage() {
           the question occurs to someone — reading the read. */}
       <CardBoundary title="💬 Ask your data">
         <AskData />
+      </CardBoundary>
+
+      {/* The only card on this page that looks forward. Renders nothing
+          until something has a date on it — see components/Targets. */}
+      <CardBoundary title="🎯 On the way to">
+        <Targets />
       </CardBoundary>
 
       {/* Range picker, and the way to show someone */}
