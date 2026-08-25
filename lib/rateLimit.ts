@@ -38,6 +38,21 @@ export const RULES = {
   // rule *is* the whole gate, and it is set where a real conversation fits
   // and a stuck loop doesn't.
   ask: { limit: 10, windowMs: 60 * 60_000 },
+  // An admin sending someone a message by hand. High enough that nobody
+  // typing will meet it, low enough that a page stuck in a retry loop
+  // cannot buzz somebody else's phone all afternoon.
+  nudge: { limit: 30, windowMs: 60 * 60_000 },
+  // The whole app's share of the free AI, for one day.
+  //
+  // Groq's free tier allows ~1,000 requests a DAY across every feature and
+  // every account — it is a property of the key, not of the person holding
+  // it. One user cannot reach it; two thousand reach it before lunch, and
+  // what they get when they do is a wall of 429s from somebody else's
+  // server. Counting here turns that into one sentence the app can say for
+  // itself, and leaves a hundred requests of headroom for the day's
+  // scheduled work. Subject is the literal string "global": there is one
+  // budget, not one each.
+  aiDay: { limit: 900, windowMs: 24 * 60 * 60_000 },
   // The weekly review writes one row per week; a handful a day is plenty of
   // room to catch up on missed weeks without emptying the free quota.
   weekly: { limit: 6, windowMs: 24 * 60 * 60_000 },
@@ -129,6 +144,26 @@ export async function hit(
     console.error("Rate limit check failed:", err);
     return ALLOW;
   }
+}
+
+/**
+ * The app's whole daily allowance of the free AI, counted once per call.
+ *
+ * Returns the 429 to send back, or null to carry on. Every AI route calls
+ * this *after* its own per-user rule, so a single account still cannot spend
+ * the day's budget on its own.
+ */
+export async function aiBudget(): Promise<NextResponse | null> {
+  const verdict = await hit("aiDay", "global");
+  if (verdict.ok) return null;
+  const hours = Math.max(1, Math.round(verdict.retryAfter / 3600));
+  return NextResponse.json(
+    {
+      error: `The app's free AI budget for today is spent — it comes back in about ${hours === 1 ? "an hour" : `${hours} hours`}. Everything else on this page is your own data and still works.`,
+      retryAfter: verdict.retryAfter,
+    },
+    { status: 429, headers: { "Retry-After": String(verdict.retryAfter) } }
+  );
 }
 
 /** The 429 to return when `hit` says no. */

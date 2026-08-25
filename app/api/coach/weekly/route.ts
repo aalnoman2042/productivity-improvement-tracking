@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { hit, tooMany } from "@/lib/rateLimit";
+import { aiBudget, hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
 import { gatherCoachFacts } from "@/lib/coachGather";
 import { askGroq, groqConfigured, GROQ_SETUP_ERROR } from "@/lib/groq";
@@ -154,6 +154,13 @@ export async function POST(req: Request) {
   if (existing) {
     return NextResponse.json({ ...shape(existing), already: true });
   }
+
+  // The app's own share of the free tier for the day — one key, one budget,
+  // however many accounts are asking. Counted at the last moment before the
+  // model is called, so a request something else was about to refuse never
+  // spends anybody's allowance.
+  const budget = await aiBudget();
+  if (budget) return budget;
 
   // The facts as of the week's last day — so `last7Days` IS the week under
   // review and `the 7 before` is the week before it, which is exactly the

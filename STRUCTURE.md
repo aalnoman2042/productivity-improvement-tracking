@@ -31,6 +31,7 @@ installs to a phone's home screen. One person owns it; a few friends use it.
 | AI | Groq (free tier) | `openai/gpt-oss-120b` / `-20b` |
 | Push | Web Push (VAPID) | Plus polled cron for scheduling |
 | Tests | Vitest | Pure `lib/` logic only — see §11 |
+| Layout | Two rules in `globals.css` | `.page-width` (header, page and footer share one width, growing at 1280/1536px) and `.card-stack` (a stack of cards on a phone, two columns on a big screen). The daily log uses a plain grid instead — it has `position: sticky` bars, and sticky inside multi-column is unreliable. |
 | Hosting | Vercel | Every push to `main` auto-deploys |
 
 ---
@@ -71,7 +72,7 @@ app/
     history/        month calendar, notes search
     tracker/[id]/   one tracker's whole story
     settings/       account, reminders, data
-    admin/          owner-only counts
+    admin/          owner-only counts, health, and the 🔔 nudge
   start/            first-run tour (signed in, outside the app shell)
   welcome/          the signed-out pitch, served at / by a proxy rewrite
   login|signup|forgot|reset/
@@ -82,6 +83,8 @@ app/
 
 components/         client components; presentation and interaction
 lib/                pure logic, shared helpers, and the database
+                    (e.g. nudge.ts — how one hand-sent push is worded;
+                     bookComments.ts — what you made of a book, as you went)
 tests/              vitest specs, one per lib module
 scripts/            one-off tools (icons, VAPID keys, demo seed, db check)
 public/sw.js        the service worker
@@ -109,7 +112,7 @@ enforcing and compares it to the code.
 | `entries` | trackerId, date, value, `meta`, note | (userId, trackerId, date) |
 | `dayNotes` | date, text | (userId, date) |
 | `tasks` | date, text, done, order | — (many per day) |
-| `books` | title, author, status, pages, pagesRead, rating | — |
+| `books` | title, author, status, pages, pagesRead, rating, `comments[]` | — |
 | `challenges` | trackerId, startDate, days, target, direction | — |
 | `aiReviews` | text, snapshot, today, model | — (latest wins) |
 | `weeklyReviews` | weekStart, weekEnd, text, snapshot, digest | (userId, weekEnd) |
@@ -118,7 +121,9 @@ enforcing and compares it to the code.
 | `cronRuns` | job, startedAt, result | — (TTL, 30 days) |
 
 **The three that deliberately touch no number** — `dayNotes`, `tasks` and
-`books` — exist outside the scoring system entirely. A day with a written
+`books` (comments included: they are added and removed, never edited, each
+stamped with the day it was written) — exist outside the scoring system
+entirely. A day with a written
 note, three ticked tasks and a finished book, but nothing logged, is still a
 day with nothing logged. This is not an oversight; see §12.
 
@@ -268,6 +273,22 @@ instead of skipping the night in silence. Per-tracker slots expire instead,
 with a three-hour grace window, and a prayer tracker recomputes its five
 times from the sun every day.
 
+**Switched off is not unreachable.** Turning the daily reminder off stops
+*everything the schedule sends* — the ask, the Sunday digest and the
+gone-quiet check-in all read `reminder.enabled` — but it keeps the browser's
+subscription, so a message sent **by hand** can still arrive. That message is
+`/api/admin/nudge` (admins only, `lib/nudge`): one push, to one person, now.
+It never stamps `reminder.lastSentFor`, so a nudge at noon cannot swallow the
+ask at eleven. "Receives nothing at all" is a separate control on the Account
+page, which unregisters the device.
+
+**One poll is bounded.** `runReminders` does database work for at most
+`REMINDER_BATCH` (250) people per run, taking whoever has gone longest
+without their ask first. Because the ask is owed rather than scheduled,
+anyone past the cap is delivered on the next poll instead of being dropped —
+and the number deferred is recorded in `cronRuns` and shown on /admin, so a
+schedule that needs polling more often says so.
+
 > **This is the one part that needs setup outside the code:** the repository
 > needs a `PIT_URL` variable and a `CRON_SECRET` secret, and `PIT_URL` must
 > point at a deployment with Vercel Deployment Protection **off**. Until
@@ -277,7 +298,7 @@ times from the sun every day.
 
 ## 11. Testing, and its honest limits
 
-342 tests, one spec per `lib/` module, all pure. `npm test`.
+381 tests, one spec per `lib/` module, all pure. `npm test`.
 
 **What is not covered, stated plainly:** not one of the ~47 route handlers
 has a test. Every bug that has actually mattered on this project was found by
@@ -325,6 +346,11 @@ quietly would be worse than failing loudly.
    *plan* precisely because the server refuses to record it.
 9. **No number on an AI card comes from the AI** (§9).
 10. **The daily ask is owed, not scheduled** (§10).
+11. **A message sent by hand never marks the schedule as done.** An admin
+    nudge sends a push and stamps nothing; the night's ask is still owed.
+12. **Reminders off means the app stops asking, not that the device is
+    gone.** The subscription survives the switch; only unregistering the
+    device ends delivery entirely.
 
 ---
 

@@ -17,6 +17,13 @@ export const REMINDER_JOB = "reminders";
 /** The polled per-tracker reminder schedule (see /api/cron/tracker-reminders). */
 export const TRACKER_REMINDER_JOB = "tracker-reminders";
 
+/**
+ * A message an admin sent by hand (see /api/admin/nudge). Filed here because
+ * a push nobody can account for afterwards makes "did it go?" unanswerable —
+ * and the health card already reads this log.
+ */
+export const ADMIN_NUDGE_JOB = "admin-nudge";
+
 export type CronRun = {
   job: string;
   startedAt: Date;
@@ -30,13 +37,18 @@ export type CronRun = {
   /** Unprompted check-ins to people who had stopped logging. */
   lapses: number | null;
   skipped: number | null;
+  /** Asks that were due but past this poll's batch cap. */
+  deferred: number | null;
   /** Sunday runs only: how many week-in-review pushes went out. */
   digests: number | null;
   error: string | null;
 };
 
 export type RunCounts = Partial<
-  Pick<CronRun, "checked" | "notified" | "stakes" | "lapses" | "skipped" | "digests">
+  Pick<
+    CronRun,
+    "checked" | "notified" | "stakes" | "lapses" | "skipped" | "deferred" | "digests"
+  >
 >;
 
 /**
@@ -62,6 +74,7 @@ export async function recordRun(
       stakes: result.stakes ?? null,
       lapses: result.lapses ?? null,
       skipped: result.skipped ?? null,
+      deferred: result.deferred ?? null,
       digests: result.digests ?? null,
       error: result.error ?? null,
     });

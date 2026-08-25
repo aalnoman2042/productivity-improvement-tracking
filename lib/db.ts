@@ -16,7 +16,14 @@ function getClient(): Promise<MongoClient> {
     // Every page load is a handful of small queries, so the pool stays tiny —
     // but idle sockets are kept long enough that the next request on a warm
     // instance doesn't pay for a new handshake.
-    maxPoolSize: 10,
+    //
+    // Tunable because the ceiling is the *cluster's*, not this process's:
+    // each serverless instance opens its own pool, so the connections in
+    // flight are (instances × this number), and a shared-tier Atlas cluster
+    // caps at 500. Raise it for a bigger cluster; lower it if Atlas starts
+    // refusing connections under load, which is what "too many connections"
+    // looks like from a page that simply won't load.
+    maxPoolSize: Number(process.env.MONGO_POOL_SIZE) || 10,
     minPoolSize: 0,
     maxIdleTimeMS: 60_000,
     // Fail fast and show an error rather than hanging the page for 30 seconds.
@@ -317,6 +324,24 @@ const VALIDATORS: Record<string, object> = {
         pattern: "^\\d{4}-\\d{2}-\\d{2}$",
       },
       note: { bsonType: ["string", "null"], maxLength: 1000 },
+      // What the reader made of it, as they went. A list rather than one
+      // field, because the thought you had at chapter nine is not the same
+      // thing as a review written after the last page.
+      comments: {
+        bsonType: ["array", "null"],
+        maxItems: 100,
+        items: {
+          bsonType: "object",
+          required: ["id", "text", "on"],
+          properties: {
+            id: { bsonType: "string" },
+            text: { bsonType: "string", minLength: 1, maxLength: 600 },
+            // Blank when a stored stamp was unreadable — the words matter
+            // more than the date they carry.
+            on: { bsonType: "string", pattern: "^(\\d{4}-\\d{2}-\\d{2})?$" },
+          },
+        },
+      },
       createdAt: { bsonType: "date" },
       updatedAt: { bsonType: ["date", "null"] },
     },
@@ -349,6 +374,9 @@ const VALIDATORS: Record<string, object> = {
       // Check-ins sent to people who had gone quiet for days.
       lapses: { bsonType: ["number", "null"] },
       skipped: { bsonType: ["number", "null"] },
+      // Asks that were due but past this poll's batch cap — the schedule
+      // saying it needs to be polled more often, out loud.
+      deferred: { bsonType: ["number", "null"] },
       digests: { bsonType: ["number", "null"] },
       error: { bsonType: ["string", "null"] },
     },
@@ -373,6 +401,12 @@ async function ensureSchema(d: Db): Promise<void> {
 
   await Promise.all([
     d.collection("users").createIndex({ email: 1 }, { unique: true }),
+    // Every poll of the daily schedule asks "who has reminders on, longest
+    // un-asked first?" — which is a collection scan and a sort in memory
+    // without this. Fifteen minutes apart, forever, for every account.
+    d
+      .collection("users")
+      .createIndex({ "reminder.enabled": 1, "reminder.lastSentFor": 1 }),
     d.collection("trackers").createIndex({ userId: 1, order: 1 }),
     d
       .collection("entries")

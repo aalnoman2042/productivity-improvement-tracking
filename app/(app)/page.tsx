@@ -637,7 +637,15 @@ function TodayLog() {
           <DayTasks date={date} />
 
           {/* One section per category. Taps still come first inside each,
-              so most of a section is settled in a few seconds. */}
+              so most of a section is settled in a few seconds.
+
+              Two columns once the screen is wide enough to hold them, so a
+              dozen trackers is a page rather than a scroll. A plain grid
+              rather than the .card-stack columns used elsewhere: this page
+              has sticky bars below, and sticky inside a multi-column
+              container is unreliable. `items-start` keeps a folded section
+              its own height instead of stretching it to match its neighbour. */}
+          <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
           {groups.map((group) => {
             const done = doneInGroup(group.items);
             const open = !isFolded(group.value);
@@ -727,6 +735,7 @@ function TodayLog() {
               </section>
             );
           })}
+          </div>
 
           {/* A bookmark is a thing you move at the end of a day too, and
               nobody goes to another screen to do it. Renders nothing at all

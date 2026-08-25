@@ -96,7 +96,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    <div className="card-stack">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Account</h1>
         <p className="mt-1 text-sm text-secondary">

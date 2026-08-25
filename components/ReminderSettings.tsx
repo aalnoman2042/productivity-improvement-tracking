@@ -199,7 +199,40 @@ export default function ReminderSettings() {
     }
   }
 
+  /**
+   * Stop the app asking. Every scheduled push ends here — the nightly ask,
+   * the Sunday week in review and the three-day check-in all read this
+   * switch — but the browser stays registered, so a message sent by hand can
+   * still arrive. Off means "stop the schedule", and unregistering the
+   * device below is what means "stop everything".
+   *
+   * It used to throw the subscription away too, which quietly made the two
+   * the same thing: permission granted months ago was lost on a switch, and
+   * getting it back needs the browser's own dialog.
+   */
   async function disable() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await fetch("/api/reminders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: false,
+          tzOffset: -new Date().getTimezoneOffset(),
+        }),
+      });
+      setMsg({ kind: "ok", text: "Reminders are off — the app won't ask again" });
+      await load();
+    } catch {
+      setMsg({ kind: "bad", text: "Could not turn reminders off" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** The full stop: this browser receives nothing from PIT at all. */
+  async function forget() {
     setBusy(true);
     setMsg(null);
     try {
@@ -212,19 +245,11 @@ export default function ReminderSettings() {
         );
         await sub.unsubscribe();
       }
-      await fetch("/api/reminders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: false,
-          tzOffset: -new Date().getTimezoneOffset(),
-        }),
-      });
       setSubscribed(false);
-      setMsg({ kind: "ok", text: "Reminders are off" });
+      setMsg({ kind: "ok", text: "This device won't receive anything from PIT" });
       await load();
     } catch {
-      setMsg({ kind: "bad", text: "Could not turn reminders off" });
+      setMsg({ kind: "bad", text: "Could not unregister this device" });
     } finally {
       setBusy(false);
     }
@@ -328,7 +353,7 @@ export default function ReminderSettings() {
                   : "rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
               }
             >
-              {busy ? "Working…" : on ? "Turn off on this device" : "Turn on reminders"}
+              {busy ? "Working…" : on ? "Turn reminders off" : "Turn on reminders"}
             </button>
             {on && (
               <>
@@ -374,6 +399,24 @@ export default function ReminderSettings() {
               ✓ On — {status.devices}{" "}
               {status.devices === 1 ? "device is" : "devices are"} set up. Each
               phone or computer has to be turned on separately.
+            </p>
+          )}
+
+          {/* Off, but the browser is still registered — which is the whole
+              point of the two being separate. Say so plainly, and put the
+              full stop right beside it. */}
+          {!on && subscribed && (
+            <p className="mt-3 text-sm text-secondary">
+              This device is still registered, so a message sent by hand — the
+              owner nudging you to log your day — can still reach it. The app
+              itself won&apos;t ask.{" "}
+              <button
+                onClick={forget}
+                disabled={busy}
+                className="font-medium text-accent hover:underline disabled:opacity-40"
+              >
+                Unregister this device
+              </button>
             </p>
           )}
 

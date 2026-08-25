@@ -14,6 +14,7 @@ import {
   type Book,
   type BookStatus,
 } from "@/lib/books";
+import { MAX_BOOK_COMMENT } from "@/lib/bookComments";
 
 /**
  * The bookshelf, living behind a button on the Trackers page.
@@ -96,7 +97,10 @@ export default function Books({ standalone = false }: { standalone?: boolean }) 
 
   const stats = useMemo(() => bookStats(books, today), [books, today]);
 
-  async function patch(id: string, body: Record<string, unknown>) {
+  // Returns whether it stuck. Most callers don't care — a tap that failed
+  // leaves the shelf as it was and the error line says so — but a typed
+  // comment must not be cleared off the screen unless the server took it.
+  async function patch(id: string, body: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
     setError("");
     try {
@@ -108,12 +112,14 @@ export default function Books({ standalone = false }: { standalone?: boolean }) 
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(data?.error ?? "Could not save that");
-        return;
+        return false;
       }
       const book = data as Book;
       q.update(books.map((b) => (b.id === book.id ? book : b)));
+      return true;
     } catch {
       setError("Could not reach the server — books need a connection");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -369,7 +375,7 @@ function BookCard({
   book: Book;
   today: string;
   busy: boolean;
-  onPatch: (id: string, body: Record<string, unknown>) => Promise<void>;
+  onPatch: (id: string, body: Record<string, unknown>) => Promise<boolean>;
   onRemove: (book: Book) => Promise<void>;
 }) {
   const [read, setRead] = useState(String(book.pagesRead || ""));
@@ -567,8 +573,126 @@ function BookCard({
               </button>
             )}
           </div>
+
+          <Comments book={book} busy={busy} onPatch={onPatch} />
         </>
       )}
     </li>
+  );
+}
+
+/**
+ * What you made of it, written as you go.
+ *
+ * A list rather than the one `note` field the shelf has always had, because
+ * the thought you had at chapter nine is not the same thing as a review
+ * written after the last page — and a single box turns the first into the
+ * second every time it is edited. So comments are added and removed, never
+ * rewritten, and each one keeps the day it was written on.
+ *
+ * Offered on every shelf, not only the finished one: a book you are halfway
+ * through is exactly when there is something to say, and a wishlist book is
+ * where "recommended by Sara" belongs.
+ *
+ * Like the rest of the shelf, none of this reaches a number or the AI — it is
+ * words somebody wrote, which is the same rule the day notes live under.
+ */
+function Comments({
+  book,
+  busy,
+  onPatch,
+}: {
+  book: Book;
+  busy: boolean;
+  onPatch: (id: string, body: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(book.comments.length > 0);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const count = book.comments.length;
+  const placeholder =
+    book.status === "finished"
+      ? "What did you make of it?"
+      : book.status === "wishlist"
+        ? "Why this one?"
+        : "Where are you, and what do you think so far?";
+
+  async function add() {
+    const text = draft.trim();
+    if (!text) return;
+    setSaving(true);
+    const ok = await onPatch(book.id, { comment: text });
+    setSaving(false);
+    // Only clear it once the server has it — a comment that vanished into a
+    // failed request is a paragraph nobody will type twice.
+    if (ok) setDraft("");
+  }
+
+  return (
+    <div className="mt-2 border-t border-edge pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="rounded-md text-xs font-medium text-secondary hover:underline"
+      >
+        💬 {count > 0 ? `${count} comment${count === 1 ? "" : "s"}` : "Add a comment"}
+      </button>
+
+      {open && (
+        <>
+          {count > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {book.comments.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-start gap-2 rounded-md bg-surface-2 px-2.5 py-1.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm break-words whitespace-pre-wrap">{c.text}</p>
+                    {c.on && (
+                      <p className="mt-0.5 text-xs text-muted">{prettyDate(c.on)}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onPatch(book.id, { removeComment: c.id })}
+                    aria-label="Remove this comment"
+                    className="rounded-md px-1.5 py-0.5 text-xs text-muted hover:bg-surface-2 hover:text-red-600 disabled:opacity-40"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={2}
+            maxLength={MAX_BOOK_COMMENT}
+            placeholder={placeholder}
+            aria-label={`A comment on ${book.title}`}
+            className="mt-2 w-full resize-none rounded-md border border-edge bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy || saving || !draft.trim()}
+              onClick={() => void add()}
+              className="rounded-md bg-brand-gradient px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Add comment"}
+            </button>
+            <span className="text-xs text-muted">
+              Stamped with today and kept as written
+            </span>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

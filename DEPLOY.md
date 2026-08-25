@@ -214,6 +214,48 @@ tracker. Nobody can see anyone else's data.
 To stop new sign-ups, change `INVITE_CODE` in Vercel and redeploy; existing
 accounts keep working.
 
+## 6. Running it for a crowd (hundreds or thousands of accounts)
+
+Everything in this file so far is the free-tier setup — right for the owner
+and a handful of friends. Two thousand people using it at once is a different
+question, and most of the answer is **not** in the code: the app was made to
+stay inside its limits, but the limits belong to the services under it.
+
+**What the code now does on its own**
+
+- The admin page reads accounts **a page at a time**, and counts trackers,
+  logged days and devices only for the rows on screen. It used to group every
+  entry in the database on every load — fine at five accounts, a full scan of
+  millions of rows at two thousand.
+- The daily reminder poll works through **at most `REMINDER_BATCH` (250)
+  people per run**, oldest-ask-first. The ask is *owed, not scheduled*, so
+  anyone past the cap is simply first in line fifteen minutes later; the
+  number deferred is recorded and shown on /admin. Raise `REMINDER_BATCH`, or
+  poll more often, if that line stops being zero.
+- The free AI has a **whole-app daily budget** (`aiDay` in `lib/rateLimit`,
+  900 requests). Past it, the coach says the budget is spent and comes back
+  tomorrow, instead of every user getting a raw 429 from Groq.
+- The Mongo pool size is `MONGO_POOL_SIZE` (default 10 **per serverless
+  instance** — connections in flight are instances × this).
+
+**What you have to buy, because no code change avoids it**
+
+| Limit | Free tier | What 2,000 users need |
+|---|---|---|
+| Atlas storage | 512 MB (M0) | The owner's own account uses ~1.4 MB of documents+indexes. 2,000 accounts logging for a year will not fit — plan on **M10 or larger**, and watch the 💾 Database card on /admin, which turns amber at 70%. |
+| Atlas connections | ~500 on shared tiers | Instances × `MONGO_POOL_SIZE`. If pages start failing to load under load, that is what "too many connections" looks like — lower the pool or move up a tier. |
+| Atlas CPU | shared, throttled | M0 is a shared box. Sustained traffic gets throttled, and throttling looks like a slow app, not an error. |
+| Groq (the AI) | ~1,000 requests **per day, per key**, 8,000 tokens/minute | This is per *key*, not per person: 2,000 people cannot each have a daily read. Either buy a paid tier, or accept that the AI is first-come-first-served each day (which is what the budget above makes it). |
+| Vercel | Hobby | Hobby is for non-commercial use and has its own concurrency and cron limits. A real crowd belongs on Pro. |
+| Web push | free | The one part that genuinely scales; sending is per-device and cheap. |
+
+Also set **`PIT_SKIP_SCHEMA_SYNC=1`** once the collections exist and the
+validators are current: without it, every cold serverless start issues a
+dozen `collMod` commands, which is a real load on a shared cluster and buys
+nothing after the first deploy. Run `npm run check:db` after any change to
+`lib/db.ts` to confirm the cluster matches before switching the sync off
+again.
+
 ## Updating the app later
 
 Any time the code changes:

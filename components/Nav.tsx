@@ -46,7 +46,7 @@ export default function Nav() {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-edge bg-surface/95 shadow-sm backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-3 sm:gap-6 sm:px-4">
+        <div className="page-width flex items-center gap-3 px-3 sm:gap-6 sm:px-4">
           <Link href="/" className="flex shrink-0 items-center gap-2 py-3">
             <Logo size={26} />
             <span className="text-brand-gradient text-lg font-bold tracking-tight">

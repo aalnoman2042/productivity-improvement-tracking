@@ -10,6 +10,7 @@ import {
   type Book,
 } from "./books";
 import { cleanNote } from "./notes";
+import { parseComments } from "./bookComments";
 
 /**
  * Turning a stored book into the shape the client sees, and a request body
@@ -33,6 +34,7 @@ export function toBook(doc: WithId<Document>): Book {
     startedOn: (doc.startedOn as string | null) ?? null,
     finishedOn: (doc.finishedOn as string | null) ?? null,
     note: (doc.note as string | null) ?? null,
+    comments: parseComments(doc.comments),
     createdAt:
       doc.createdAt instanceof Date
         ? doc.createdAt.toISOString()

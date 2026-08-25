@@ -11,6 +11,7 @@
  * Everything here is pure. The route validates with it, the page renders with
  * it, and the tests hold both to the same arithmetic.
  */
+import type { BookComment } from "./bookComments";
 
 export type BookStatus = "wishlist" | "reading" | "finished" | "dropped";
 
@@ -65,6 +66,8 @@ export type Book = {
   startedOn: string | null;
   finishedOn: string | null;
   note: string | null;
+  /** What you made of it, as you went — oldest first. Never a number. */
+  comments: BookComment[];
   createdAt: string;
 };
 

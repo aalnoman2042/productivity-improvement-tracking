@@ -190,7 +190,7 @@ export default function HistoryPage() {
   const missed = inPast.filter((d) => d.logged === 0).length;
 
   return (
-    <div className="space-y-5">
+    <div className="card-stack">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">History</h1>
         <p className="mt-1 text-sm text-secondary">

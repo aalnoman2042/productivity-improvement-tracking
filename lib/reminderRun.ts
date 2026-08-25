@@ -38,6 +38,8 @@ export type ReminderRunResult = {
   skipped: number;
   /** Owed, but no browser took it. */
   undelivered: number;
+  /** Due, but this poll ran out of budget — first in line on the next one. */
+  deferred: number;
   digests: number;
 };
 
@@ -150,6 +152,24 @@ async function lastLoggedDate(d: Db, userId: ObjectId): Promise<string | null> {
 }
 
 /**
+ * How many people one poll will do database work for.
+ *
+ * The ask is *owed, not scheduled* (rule 10): once someone's hour has passed
+ * it stays due for the rest of their local day, so a poll that runs out of
+ * budget delays a reminder by fifteen minutes rather than losing it. That is
+ * what makes a cap safe — and a cap is what stops a thousand people sharing
+ * one bedtime from turning a single poll into thousands of queries and a
+ * timed-out serverless function that delivers nothing at all.
+ *
+ * Candidates are read oldest-ask-first, so the batch rotates: whoever was
+ * missed this time is at the front of the queue next time.
+ */
+const BATCH = Number(process.env.REMINDER_BATCH) || 250;
+
+/** How many candidates one poll will even look at. Small docs, one query. */
+const MAX_CANDIDATES = 5_000;
+
+/**
  * Run the schedule. With `onlyUserId` it runs for one person — that is the
  * in-app poke, which must never send someone else's reminders.
  */
@@ -159,23 +179,23 @@ export async function runReminders(
   const now = new Date();
   const d = await db();
 
-  // Two audiences, one pass. The daily ask belongs to whoever switched
-  // reminders on; the gone-quiet check-in goes to anyone with a device
-  // listening at all — it is the message you cannot ask for in advance,
-  // because by the time it applies you have stopped opening the app.
-  const subscribed = (await d
-    .collection("pushSubs")
-    .distinct("userId", onlyUserId ? { userId: onlyUserId } : {})) as ObjectId[];
-
+  // Everything scheduled belongs to whoever switched reminders on — the
+  // nightly ask, the Sunday week in review and the gone-quiet check-in alike.
+  // A registered browser is not consent on its own: turning the switch off
+  // now keeps the subscription, so that the owner can still send a message by
+  // hand, and this query is the line between the two.
   const users = await d
     .collection("users")
     .find(
       {
         ...(onlyUserId ? { _id: onlyUserId } : {}),
-        $or: [{ "reminder.enabled": true }, { _id: { $in: subscribed } }],
+        "reminder.enabled": true,
       },
       { projection: { name: 1, reminder: 1, createdAt: 1 } }
     )
+    // Whoever has gone longest without their ask is looked at first.
+    .sort({ "reminder.lastSentFor": 1 })
+    .limit(onlyUserId ? 1 : MAX_CANDIDATES)
     .toArray();
 
   const result: ReminderRunResult = {
@@ -186,6 +206,7 @@ export async function runReminders(
     lapses: 0,
     skipped: 0,
     undelivered: 0,
+    deferred: 0,
     digests: 0,
   };
 
@@ -197,6 +218,14 @@ export async function runReminders(
     if (!dueNow(now, tzOffset, time)) continue;
     result.due++;
 
+    // Out of budget for this poll. Counted rather than dropped quietly: an
+    // ask that keeps being deferred is a schedule that needs polling more
+    // often, and that has to be visible somewhere (it shows on /admin).
+    if (!onlyUserId && result.due > BATCH) {
+      result.deferred++;
+      continue;
+    }
+
     const today = localDateStr(now, tzOffset);
     const date = dayToLog(now, tzOffset, time);
 
@@ -205,6 +234,15 @@ export async function runReminders(
     // exactly when the app has stopped being opened — so this one doesn't
     // wait to be asked for, and it replaces the ordinary ask rather than
     // arriving beside it. Re-sent no more often than the gap it is about.
+    //
+    // It still needs the switch to be on. Turning reminders off now keeps the
+    // browser registered (so a message sent by hand can reach it) instead of
+    // throwing the subscription away, which means "has a device" no longer
+    // implies "wants to hear from the schedule" — and an unprompted check-in
+    // to somebody who switched the app's asking off would be exactly the
+    // thing they switched off.
+    if (!user.reminder?.enabled) continue;
+
     const last = await lastLoggedDate(d, user._id);
     const away = last ? daysBetween(last, today) : accountAge(user.createdAt, today);
     const lastLapse = user.reminder?.lastLapseFor as string | undefined;
@@ -233,8 +271,6 @@ export async function runReminders(
       }
       continue;
     }
-
-    if (!user.reminder?.enabled) continue;
 
     // --- The daily ask -----------------------------------------------------
     // Goes out every day, logged or not — the ask is the closing ritual of

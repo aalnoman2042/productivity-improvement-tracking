@@ -165,6 +165,70 @@ body::before {
 }
 
 /* =====================================================================
+   How wide the app is — ONE rule, because the header, the page and the
+   footer have to agree. They were three separate `max-w-5xl`s, which is
+   three chances for a screen to have a header wider than its content.
+
+   The phone is untouched: below 1280px this is the 64rem it always was.
+   Past that the app grows into the screen instead of leaving a laptop
+   showing two hand-widths of wallpaper either side — but it stops at
+   88rem, because a line of text 2,000px wide is not a feature and the
+   cards inside are laid out in columns rather than stretched (.card-stack).
+   ===================================================================== */
+.page-width {
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+}
+@media (min-width: 1280px) {
+  .page-width {
+    max-width: 76rem;
+  }
+}
+@media (min-width: 1536px) {
+  .page-width {
+    max-width: 88rem;
+  }
+}
+
+/* =====================================================================
+   A stack of cards on a phone; two columns on a big screen.
+
+   Multi-column rather than a grid on purpose: these pages are a pile of
+   independent cards of wildly different heights, and a grid leaves a row
+   as tall as its tallest member with holes under the rest. Columns pack.
+
+   The spacing lives here rather than in a `space-y-*` class because
+   `space-y` puts a top margin on every sibling but the first — and in two
+   columns the top of the second column IS a sibling, so it would start
+   1.25rem lower than the first. Same reason `break-inside` is on the
+   children: a card sliced in half across a column boundary is worse than
+   any amount of empty space.
+
+   NOT for the daily log: it has two `position: sticky` bars, and sticky
+   inside a multi-column container is unreliable across browsers. That page
+   gets a plain grid for its tracker sections instead.
+   ===================================================================== */
+.card-stack > * {
+  margin-bottom: 1.25rem;
+}
+.card-stack > *:last-child {
+  margin-bottom: 0;
+}
+@media (min-width: 1024px) {
+  .card-stack {
+    columns: 2;
+    column-gap: 1.25rem;
+  }
+  .card-stack > * {
+    break-inside: avoid;
+    /* Every card needs the gap now — the last one in column one is not the
+       last one on the page. */
+    margin-bottom: 1.25rem;
+  }
+}
+
+/* =====================================================================
    Swipe navigation — a nudge out, a slide in. Kept to transform+opacity
    so it stays on the compositor, and off entirely for reduced motion.
    ===================================================================== */

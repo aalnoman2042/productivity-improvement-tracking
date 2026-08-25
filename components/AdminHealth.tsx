@@ -25,6 +25,7 @@ type RecentRun = {
   notified: number | null;
   skipped: number | null;
   lapses: number | null;
+  deferred: number | null;
   digests: number | null;
   error: string | null;
 };
@@ -198,6 +199,9 @@ export default function AdminHealth() {
                       r.notified ? `${r.notified} sent` : null,
                       r.skipped ? `${r.skipped} skipped` : null,
                       r.lapses ? `${r.lapses} check-ins` : null,
+                      // A poll that ran out of budget. Silence with a
+                      // reason, which is the only kind worth having.
+                      r.deferred ? `${r.deferred} deferred` : null,
                       r.digests ? `${r.digests} digests` : null,
                       r.tookMs != null ? `${r.tookMs}ms` : null,
                     ]

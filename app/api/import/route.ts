@@ -6,6 +6,7 @@ import { isValidDateStr } from "@/lib/dates";
 import { parseMeta } from "@/lib/entryMeta";
 import { clampRead, normalizeStatus, parsePages, parseRating } from "@/lib/books";
 import { parseAuthor, parseBookNote, parseTitle } from "@/lib/bookDoc";
+import { parseComments } from "@/lib/bookComments";
 import { MAX_DAY_NOTE, cleanNote } from "@/lib/notes";
 import { cleanTask } from "@/lib/tasks";
 import { parseGoal } from "@/lib/trackerDoc";
@@ -230,6 +231,7 @@ export async function POST(req: Request) {
             startedOn: isValidDateStr(b?.startedOn) ? b.startedOn : null,
             finishedOn: isValidDateStr(b?.finishedOn) ? b.finishedOn : null,
             note: parseBookNote(b?.note),
+            comments: parseComments(b?.comments),
             updatedAt: now,
           },
           $setOnInsert: { createdAt: now },

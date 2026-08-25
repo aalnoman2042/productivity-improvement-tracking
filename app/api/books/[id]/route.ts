@@ -11,6 +11,7 @@ import {
   parseRating,
 } from "@/lib/books";
 import { parseAuthor, parseBookNote, parseTitle, toBook } from "@/lib/bookDoc";
+import { addComment, cleanComment, removeComment } from "@/lib/bookComments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -49,6 +50,33 @@ export async function PATCH(req: Request, ctx: Ctx) {
     set.title = title;
   }
   if (body?.author !== undefined) set.author = parseAuthor(body.author);
+
+  // Comments are added and removed, never edited: what you thought at
+  // chapter nine is worth keeping *as* what you thought then, and a list you
+  // can rewrite becomes one paragraph polished into a review.
+  if (body?.comment !== undefined) {
+    const text = cleanComment(body.comment);
+    if (!text) {
+      return NextResponse.json({ error: "Write something first" }, { status: 400 });
+    }
+    const next = addComment(book.comments, {
+      id: new ObjectId().toHexString(),
+      text,
+      // Stamped with the reader's day, like every other date on a book.
+      on: today,
+    });
+    if (!next) {
+      return NextResponse.json(
+        { error: "That book is holding all the comments it can" },
+        { status: 400 }
+      );
+    }
+    set.comments = next;
+  }
+  if (body?.removeComment !== undefined) {
+    set.comments = removeComment(book.comments, String(body.removeComment));
+  }
+
   if (body?.note !== undefined) set.note = parseBookNote(body.note);
   if (body?.rating !== undefined) set.rating = parseRating(body.rating);
 

@@ -62,7 +62,12 @@ export async function GET(req: Request) {
     // newest row to say when a reminder last went out, which should mean
     // exactly that. A reminder owed but undeliverable counts: that is the
     // outage worth seeing.
-    if (result.notified > 0 || result.digests > 0 || result.undelivered > 0) {
+    if (
+      result.notified > 0 ||
+      result.digests > 0 ||
+      result.undelivered > 0 ||
+      result.deferred > 0
+    ) {
       await recordRun(REMINDER_JOB, startedAt, {
         ok: true,
         checked: result.checked,
@@ -70,6 +75,7 @@ export async function GET(req: Request) {
         stakes: result.stakes,
         lapses: result.lapses,
         skipped: result.skipped + result.undelivered,
+        deferred: result.deferred,
         digests: result.digests,
       });
     }

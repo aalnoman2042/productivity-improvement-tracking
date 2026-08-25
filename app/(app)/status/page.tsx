@@ -215,7 +215,9 @@ export default function StatusPage() {
   }, [stats, today, goalsMet, goalsTotal, toImprove, wins, fails]);
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    // One column on a phone, two on a big screen — the cap was 36rem of
+    // column in the middle of a 1,400px window. See .card-stack in globals.
+    <div className="card-stack">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Status</h1>
         <p className="mt-1 text-sm text-secondary">

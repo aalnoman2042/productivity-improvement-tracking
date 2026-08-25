@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { hit, tooMany } from "@/lib/rateLimit";
+import { aiBudget, hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
 import { gatherCoachFacts } from "@/lib/coachGather";
 import { askGroq, groqConfigured, GROQ_SETUP_ERROR } from "@/lib/groq";
@@ -143,6 +143,13 @@ export async function POST(req: Request) {
     );
   }
   const { facts, snapshot } = gathered;
+
+  // The app's own share of the free tier for the day — one key, one budget,
+  // however many accounts are asking. Counted here, at the last moment
+  // before the model is called, so a read the cooldown was going to refuse
+  // never spends anybody's allowance.
+  const budget = await aiBudget();
+  if (budget) return budget;
 
   // Once every eight hours is a budget that can afford to think. The effort
   // is what turns "sleep is down 27%" into "this is why the afternoons are
