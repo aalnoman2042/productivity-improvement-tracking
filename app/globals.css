@@ -149,14 +149,38 @@ body::before {
   background-repeat: no-repeat;
 }
 
-/* Respect the notch / home indicator */
+/* ---------------------------------------------------------------------
+   The notch, the home indicator, and the status bar the Android app draws
+   underneath.
+
+   `env(safe-area-inset-*)` is the standard answer and the one browsers give.
+   Inside the APK it is only sometimes the answer: Android 15 and 16 force
+   every app edge to edge, and on a WebView older than 140 the insets never
+   reach the page at all. Capacitor's System Bars plugin covers that gap by
+   publishing the real values as `--safe-area-inset-*` custom properties, so
+   each side is read from Capacitor first and falls back to `env()` — which
+   is what every browser will use, unchanged.
+   --------------------------------------------------------------------- */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--sab);
 }
 
 /* Clears the fixed bottom nav (and the iPhone home indicator) on phones. */
 .app-main {
-  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(6.5rem + var(--sab));
+}
+
+/* The sticky header sits under the status bar in the Android app, where
+   edge-to-edge is not optional. Scoped to the shell on purpose: in a browser
+   the header already starts below the browser's own chrome, and padding it
+   there would only add a gap nobody asked for. */
+[data-shell="native"] .app-header {
+  padding-top: var(--sat);
 }
 @media (min-width: 640px) {
   .app-main {
@@ -511,4 +535,13 @@ button:active:not(:disabled) {
   .hide-installed {
     display: none !important;
   }
+}
+
+/* The same job for the Android app, which the media query above cannot see:
+   a WebView is not a browser in standalone mode, it is not a browser. The
+   attribute is stamped on <html> by the inline script in the root layout,
+   before the first paint, for exactly the same reason the media query is
+   here rather than in React. */
+[data-shell="native"] .hide-installed {
+  display: none !important;
 }

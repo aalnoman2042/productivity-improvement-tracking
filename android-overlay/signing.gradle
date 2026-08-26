@@ -1,0 +1,63 @@
+// Signing and versioning for the release APK.
+//
+// Copied into android/app/ by scripts/android-overrides.mjs and applied from
+// the generated build.gradle with a single appended `apply from:` line. It
+// works this way because Gradle merges repeated `android { }` blocks — so
+// nothing here has to find-and-replace generated text, which is the part that
+// rots. The one appended line is the whole contact surface.
+//
+// Everything sensitive arrives through the environment. Nothing is written to
+// a file in the workspace, and nothing is passed on a command line.
+
+def ksPath  = System.getenv('ANDROID_KEYSTORE_PATH')
+def ksPass  = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def ksAlias = System.getenv('ANDROID_KEY_ALIAS')
+
+// A PKCS#12 made by `openssl pkcs12 -export` has exactly one passphrase: it
+// encrypts the certificate bag, the key bag and the MAC alike. There is no
+// separate key password to get wrong, so the store password is it. (keytool
+// refuses to make the asymmetric case at all — JDK-8008292.)
+def keyPass = System.getenv('ANDROID_KEY_PASSWORD') ?: ksPass
+
+android {
+    defaultConfig {
+        // Named `appVersionCode`, not `versionCode`: inside AGP's defaultConfig
+        // closure a bare `versionCode` is ambiguous between the DSL setter and
+        // a Gradle project property, and the ambiguity resolves silently.
+        versionCode = (project.findProperty('appVersionCode') ?: '1').toString().toInteger()
+        versionName = (project.findProperty('appVersionName') ?: '1.0').toString()
+    }
+}
+
+if (ksPath && ksPass && ksAlias) {
+    android {
+        signingConfigs {
+            release {
+                storeFile     = file(ksPath)
+                // Inferred on any JDK since 9, where PKCS12 became the default
+                // keystore type. Stated anyway so the build does not depend on
+                // a JVM security property staying where it is.
+                storeType     = 'PKCS12'
+                storePassword = ksPass
+                keyAlias      = ksAlias
+                keyPassword   = keyPass
+                enableV1Signing = true
+                // Not optional: an app targeting API 30+ signed only with the
+                // v1 scheme cannot be installed on Android 11 or newer at all.
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    logger.lifecycle("[signing] release signed with alias '${ksAlias}'")
+} else {
+    // Deliberately not a failure here — `assembleDebug` has no business
+    // needing a keystore. The workflow asserts the signed APK exists after
+    // the build, which is where an absent secret should be caught.
+    logger.lifecycle('[signing] ANDROID_KEYSTORE_* absent — release will be UNSIGNED')
+}

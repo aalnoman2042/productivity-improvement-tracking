@@ -47,3 +47,15 @@ next-env.d.ts
 
 # local Claude Code config (hooks reference the secret brief)
 .claude/
+
+# android: the native project is generated in CI (`npx cap add android`),
+# never committed — see .github/workflows/apk.yml
+/android
+
+# the APK signing key and anything derived from it. Losing this file means
+# no future APK can install over the current one; committing it to a public
+# repo would mean anyone could sign an app that claims to be PIT.
+*.p12
+*.jks
+*.keystore
+*.p12.b64

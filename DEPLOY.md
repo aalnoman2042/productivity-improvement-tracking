@@ -205,6 +205,88 @@ set: if it says the schedule has never run, nothing is polling it.
 Open the URL on your phone, sign in, and (optional but recommended) use the
 browser menu → **"Add to Home Screen"** so it opens like an app.
 
+## 4b. Build the Android app (optional)
+
+"Add to Home Screen" is enough for most people. A real APK is worth it for two
+things the browser can't give you: an icon that doesn't say "Chrome" underneath,
+and a reminder the phone keeps on its own alarm clock — which arrives with no
+signal, with PIT closed, and whether or not anything on the internet is awake.
+
+**The APK contains no copy of PIT.** It is a window onto
+`https://protrackive.vercel.app`. So you build it once, and after that every
+`git push` reaches the phone at the next launch with **nothing to reinstall**.
+You only build a new one when something native changes — the app's name, its
+icon, a permission, the URL it points at.
+
+You need nothing installed. No Android Studio, no Java, no SDK. GitHub builds it.
+
+### One-time setup
+
+**1. Make the signing key**, on your PC, in Git Bash:
+
+```bash
+cd /d/PIT/pit
+npm run keystore
+```
+
+It prints a password and writes `pit-release.p12`. **Put both in a password
+manager before you do anything else.** Android identifies an app by the key
+that signed it: lose this and no future APK can ever install over the current
+one — every phone would have to uninstall first, and uninstalling takes the
+app's data with it. Both files are gitignored; the key must never be committed.
+
+**2. Add three repository secrets.** On GitHub → **Settings → Secrets and
+variables → Actions → New repository secret**:
+
+| Name | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the single long line inside `pit-release.p12.b64` |
+| `ANDROID_KEYSTORE_PASSWORD` | the password the script printed |
+| `ANDROID_KEY_ALIAS` | `pit` |
+
+Then delete `pit-release.p12.b64` — the `.p12` is the copy worth keeping.
+
+> The key is made on your machine rather than by the build for one reason:
+> this repository is public, which makes build artifacts and workflow inputs
+> public too. A key generated on a runner is a key anyone could download, and
+> an app anyone could sign as PIT.
+
+**3. Build it.** GitHub → **Actions → APK → Run workflow**. About five
+minutes. It generates the whole Android project from scratch, signs it, checks
+the signature is one Android will actually accept, and publishes a release.
+
+### Installing it
+
+Download it on the phone, from a link that always points at the newest build:
+
+```
+https://github.com/aalnoman2042/productivity-improvement-tracking/releases/latest/download/pit.apk
+```
+
+Open the downloaded file. Android will ask once whether to allow installing
+apps from your browser — that is the sideloading prompt, and it is expected.
+Sign in, then go to **Account → Daily reminder** and turn reminders on; the
+app will ask for notification permission and then keep the hour itself.
+
+### If reminders stop arriving
+
+It is almost always Android putting the app to sleep, not PIT forgetting.
+Samsung and Xiaomi are the worst for this. The fix is in their settings:
+
+- **Samsung** — Settings → Battery → Background usage limits → take PIT out of
+  **Sleeping apps**, and set it to **Unrestricted**.
+- **Xiaomi / Redmi / POCO** — turn **Autostart** on for PIT, and set battery
+  saver to **No restrictions**.
+- **Anything else** — Settings → Apps → PIT → Battery → **Unrestricted**.
+
+### What the app can't do
+
+The daily ask works. The **Sunday week in review** and the **three-day
+check-in** do not arrive in the app — those are sent from the server, and an
+Android WebView has no way to receive a push. They still reach any browser
+where you've turned reminders on, so keeping PIT installed on a laptop or in
+Chrome is worth it if you want them.
+
 ## 5. Invite your friends
 
 Send them the URL and the invite code. They tap **Sign up**, enter their own
@@ -267,7 +349,11 @@ git commit -m "describe the change"
 git push
 ```
 
-Vercel redeploys automatically on every push.
+Vercel redeploys automatically on every push — **and that is the whole update
+for the Android app too.** It opens the deployed site, so it has the new
+version at its next launch. You only rebuild the APK (Actions → APK → Run
+workflow) when something native changes: the name, the icon, a permission, the
+URL it points at.
 
 ## Notes
 

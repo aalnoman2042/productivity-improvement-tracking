@@ -45,7 +45,7 @@ export default function Nav() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-edge bg-surface/95 shadow-sm backdrop-blur-sm">
+      <header className="app-header sticky top-0 z-20 border-b border-edge bg-surface/95 shadow-sm backdrop-blur-sm">
         <div className="page-width flex items-center gap-3 px-3 sm:gap-6 sm:px-4">
           <Link href="/" className="flex shrink-0 items-center gap-2 py-3">
             <Logo size={26} />

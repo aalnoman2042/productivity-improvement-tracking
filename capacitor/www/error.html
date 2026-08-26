@@ -1,0 +1,135 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PIT — offline</title>
+<!--
+  The only page this app carries.
+
+  PIT itself is served from the web, so the APK holds no copy of it — that is
+  the whole point of the shell, and why a deploy reaches your phone without a
+  reinstall. But an app that shows a blank white WebView when the signal drops
+  looks broken rather than offline, so Capacitor is pointed at this file as
+  `server.errorPath`: the one screen that has to work with no network at all.
+
+  It stands in for two different failures — no connection, and a page the
+  server refused — and from here they are indistinguishable, so it asks the
+  browser which one it was rather than asserting. Getting that wrong in the
+  confident direction would be telling someone their signal is down while
+  they are watching a video.
+
+  Everything is inline, and nothing here can call a Capacitor plugin:
+  Capacitor injects its bridge only for the site's own origin, and this page
+  is served from the app's assets. Plain HTML, plain CSS, plain DOM.
+
+  A consequence worth knowing rather than engineering around: with no bridge
+  there is no back-button listener either, so Android's back press falls to
+  Capacitor's default, which is `webView.goBack()` — back onto the address
+  that just failed. If it fails again this page returns. So on this screen
+  back behaves as a second Try again rather than as a way out; leaving is the
+  home button. Fixing that properly would mean shipping a custom Activity in
+  the overlay, which is a lot of coupling to the template for a screen you
+  only see with no signal.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --edge: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --brand: #1c5cab;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d0d;
+      --card: #171717;
+      --edge: #262626;
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --brand: #4b8fe3;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: calc(1.5rem + env(safe-area-inset-top)) 1.5rem
+             calc(1.5rem + env(safe-area-inset-bottom));
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    width: 100%;
+    max-width: 22rem;
+    text-align: center;
+    background: var(--card);
+    border: 1px solid var(--edge);
+    border-radius: 0.75rem;
+    padding: 2rem 1.5rem;
+  }
+  .mark {
+    width: 3rem; height: 3rem;
+    margin: 0 auto 1rem;
+    display: grid; place-items: center;
+    border-radius: 0.75rem;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 700; font-size: 1.125rem; letter-spacing: 0.02em;
+  }
+  h1 { margin: 0 0 0.5rem; font-size: 1.125rem; }
+  p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+  button {
+    margin-top: 1.5rem;
+    width: 100%;
+    padding: 0.7rem 1rem;
+    border: 0; border-radius: 0.5rem;
+    background: var(--brand); color: #fff;
+    font: inherit; font-weight: 500;
+    cursor: pointer;
+  }
+  button:active { filter: brightness(1.1); }
+  small { display: block; margin-top: 1rem; font-size: 0.75rem; color: var(--muted); }
+</style>
+<main>
+  <div class="mark">PIT</div>
+  <h1 id="head">Can&rsquo;t open PIT</h1>
+  <p id="why">
+    PIT lives on the web, so it needs a moment of signal to open. Your logged
+    days are safe — nothing here is lost by a screen that didn&rsquo;t load.
+  </p>
+  <button type="button" id="retry">Try again</button>
+  <small id="hint"></small>
+</main>
+<script>
+  // Straight back to the live site rather than a reload: reloading would only
+  // fetch this same local file again.
+  var HOME = "https://protrackive.vercel.app/";
+  document.getElementById("retry").addEventListener("click", function () {
+    location.replace(HOME);
+  });
+  // A phone that regains signal while this screen is up should not need a
+  // tap. Guarded because a flapping connection can fire this repeatedly, and
+  // each one starts a navigation.
+  var going = false;
+  window.addEventListener("online", function () {
+    if (going) return;
+    going = true;
+    location.replace(HOME);
+  });
+  if (!navigator.onLine) {
+    document.getElementById("head").textContent = "No connection";
+    document.getElementById("hint").textContent = "Waiting for a connection…";
+  } else {
+    // Online, so the network was not the problem — most likely the address
+    // does not exist, or the site answered with an error.
+    document.getElementById("why").textContent =
+      "The connection is fine, so this was the page rather than the signal — " +
+      "either the address doesn't exist or the site had a moment. Your logged " +
+      "days are safe either way.";
+  }
+</script>

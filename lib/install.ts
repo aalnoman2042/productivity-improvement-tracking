@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { isNativeShell } from "@/lib/native";
 
 /**
  * Whether PIT can be installed to the home screen, and how.
@@ -76,7 +77,11 @@ function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     // iOS's own, non-standard flag.
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    // The Android APK. A plain WebView matches neither of the above — it is
+    // not a browser in standalone mode, it is not a browser — so without
+    // this the installed app spends its life offering to install itself.
+    isNativeShell()
   );
 }
 

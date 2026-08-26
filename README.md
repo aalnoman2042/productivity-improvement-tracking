@@ -221,7 +221,27 @@ npm run vapid-keys   # once; paste the output into .env.local
 Turn it on per device from the Account page (each phone or computer subscribes
 separately) and use **Send a test** to confirm it arrives. On iPhone, PIT must
 be added to the Home Screen first — iOS only delivers push to installed
-web apps.
+web apps. In the Android app it works differently and better: there is no push
+in an Android WebView at all, so the phone keeps the hour on its own alarm
+clock and asks itself, with no signal and nothing awake on the internet.
+
+## The Android app
+
+There is an APK, if you'd rather have an icon than a bookmark:
+
+**[Download the latest APK](https://github.com/aalnoman2042/productivity-improvement-tracking/releases/latest/download/pit.apk)**
+
+It is a window onto the deployed site rather than a copy of it, which has one
+happy consequence: **it updates itself.** Every push to `main` is on the phone
+at its next launch, with nothing to reinstall. A new APK is only ever needed
+when something native changes — the name, the icon, a permission.
+
+What you gain over the home-screen shortcut is the reminder: the phone
+schedules it locally, so it arrives whether or not any server is awake. What
+you lose is the Sunday week in review and the three-day check-in, which are
+pushes and cannot reach a WebView; keep PIT in a browser somewhere if you want
+those. Building it is in [DEPLOY.md](./DEPLOY.md) §4b — GitHub does the work,
+and you need no Android tooling at all.
 
 **Installing** is one tap wherever the browser allows one (Chrome and friends
 hand over a prompt, which the Install button replays). Where it isn't — every
@@ -476,6 +496,7 @@ the offline queue's merge behaviour (`lib/sync.ts`).
 ## Stack
 
 Next.js (App Router) · TypeScript · Tailwind v4 · Recharts · MongoDB ·
+Capacitor 8 for the Android shell ·
 sessions as signed JWT cookies (`jose`) with passwords hashed using Node's
 `scrypt`; every route is guarded in `proxy.ts` and every query is scoped by
 `userId`. Changing your password stamps `passwordChangedAt` into new tokens

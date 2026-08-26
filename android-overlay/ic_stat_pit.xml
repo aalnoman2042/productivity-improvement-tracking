@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The reminder's status-bar icon.
+
+  Android masks a notification's small icon to a silhouette and tints it, so
+  anything with colour or detail arrives as a white blob. Drawn here as the
+  silhouette it will become: three rising bars, which is what PIT is about.
+  Without this file the reminder shows up under the generic system "i".
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,14h3.5v6H4z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.25,9h3.5v11h-3.5z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,4h3.5v16h-3.5z" />
+</vector>

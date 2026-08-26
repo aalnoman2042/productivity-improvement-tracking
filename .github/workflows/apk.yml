@@ -1,0 +1,229 @@
+name: APK
+
+# Builds the Android app.
+#
+# There is no `android/` directory in this repository. It is scaffolded from
+# nothing on every run by `npx cap add android`, patched by
+# `scripts/android-overrides.mjs`, built, signed and thrown away. That keeps a
+# hundred generated Gradle files out of a Next.js repo, and it means the
+# native project can never quietly drift from the Capacitor version in
+# package.json — there is only ever one, and it is a few seconds old.
+#
+# **This is not how PIT ships.** The APK is a shell around
+# https://protrackive.vercel.app and carries no copy of the app, so a push to
+# `main` is on everyone's phone at the next launch with nothing rebuilt and
+# nothing reinstalled. This workflow only needs to run when something *native*
+# changes: the app's name or icon, a permission, a plugin, the URL it points
+# at. That is why it is not on every push.
+#
+# One-time setup, under Settings → Secrets and variables → Actions:
+#   ANDROID_KEYSTORE_BASE64     the .p12 from `npm run keystore`, base64
+#   ANDROID_KEYSTORE_PASSWORD   the password that script printed
+#   ANDROID_KEY_ALIAS           pit
+#
+# The key is generated on the owner's machine, never here. This repository is
+# public, which makes every artifact and every workflow input world-readable —
+# a keystore made on a runner would be a keystore anyone could download, and
+# an app anyone could sign as PIT.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Attach the APK to the GitHub release"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    # Only the things that actually change the APK.
+    paths:
+      - "capacitor.config.ts"
+      - "capacitor/www/**"
+      - "android-overlay/**"
+      - "scripts/android-overrides.mjs"
+      - ".github/workflows/apk.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Only to create the release. Everything else runs read-only.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Capacitor 8's CLI declares engines.node >= 22.
+          node-version: "22"
+          cache: npm
+
+      # Deliberately not the runner's default 17. @capacitor/android compiles
+      # with source/target compatibility 21, so JDK 17 fails outright with
+      # "invalid source release: 21" — and Gradle 8.14.3 (Capacitor 8's
+      # wrapper) does not run on 25 either. The window is 21 to 24.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # The runner image ships the Android SDK, build-tools 36 and pre-accepted
+      # licences, so there is no SDK step here. If a future image drops them,
+      # `android-actions/setup-android@v4` is the one-line replacement.
+
+      - run: npm ci
+
+      # `cap add android` treats a missing webDir as a warning, not an error:
+      # it scaffolds the project, skips its sync step, exits 0, and hands you a
+      # green build and an APK with no app in it. The directory is committed,
+      # so this only fires if something has gone properly wrong — but it fires
+      # before the twenty minutes of building rather than after.
+      - name: Assert the web directory exists
+        run: |
+          if [ ! -f capacitor/www/error.html ]; then
+            echo "::error::capacitor/www/error.html is missing — cap add would skip its sync and build an APK with no app in it."
+            exit 1
+          fi
+
+      - name: Compute version
+        id: ver
+        run: |
+          # Android refuses to install an APK whose versionCode is not higher
+          # than the installed one, and a freshly generated project always says
+          # 1. run_number is monotonic per workflow and survives re-runs, which
+          # is exactly the shape versionCode wants. The offset is headroom: if
+          # this file is ever renamed the counter restarts at 1, and the only
+          # way back is an offset above everything already shipped.
+          OFFSET=1000
+          echo "code=$(( ${{ github.run_number }} + OFFSET ))" >> "$GITHUB_OUTPUT"
+          echo "name=$(node -p "require('./package.json').version")-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate the Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+          chmod +x android/gradlew
+
+      - name: Apply signing, manifest and icon overrides
+        run: node scripts/android-overrides.mjs
+
+      # Written to the runner's temp directory rather than the workspace, so no
+      # artifact glob can ever sweep it up.
+      - name: Decode the signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set. Run 'npm run keystore' locally and add the three secrets; an unsigned APK cannot be installed."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          test -s "$RUNNER_TEMP/release.p12" || { echo "::error::keystore decoded to zero bytes"; exit 1; }
+
+      - name: Build the release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          # No ANDROID_KEY_PASSWORD on purpose: a PKCS#12 written by openssl
+          # has one passphrase for the store and the key alike, and
+          # signing.gradle falls back to the store password rather than
+          # offering a second one to get wrong.
+        run: |
+          ./gradlew assembleRelease \
+            -PappVersionCode=${{ steps.ver.outputs.code }} \
+            -PappVersionName=${{ steps.ver.outputs.name }} \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" \
+            -Dorg.gradle.internal.http.socketTimeout=60000 \
+            -Dorg.gradle.internal.http.connectionTimeout=60000 \
+            --no-daemon --stacktrace
+
+      # The step that stops the worst outcome. `assembleRelease` with no
+      # signing config does not fail — it writes app-release-unsigned.apk and
+      # exits 0. Without this the workflow would go green, publish a release,
+      # and hand people a file Android refuses to install.
+      - name: Verify the APK is signed
+        run: |
+          BT="$(ls -1d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)"
+          export PATH="$BT:$PATH"
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "::error::app-release.apk is missing — the build produced an UNSIGNED apk. Check the ANDROID_KEYSTORE_* secrets."
+            ls -la android/app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          apksigner verify --verbose --print-certs "$APK"
+          # An app targeting API 30+ signed only with the v1 scheme cannot be
+          # installed on Android 11 or newer at all.
+          apksigner verify --verbose "$APK" | grep -q "v2 scheme.*true" \
+            || { echo "::error::no APK Signature Scheme v2 signature"; exit 1; }
+
+      - name: Shred the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.p12"
+
+      # The filename has to be constant for the /releases/latest/download/ URL
+      # to be a permanent link, so the version lives in the release, not the
+      # file. The versioned copy is there for going back to a known-good one.
+      - name: Stage the APK under a stable name
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/pit.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/pit-${{ steps.ver.outputs.name }}.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pit-apk-${{ steps.ver.outputs.code }}
+          path: dist/*.apk
+          retention-days: 30
+
+      - name: Publish the release
+        # Not `inputs.publish != false`. On a push the `inputs` context does
+        # not exist, and GitHub compares mismatched types by coercing both to
+        # numbers — null becomes 0, false becomes 0 — so that condition is
+        # false on exactly the runs that should publish. Ask which event this
+        # is first, and only consult the checkbox when there is one.
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: apk-v${{ steps.ver.outputs.name }}
+          name: PIT app ${{ steps.ver.outputs.name }}
+          # /releases/latest skips anything marked prerelease, and that URL is
+          # the whole point of publishing here.
+          prerelease: false
+          make_latest: true
+          body: |
+            The Android app for PIT — a shell around https://protrackive.vercel.app.
+
+            It carries no copy of PIT, so it updates itself: whatever is deployed
+            is what opens. You only need this file when something native changes.
+
+            **Install:** download `pit.apk` on the phone and open it. Android will
+            ask you to allow installing from your browser the first time. It
+            installs over any previous version without losing anything.
+
+            versionCode ${{ steps.ver.outputs.code }}
+          files: |
+            dist/pit.apk
+            dist/pit-${{ steps.ver.outputs.name }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### PIT ${{ steps.ver.outputs.name }} — versionCode ${{ steps.ver.outputs.code }}"
+            echo ""
+            echo "Permanent link: https://github.com/${{ github.repository }}/releases/latest/download/pit.apk"
+          } >> "$GITHUB_STEP_SUMMARY"

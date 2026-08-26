@@ -29,8 +29,9 @@ installs to a phone's home screen. One person owns it; a few friends use it.
 | Auth | JWT in an httpOnly cookie | `jose`, scrypt password hashing |
 | Charts | Recharts | Lazily imported *and* lazily mounted |
 | AI | Groq **and** Google, both free tiers | `lib/ai.ts` is one door: gpt-oss-120b/20b, falling through to gemini-3.5-flash/-lite when a quota, a key or a model fails. A daily cap belongs to a *key*, so the answer to "quota spent" is another provider, not another model. |
-| Push | Web Push (VAPID) | Plus polled cron for scheduling |
-| Tests | Vitest | Pure `lib/` logic, **and now route handlers** — see §11 |
+| Push | Web Push (VAPID) | Plus polled cron for scheduling. **Browsers only** — an Android WebView has no Push API, so the app schedules its own (§11) |
+| Android app | Capacitor 8, pinned | A WebView on `server.url`; carries no copy of PIT, so a deploy needs no reinstall (§11). `android/` is generated in CI, never committed |
+| Tests | Vitest | Pure `lib/` logic, **and now route handlers** — see §12 |
 | Layout | Two rules in `globals.css` | `.page-width` (header, page and footer share one width, growing at 1280/1536px) and `.card-stack` (a stack of cards on a phone, two columns on a big screen). The daily log uses a plain grid instead — it has `position: sticky` bars, and sticky inside multi-column is unreliable. |
 | Hosting | Vercel | Every push to `main` auto-deploys |
 
@@ -93,9 +94,18 @@ lib/                pure logic, shared helpers, and the database
                        arrival date your own pace implies;
                      pixels.ts — a year laid out as calendar weeks)
 tests/              vitest specs, one per lib module
-scripts/            one-off tools (icons, VAPID keys, demo seed, db check)
+scripts/            one-off tools (icons, VAPID keys, demo seed, db check,
+                    and the two the Android app needs: make-keystore.mjs
+                    once per lifetime, android-overrides.mjs every build)
 public/sw.js        the service worker
 proxy.ts            middleware: auth gate + moved addresses
+
+capacitor.config.ts the Android shell: what it is called, and the URL it opens
+capacitor/www/      the only files the APK carries — error.html, and a stub
+                    index.html that exists because Capacitor insists on one
+android-overlay/    what CI puts back after generating android/: the signing
+                    config, one manifest permission, the notification icon
+android/            NOT in the repository. Generated, patched, built, discarded
 ```
 
 **The rule that keeps this navigable:** anything testable lives in `lib/`.
@@ -139,7 +149,7 @@ and an app that cannot tell them apart teaches you to log a lie.
 stamped with the day it was written) — exist outside the scoring system
 entirely. A day with a written
 note, three ticked tasks and a finished book, but nothing logged, is still a
-day with nothing logged. This is not an oversight; see §12.
+day with nothing logged. This is not an oversight; see §13.
 
 ---
 
@@ -222,7 +232,7 @@ All of it pure, all of it in `lib/`, all of it tested.
 
 **Time and the calendar**
 - `dates.ts` — parsing, ranges, buckets, and `isBeyondToday`, the guard that
-  makes the Tomorrow tab safe (§12).
+  makes the Tomorrow tab safe (§13).
 - `clock.ts` — the night axis, so a 1am bedtime sorts after a 11pm one.
 - `streak.ts`, `milestones.ts`, `challenges.ts`.
 
@@ -303,6 +313,17 @@ anyone past the cap is delivered on the next poll instead of being dropped —
 and the number deferred is recorded in `cronRuns` and shown on /admin, so a
 schedule that needs polling more often says so.
 
+**The Android app does not wait to be told.** An Android WebView has no
+Push API, so every one of the arrows above stops at its door. Instead the
+phone reads the hour off the account and writes it onto its own alarm clock
+(`lib/native.ts`), which is both weaker and stronger than push: it cannot
+carry a message the server computed — no "your challenge ends today", no
+Sunday digest — but it fires with no signal, with PIT closed, and with
+nothing on the internet awake. The account's setting stays the one setting;
+only the delivery differs. It is re-armed on every resume, because Android
+exempts only the *next* occurrence from Doze, and because a force-stop or a
+reboot before first unlock throws the alarm away.
+
 > **This is the one part that needs setup outside the code:** the repository
 > needs a `PIT_URL` variable and a `CRON_SECRET` secret, and `PIT_URL` must
 > point at a deployment with Vercel Deployment Protection **off**. Until
@@ -310,9 +331,55 @@ schedule that needs polling more often says so.
 
 ---
 
-## 11. Testing, and its honest limits
+## 11. The Android shell
 
-503 tests. `npm test`.
+The APK is a WebView pointed at the deployed site. It carries **no copy of
+PIT** — `capacitor.config.ts` sets `server.url` and that is the entire
+mechanism — so a push to `main` is on the phone at its next launch, with
+nothing rebuilt and nothing reinstalled. The only thing that needs a new APK
+is a change to something *native*: the name, the icon, a permission, a plugin,
+the URL it points at.
+
+```
+git push  ──►  Vercel  ──►  protrackive.vercel.app  ──►  the browser
+                                     │                └──►  the APK's WebView
+                                     │
+  .github/workflows/apk.yml  ──►  a new APK, only when the native side changes
+```
+
+**`android/` is not in this repository.** It is generated by
+`npx cap add android` during the build, patched by
+`scripts/android-overrides.mjs` from the files in `android-overlay/`, signed,
+and thrown away. The patch writes files Capacitor's generator never writes —
+Gradle merges repeated `android { }` blocks and AGP merges build-type
+manifests — so exactly one generated line is ever touched, and it is an
+append. A canary in the same script fails the build the day the template
+stops looking the way it looks now, because the alternative is an APK that
+builds, signs, uploads and cannot be installed.
+
+**Three things the web version gets for free and the shell has to be told.**
+A WebView is not a browser in standalone mode; it is not a browser at all.
+
+| Fact | How it is known | Why it isn't automatic |
+|---|---|---|
+| "I am the app" | `PITApp` appended to the user agent, read through `lib/native.ts` | Nothing else distinguishes the WebView from Chrome. Being on the *request* is the point — the inline script in the root layout can stamp `data-shell="native"` on `<html>` before the first paint |
+| Install offers stay hidden | `[data-shell="native"] .hide-installed` | `@media (display-mode: standalone)` does not match a WebView, so the installed app would spend its life offering to install itself |
+| Content clears the status bar | `--safe-area-inset-*`, published by Capacitor's System Bars plugin, with `env()` as the fallback | Android 15 and 16 draw every app edge to edge and removed the opt-out |
+
+**Push does not exist here** — an Android WebView has no Push API at all, so
+nothing the server sends can arrive. The daily ask is kept by the phone
+instead (§10). The one screen the APK does carry is `capacitor/www/error.html`,
+shown when the WebView cannot reach the site; it is served from the app's own
+assets, which means Capacitor's bridge is *not* injected into it and it can
+call nothing — including the back-button listener, so on that one screen back
+falls through to Capacitor's default and retries the address that failed. It
+behaves as a second Try again; the way out is the home button.
+
+---
+
+## 12. Testing, and its honest limits
+
+510 tests. `npm test`.
 
 **What used to be missing, and now partly isn't.** For most of this
 project's life not one route handler had a test, and the reason was mundane:
@@ -345,7 +412,7 @@ a sentence. What is not wrapped is deliberate: the tracker inputs on the daily
 log and the calendar on History are the point of those pages, and hiding them
 quietly would be worse than failing loudly.
 
-## 12. Invariants — do not regress these
+## 13. Invariants — do not regress these
 
 1. **A day's time (duration + sleep) ≤ 1440 minutes,** enforced on the
    server, in the stopwatch, and on the page.
@@ -381,15 +448,28 @@ quietly would be worse than failing loudly.
     as time badly spent is only ever the habit flag they set too. The app
     never decides either. Sleep is priced in the total and judged in
     neither column — see `lib/timeValue`.
-16. **The catch-up screen offers taps only.** Reconstructing a yes/no from
+16. **The APK carries no copy of PIT.** It is a WebView on the deployed
+    URL, so what is deployed is what opens. Anything that would put app
+    code inside the APK breaks the only reason it needs no reinstall.
+17. **A reminder in the Android app is the phone's own.** Nothing the
+    server sends can reach a WebView, so the hour is an alarm the device
+    keeps — re-armed on every resume, because `allowWhileIdle` exempts
+    only the next occurrence from Doze.
+18. **The signing key is never generated in CI.** The repository is
+    public, so an artifact or a workflow input is a public place. A key
+    born on a runner is a key anyone can sign as PIT with.
+19. **The catch-up screen offers taps only.** Reconstructing a yes/no from
     memory is honest; typing last Tuesday's sleep is invention, and this app
     would rather keep a gap than gain a made-up number.
 
 ---
 
-## 13. Deploying
+## 14. Deploying
 
-`git push` to `main`. Vercel builds and deploys. That is the whole procedure.
+`git push` to `main`. Vercel builds and deploys. That is the whole procedure —
+**for the phone too**, which is the point of the shell (§11): the APK opens
+the deployed site, so a deploy is on it at the next launch with nothing to
+reinstall.
 
 Before pushing: `npm test`, `npm run lint`, `npx tsc --noEmit`,
 `npm run build:local`. All four must be clean.

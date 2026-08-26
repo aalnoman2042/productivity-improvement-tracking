@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Merged into the generated manifest by the Android Gradle Plugin, which reads
+  build-type source sets (src/release, src/debug) at a higher priority than
+  src/main. scripts/android-overrides.mjs drops it into both, so the generated
+  manifest is never edited — the file Capacitor rewrites stays the file
+  Capacitor owns.
+
+  Almost nothing needs to be here. @capacitor/local-notifications ships its own
+  manifest declaring POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM, WAKE_LOCK,
+  RECEIVE_BOOT_COMPLETED and the boot receiver that re-arms alarms after a
+  restart; all of it arrives through the same merge. INTERNET comes from
+  Capacitor's own template.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The one addition, and it earns its place.
+
+      From Android 14, SCHEDULE_EXACT_ALARM is denied by default to a newly
+      installed app. The plugin's response is to fling the user out of the
+      WebView into the system "Alarms & reminders" screen on the very first
+      schedule() call — mid-tap, unannounced. USE_EXACT_ALARM is granted at
+      install and cannot be revoked, so the reminder is simply exact and the
+      ambush never happens.
+
+      Google Play restricts this permission to alarm and calendar apps, which
+      would rule it out — but that is a store review rule, enforced at
+      submission, and this APK is sideloaded from a GitHub release. If PIT
+      ever goes to Play, this line comes out and the settings-redirect flow
+      comes back.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!--
+      The other one, and it is easy to miss because nothing asks for it.
+
+      Android's WebView only starts Chromium's network-change notifier when
+      the host app holds this permission. Without it `navigator.onLine` is
+      pinned to `true` forever and the `online` / `offline` events never
+      fire — which would not be a cosmetic loss here. PIT's whole offline
+      layer is built on those: `lib/sync.ts` drains its queue of unsent days
+      on `online`, `lib/useCached.ts` revalidates on reconnect, and
+      `SyncStatus` would sit there claiming a connection the phone does not
+      have. The app would look like it had saved a day it was still holding.
+
+      A normal, install-time permission: nothing is prompted, and it grants
+      no ability to read the network, only to be told when it changes.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+</manifest>
