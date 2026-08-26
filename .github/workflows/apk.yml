@@ -81,7 +81,26 @@ jobs:
       # licences, so there is no SDK step here. If a future image drops them,
       # `android-actions/setup-android@v4` is the one-line replacement.
 
-      - run: npm ci
+      # `install`, not `ci`, and that is a deliberate exception rather than
+      # laziness.
+      #
+      # `npm ci` demands that package-lock.json and package.json agree about
+      # the *whole* ideal tree, and the lockfile in this repo is written by
+      # whichever npm the owner has locally (11.x). A runner on npm 10 derives
+      # a slightly different tree around one transitive peer conflict in the
+      # ESLint toolchain and refuses with `EUSAGE ... Missing: @emnapi/core`.
+      # `npm install` reconciles instead of refusing — it is what Vercel runs,
+      # and what has built this app every day.
+      #
+      # Losing `ci`'s exactness costs nothing here. The APK contains no
+      # JavaScript from this repository, so node_modules cannot change the
+      # artifact; the only thing this install has to get right is the
+      # Capacitor CLI and plugins that scaffold the native project, and those
+      # are pinned to exact versions in package.json. The alternative — an
+      # `overrides` entry — would change what Vercel installs for the website,
+      # which is not a risk worth taking to build an Android file.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
       # `cap add android` treats a missing webDir as a warning, not an error:
       # it scaffolds the project, skips its sync step, exits 0, and hands you a
