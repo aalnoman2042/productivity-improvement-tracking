@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbReady } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
+import { aiLockedBody, hasAI } from "@/lib/access";
 import { aiBudget, hit, tooMany } from "@/lib/rateLimit";
 import { isValidDateStr } from "@/lib/dates";
 import { gatherCoachFacts } from "@/lib/coachGather";
@@ -64,6 +65,16 @@ export async function POST(req: Request) {
 
   if (!aiConfigured()) {
     return NextResponse.json({ error: AI_SETUP_ERROR }, { status: 503 });
+  }
+
+  // The coach is the one feature with a bill attached — see `lib/access.ts`.
+  // 403 with a `locked` flag rather than a bare error, so the card can say
+  // what is going on instead of looking broken.
+  const account = await (await dbReady())
+    .collection("users")
+    .findOne({ _id: userId }, { projection: { invited: 1 } });
+  if (!hasAI(account)) {
+    return NextResponse.json(aiLockedBody, { status: 403 });
   }
 
   const body = await req.json().catch(() => null);

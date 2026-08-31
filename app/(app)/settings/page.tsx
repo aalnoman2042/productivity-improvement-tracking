@@ -9,6 +9,7 @@ import PasswordInput from "@/components/PasswordInput";
 import ReminderSettings from "@/components/ReminderSettings";
 import TimeValueSettings from "@/components/TimeValueSettings";
 import CardBoundary from "@/components/CardBoundary";
+import DeleteAccount from "@/components/DeleteAccount";
 import { APP_VERSION } from "@/lib/version";
 
 type Me = { id: string; name: string; email: string; admin?: boolean };
@@ -301,6 +302,11 @@ export default function SettingsPage() {
             </button>
           </section>
 
+          {/* The way out. Last in the column on purpose — nobody arrives on
+              this page looking for it, and the one person who is looking
+              will scroll. */}
+          <DeleteAccount />
+
           <section className="animate-rise-in rounded-xl border border-edge card p-4 shadow-sm">
             <h2 className="font-semibold">About</h2>
             <dl className="mt-3 space-y-2 text-sm">
@@ -323,7 +329,7 @@ export default function SettingsPage() {
                     rel="noopener noreferrer"
                     className="underline-offset-2 hover:underline"
                   >
-                    Rohan
+                    Abdullah Al Noman
                   </a>
                 </dd>
               </div>

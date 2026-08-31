@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
@@ -284,6 +285,11 @@ function TrackersList() {
       place: form.remindOn && form.remindMode === "prayer" ? form.place : null,
       // Minutes east of UTC — how the server knows when "18:00" is for you.
       tzOffset: -new Date().getTimezoneOffset(),
+      // The day a changed goal starts counting from. The server records the
+      // old promise against it so the past keeps being judged at the target
+      // that was actually in force — see lib/goalHistory.ts. It has to come
+      // from here because only the browser knows what day it is for you.
+      today: toDateStr(new Date()),
     };
     const res = await fetch(
       editingId ? `/api/trackers/${editingId}` : "/api/trackers",
@@ -641,29 +647,27 @@ function TrackersList() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Category</label>
-              <select
+              <Select
+                label="Category"
                 value={customCategory ? NEW_CATEGORY : form.category}
-                onChange={(e) => {
-                  if (e.target.value === NEW_CATEGORY) {
+                onChange={(v) => {
+                  if (v === NEW_CATEGORY) {
                     setCustomCategory(true);
                     setF("category", "");
                   } else {
                     setCustomCategory(false);
-                    setF("category", e.target.value);
+                    setF("category", v);
                   }
                 }}
-                className={field}
-              >
-                {categoryOptions.map((value) => {
-                  const meta = categoryMeta(value);
-                  return (
-                    <option key={value} value={value}>
-                      {meta.icon} {meta.label}
-                    </option>
-                  );
-                })}
-                <option value={NEW_CATEGORY}>＋ New category…</option>
-              </select>
+                buttonClassName="py-2"
+                options={[
+                  ...categoryOptions.map((value) => {
+                    const meta = categoryMeta(value);
+                    return { value, label: `${meta.icon} ${meta.label}` };
+                  }),
+                  { value: NEW_CATEGORY, label: "＋ New category…" },
+                ]}
+              />
               {customCategory && (
                 <input
                   value={form.category}
@@ -764,16 +768,16 @@ function TrackersList() {
             </label>
             {form.goalOn && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <select
+                <Select
+                  label="Goal direction"
                   value={form.goalDirection}
-                  onChange={(e) =>
-                    setF("goalDirection", e.target.value as "min" | "max")
-                  }
-                  className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-                >
-                  <option value="min">At least</option>
-                  <option value="max">At most</option>
-                </select>
+                  onChange={(v) => setF("goalDirection", v as "min" | "max")}
+                  className="w-28"
+                  options={[
+                    { value: "min", label: "At least" },
+                    { value: "max", label: "At most" },
+                  ]}
+                />
                 <input
                   inputMode="decimal"
                   value={form.goalTarget}
@@ -784,16 +788,16 @@ function TrackersList() {
                 <span className="text-sm text-secondary">
                   {isTimeType ? "hours" : form.unit || "×"}
                 </span>
-                <select
+                <Select
+                  label="Goal period"
                   value={form.goalPeriod}
-                  onChange={(e) =>
-                    setF("goalPeriod", e.target.value as "day" | "week")
-                  }
-                  className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-                >
-                  <option value="day">per day</option>
-                  <option value="week">per week</option>
-                </select>
+                  onChange={(v) => setF("goalPeriod", v as "day" | "week")}
+                  className="w-28"
+                  options={[
+                    { value: "day", label: "per day" },
+                    { value: "week", label: "per week" },
+                  ]}
+                />
               </div>
             )}
             {/* Eight glasses is a number everyone has heard and nobody has

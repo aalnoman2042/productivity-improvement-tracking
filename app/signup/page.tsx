@@ -97,14 +97,24 @@ export default function SignupPage() {
         />
         <p className="mb-4 text-xs text-muted">At least 8 characters.</p>
 
-        <label className="mb-1 block text-sm font-medium">Invite code</label>
+        <label className="mb-1 block text-sm font-medium">
+          Invite code{" "}
+          <span className="font-normal text-muted">— optional</span>
+        </label>
         <input
-          required
           value={form.invite}
           onChange={(e) => set("invite", e.target.value)}
-          placeholder="Ask the owner for this"
+          placeholder="Leave blank if you don't have one"
           className={field}
         />
+        {/* The code stopped being a door and became a key to one room. It is
+            worth saying here rather than only on the pitch page: this is the
+            field people stall on. */}
+        <p className="mt-1 text-xs text-muted">
+          Not needed to sign up — the whole tracker works without it. A code
+          switches on the 🧠 AI coach, which runs on one shared free
+          allowance and so can&apos;t be open to everyone yet.
+        </p>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
@@ -123,9 +133,9 @@ export default function SignupPage() {
           </Link>
         </p>
 
-        {/* The invite field says "ask the owner" — this is how you reach him. */}
+        {/* Where to ask for a code, for the one person who wants the coach. */}
         <p className="mt-3 border-t border-edge pt-3 text-center text-xs text-muted">
-          Don&apos;t have an invite code?{" "}
+          Want the AI coach?{" "}
           <a
             href="https://abdullah-al-noman.vercel.app/"
             target="_blank"

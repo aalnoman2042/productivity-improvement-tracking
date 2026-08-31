@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
 import { deletePhrase, normalizeCategory } from "@/lib/trackers";
 import { parseGoal, parseHabit, parseTarget } from "@/lib/trackerDoc";
+import { parseGoalHistory, recordGoal } from "@/lib/goalHistory";
+import { isValidDateStr } from "@/lib/dates";
 import { parseReminderMode, parseReminderTimes } from "@/lib/trackerReminders";
 import { parsePlace } from "@/lib/prayerTimes";
 
@@ -33,7 +35,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (category) set.category = category;
   }
   if (typeof body.archived === "boolean") set.archived = body.archived;
-  if ("goal" in body) set.goal = parseGoal(body.goal);
+  const nextGoal = "goal" in body ? parseGoal(body.goal) : undefined;
+  if (nextGoal !== undefined) set.goal = nextGoal;
   if ("target" in body) set.target = parseTarget(body.target);
   if ("habit" in body) set.habit = parseHabit(body.habit);
   if ("reminder" in body) {
@@ -51,9 +54,39 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const d = await db();
-  const res = await d
-    .collection("trackers")
-    .updateOne({ _id: new ObjectId(id), userId }, { $set: set });
+
+  /**
+   * A changed goal is a new promise, and the old one has to survive it.
+   *
+   * Read the tracker first — only to compare goals, and only when a goal was
+   * sent — so the history can record what the goal *was* alongside the day
+   * the new one started. Without this, raising a target from 2h to 5h would
+   * re-judge every past day at 5h and turn a week you actually kept into a
+   * week you failed. See `lib/goalHistory.ts`.
+   *
+   * `today` is the caller's clock, like everywhere else that is date-scoped:
+   * the server cannot know which day it is for the reader, and a promise
+   * dated a day out is a promise attached to the wrong days. A caller that
+   * sends no `today` gets the goal changed and no history written, which is
+   * the old behaviour and strictly better than a wrong date.
+   */
+  const filter = { _id: new ObjectId(id), userId };
+  if (nextGoal !== undefined && isValidDateStr(body.today)) {
+    const before = await d
+      .collection("trackers")
+      .findOne(filter, { projection: { goal: 1, goalHistory: 1 } });
+    if (before) {
+      const history = recordGoal(
+        parseGoalHistory(before.goalHistory),
+        parseGoal(before.goal),
+        nextGoal,
+        body.today
+      );
+      if (history) set.goalHistory = history;
+    }
+  }
+
+  const res = await d.collection("trackers").updateOne(filter, { $set: set });
   if (res.matchedCount === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

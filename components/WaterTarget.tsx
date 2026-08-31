@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import { useState } from "react";
 import { useStored } from "@/lib/useCached";
 import {
@@ -80,18 +81,17 @@ export default function WaterTarget({
         />
         <span className="text-sm text-secondary">kg</span>
 
-        <select
+        <Select
+          label="How active a day"
           value={activity}
-          onChange={(e) => setActivity(e.target.value as Activity)}
-          aria-label="How active a day"
-          className="border border-edge px-2 py-1.5 text-sm"
-        >
-          {ACTIVITIES.map((a) => (
-            <option key={a.value} value={a.value}>
-              {a.label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setActivity(v as Activity)}
+          className="min-w-[10rem]"
+          options={ACTIVITIES.map((a) => ({
+            value: a.value,
+            label: a.label,
+            hint: a.hint,
+          }))}
+        />
       </div>
 
       {/* The ask, when there is nothing to work from. Not an error — most

@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import { useState } from "react";
 import { toDateStr } from "@/lib/dates";
 import {
@@ -121,34 +122,28 @@ export default function PrayerTimesPicker({
       )}
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="block">
+        {/* Not a <label>: it wraps a button now, and a label's click would
+            be forwarded into it and toggle the panel twice. */}
+        <div className="block">
           <span className="text-xs text-secondary">Calculation</span>
-          <select
+          <Select
+            label="Calculation method"
             value={place?.method ?? "karachi"}
-            onChange={(e) => set({ method: e.target.value as PrayerPlace["method"] })}
-            className="mt-1 w-full rounded-md border border-edge card px-2 py-1.5 text-sm"
-          >
-            {CALC_METHODS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
+            onChange={(v) => set({ method: v as PrayerPlace["method"] })}
+            className="mt-1"
+            options={CALC_METHODS.map((m) => ({ value: m.value, label: m.label }))}
+          />
+        </div>
+        <div className="block">
           <span className="text-xs text-secondary">Asr</span>
-          <select
+          <Select
+            label="Asr school"
             value={place?.asr ?? "hanafi"}
-            onChange={(e) => set({ asr: e.target.value as PrayerPlace["asr"] })}
-            className="mt-1 w-full rounded-md border border-edge card px-2 py-1.5 text-sm"
-          >
-            {ASR_SCHOOLS.map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(v) => set({ asr: v as PrayerPlace["asr"] })}
+            className="mt-1"
+            options={ASR_SCHOOLS.map((a) => ({ value: a.value, label: a.label }))}
+          />
+        </div>
       </div>
 
       {/* The proof. If these five are wrong, everything downstream is. */}

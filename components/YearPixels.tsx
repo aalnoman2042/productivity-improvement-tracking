@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import { useEffect, useState } from "react";
 import { useNearViewport } from "@/lib/useNearViewport";
 import { useCached } from "@/lib/useCached";
@@ -103,19 +104,16 @@ export default function YearPixels() {
         <label className="sr-only" htmlFor="pixel-tracker">
           Which tracker
         </label>
-        <select
-          id="pixel-tracker"
+        <Select
+          label="Which tracker"
           value={pick}
-          onChange={(e) => setPick(e.target.value)}
-          className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-        >
-          <option value="">All days</option>
-          {trackers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+          onChange={setPick}
+          className="min-w-[9rem]"
+          options={[
+            { value: "", label: "All days" },
+            ...trackers.map((t) => ({ value: t.id, label: t.name })),
+          ]}
+        />
       </div>
 
       {failed ? (

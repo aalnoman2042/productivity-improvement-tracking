@@ -293,6 +293,8 @@ export default function LifeNow() {
   const stored = q.data;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /** Set when the account simply doesn't have the coach — an explanation. */
+  const [locked, setLocked] = useState("");
 
   // A clock the countdown can read *purely* — same pattern as the timer.
   const [now, setNow] = useState(() => Date.now());
@@ -323,6 +325,13 @@ export default function LifeNow() {
         body: JSON.stringify({ today: toDateStr(new Date()) }),
       });
       const data = await res.json().catch(() => null);
+      // A locked coach is not a failure — see lib/access.ts. It is said in
+      // the app's own voice rather than in the red box that means "something
+      // broke", because nothing did.
+      if (res.status === 403 && data?.locked) {
+        setLocked(String(data.error));
+        return;
+      }
       if (!res.ok) throw new Error(data?.error ?? "Could not analyze");
       q.update(data as Stored);
     } catch (err) {
@@ -377,10 +386,16 @@ export default function LifeNow() {
       </div>
 
       <div className="space-y-3.5 p-4">
-        {error && (
-          <p className="rounded-lg border border-red-600/40 bg-red-600/5 p-2.5 text-sm text-red-600">
-            {error}
+        {locked ? (
+          <p className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm text-secondary">
+            ✨ {locked}
           </p>
+        ) : (
+          error && (
+            <p className="rounded-lg border border-red-600/40 bg-red-600/5 p-2.5 text-sm text-red-600">
+              {error}
+            </p>
+          )
         )}
 
         {busy && !stored && (

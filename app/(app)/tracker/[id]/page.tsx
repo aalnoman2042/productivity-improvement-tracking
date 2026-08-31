@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Commitments from "@/components/Commitments";
 import { useParams } from "next/navigation";
 import { useCached } from "@/lib/useCached";
 import { calendarGrid, monthOf, addMonths, monthTitle, prettyDate, toDateStr, WEEKDAY_INITIALS } from "@/lib/dates";
@@ -315,6 +316,11 @@ export default function TrackerDetailPage() {
           </span>
         ))}
       </div>
+
+      {/* Every promise made about this tracker, kept apart. Renders nothing
+          until the goal has actually changed at least once — before that it
+          would only repeat the goal line in the header. */}
+      <Commitments tracker={tracker} entries={entries} today={today} />
 
       {/* The long arc, month by month */}
       <section className="rounded-xl border border-edge card p-4 shadow-sm">

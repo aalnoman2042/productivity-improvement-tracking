@@ -1,6 +1,7 @@
 import type { Document, WithId } from "mongodb";
 import type { Goal, Habit } from "./trackers";
 import { parseTarget, type Target } from "./targets";
+import { parseGoalHistory, type GoalHistory } from "./goalHistory";
 
 /**
  * Converting a stored tracker to the shape the client sees, and validating a
@@ -20,6 +21,9 @@ export function toTracker(doc: WithId<Document>) {
     color: doc.color as string,
     category: doc.category as string,
     goal: (doc.goal ?? null) as Goal,
+    // Every goal it has ever carried. Null on the great majority — a goal
+    // that has never changed needs no history to be judged correctly.
+    goalHistory: parseGoalHistory(doc.goalHistory) as GoalHistory | null,
     // The client only needs the times of day; lastSentFor is the cron's.
     reminder: (doc.reminder?.times ?? null) as string[] | null,
     // Whether those times are the ones typed or today's waqts. Sent as its

@@ -60,6 +60,12 @@ const VALIDATORS: Record<string, object> = {
       resetExpires: { bsonType: ["date", "null"] },
       // Stamped into every session; changing the password orphans old tokens.
       passwordChangedAt: { bsonType: ["date", "null"] },
+      // Whether this account was created with the invite code. The app is
+      // open to everyone; the **AI coach** is not, because it runs on one
+      // shared free-tier allowance that cannot be split between strangers.
+      // Absent on every account created before the field, and all of those
+      // WERE invited — see `lib/access.ts`, which reads absent as invited.
+      invited: { bsonType: ["bool", "null"] },
       // What an hour of this person's life is worth to them, so the app can
       // price the time they spend (`lib/timeValue`). Absent for everyone who
       // never set one, and the whole feature is invisible until they do.
@@ -136,6 +142,32 @@ const VALIDATORS: Record<string, object> = {
           target: { bsonType: "number", minimum: 0 },
           period: { enum: ["day", "week"] },
           direction: { enum: ["min", "max"] },
+        },
+      },
+      // Every goal this tracker has ever carried, oldest first, each with
+      // the day it came into force. `goal` above is still the one in force
+      // NOW; this is what makes the past judgeable at the promise that was
+      // actually in place then — raise a target and last week must not
+      // retroactively become a week you failed. See `lib/goalHistory.ts`.
+      // Absent on every tracker whose goal has never changed.
+      goalHistory: {
+        bsonType: ["array", "null"],
+        maxItems: 200,
+        items: {
+          bsonType: "object",
+          required: ["from", "goal"],
+          properties: {
+            from: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+            goal: {
+              bsonType: ["object", "null"],
+              required: ["target", "period", "direction"],
+              properties: {
+                target: { bsonType: "number", minimum: 0 },
+                period: { enum: ["day", "week"] },
+                direction: { enum: ["min", "max"] },
+              },
+            },
+          },
         },
       },
       // A number to reach by a date, which is a different question from the

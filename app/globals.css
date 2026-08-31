@@ -418,26 +418,18 @@ input {
 }
 
 /* =====================================================================
-   Dropdowns.
+   Dropdowns — the floor under a control the app no longer uses.
 
-   All nine of them in one rule, because a native <select> is the one control
-   a browser refuses to make look like the rest of your app. Left alone they
-   arrived three different heights on three platforms wearing the OS's own
-   arrow — a grey triangle on Windows, a blue one on iOS, and on some Android
-   WebViews nothing at all — on a card that has no grey or blue anywhere else
-   in it. Next to the app's own buttons they read as something pasted in.
+   These rules styled all nine native <select>s, and they were not enough.
+   A <select> can be styled to the last pixel *while closed*, and the moment
+   it opens the operating system draws the list: on Windows a flat white
+   rectangle with a blue highlight, in a dark app, beside cards with soft
+   shadows and 1rem corners. `option { background }` does not reach it and
+   nothing in CSS does — which is why `components/Select.tsx` exists and why
+   there is no `<select>` left in the app.
 
-   So `appearance: none` takes the platform's chrome off and the chevron is
-   drawn here. It is a background image per theme rather than one image in
-   `currentColor`, because a data-URI SVG cannot see `currentColor` — it is
-   a separate document, and the property does not cross that boundary. Two
-   small images is the honest fix; a mask would clip the select's own text.
-
-   `padding-inline-end` leaves room for the arrow, logical rather than
-   `padding-right` so a right-to-left locale puts it on the correct side.
-   The closed control gets a real surface so it reads as pressable; the open
-   list is the browser's, and follows the `color-scheme` each theme block at
-   the top of this file already declares.
+   Kept because it costs a few bytes and it is the difference between a
+   native select added in a hurry looking passable and looking pasted in.
    ===================================================================== */
 select {
   appearance: none;

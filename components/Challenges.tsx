@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { seriesColor } from "@/lib/palette";
@@ -258,23 +259,25 @@ export default function Challenges({
             <label className="mb-1 block text-sm font-medium">
               What counts as done each day?
             </label>
-            <select
+            <Select
+              label="What counts as done each day?"
               value={form.trackerId}
-              onChange={(e) => {
-                setF("trackerId", e.target.value);
+              onChange={(v) => {
+                setF("trackerId", v);
                 setF("target", "");
               }}
-              className={field}
-            >
-              <option value={NEW_TRACKER}>
-                ✓ A new Yes/No tracker named after the challenge
-              </option>
-              {active.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({typeMeta(t.type as TrackerType).label})
-                </option>
-              ))}
-            </select>
+              options={[
+                {
+                  value: NEW_TRACKER,
+                  label: "✓ A new Yes/No tracker named after the challenge",
+                },
+                ...active.map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                  hint: typeMeta(t.type as TrackerType).label,
+                })),
+              ]}
+            />
             {form.trackerId === NEW_TRACKER ? (
               <p className="mt-1 text-xs text-muted">
                 It appears on the daily log under 🏆 Challenge — tap it done
@@ -288,16 +291,16 @@ export default function Challenges({
             )}
             {wantsTarget && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <select
+                <Select
+                  label="Target direction"
                   value={form.direction}
-                  onChange={(e) =>
-                    setF("direction", e.target.value as "min" | "max")
-                  }
-                  className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm"
-                >
-                  <option value="min">At least</option>
-                  <option value="max">At most</option>
-                </select>
+                  onChange={(v) => setF("direction", v as "min" | "max")}
+                  className="w-28"
+                  options={[
+                    { value: "min", label: "At least" },
+                    { value: "max", label: "At most" },
+                  ]}
+                />
                 <input
                   inputMode="decimal"
                   value={form.target}

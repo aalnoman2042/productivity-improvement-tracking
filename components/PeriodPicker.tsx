@@ -1,5 +1,6 @@
 "use client";
 
+import Select from "@/components/Select";
 import {
   PERIODS,
   periodEnd,
@@ -98,22 +99,18 @@ export default function PeriodPicker({
           ‹
         </button>
 
-        <label className="sr-only" htmlFor="period-anchor">
-          Which period
-        </label>
-        <select
-          id="period-anchor"
+        <Select
+          label="Which period"
           value={anchor}
-          onChange={(e) => step(e.target.value)}
-          className="rounded-md border border-edge bg-transparent px-2 py-1.5 text-sm font-medium"
-        >
-          {listed.map((unit) => (
-            <option key={unit} value={unit}>
-              {periodLabel(period, unit)}
-              {unit === current ? " · now" : ""}
-            </option>
-          ))}
-        </select>
+          onChange={step}
+          className="min-w-[11rem]"
+          buttonClassName="font-medium"
+          options={listed.map((unit) => ({
+            value: unit,
+            label: periodLabel(period, unit),
+            hint: unit === current ? "now" : undefined,
+          }))}
+        />
 
         <button
           type="button"

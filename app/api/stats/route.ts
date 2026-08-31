@@ -7,6 +7,7 @@ import { typeMeta, type Goal, type TrackerType } from "@/lib/trackers";
 import { toNight } from "@/lib/clock";
 import { streakInfo } from "@/lib/streak";
 import { loggingRun } from "@/lib/rest";
+import { goalOn, type GoalHistory } from "@/lib/goalHistory";
 import type { ClockSummary, StreakInfo } from "@/lib/stats";
 import {
   PERIOD_BUCKET,
@@ -133,22 +134,41 @@ function clockSummary(r: ClockRoll | undefined, prev: ClockRoll | undefined): Cl
   };
 }
 
+/**
+ * How many of the period's days met the goal — **the goal in force on each
+ * of them**, which is not always the goal in force now.
+ *
+ * `history` is the tracker's record of promises (`lib/goalHistory.ts`). Raise
+ * a daily target from 2h to 5h on the 8th and the 1st–7th are still judged
+ * at 2h, for ever. Days with no goal at all in force are not counted in the
+ * denominator: they were never a promise, so they cannot be a miss.
+ */
 function goalProgress(
   goal: Goal,
+  history: GoalHistory | null,
   r: Rollup,
   start: string,
   end: string,
   days: number
 ): { met: number; total: number } | null {
-  if (!goal) return null;
+  // Nothing was ever promised, at any point in the window.
+  if (!goal && !history?.some((p) => p.goal !== null)) return null;
 
-  if (goal.period === "day") {
+  if (goal?.period === "day" || (!goal && history)) {
     let met = 0;
+    let total = 0;
     for (let i = 0; i < days; i++) {
-      if (meetsGoal(r.dayValues.get(addDays(start, i)) ?? 0, goal)) met++;
+      const date = addDays(start, i);
+      const onThatDay = goalOn(history, date, goal);
+      // Weekly promises are judged below, not day by day.
+      if (!onThatDay || onThatDay.period !== "day") continue;
+      total++;
+      if (meetsGoal(r.dayValues.get(date) ?? 0, onThatDay)) met++;
     }
-    return { met, total: days };
+    if (total > 0) return { met, total };
+    if (!goal) return null;
   }
+  if (!goal) return null;
 
   const weekly = new Map<string, number>();
   for (const [date, value] of r.dayValues) {
@@ -168,8 +188,17 @@ function goalProgress(
   // and its one clipped week is the best available.
   const judged = weeks.length > 0 ? weeks : bucketsForRange(start, end, "week");
   let met = 0;
-  for (const wk of judged) if (meetsGoal(weekly.get(wk) ?? 0, goal)) met++;
-  return { met, total: judged.length };
+  let total = 0;
+  for (const wk of judged) {
+    // The promise in force at the week's start governs that week. A goal
+    // changed mid-week belongs to the week after it — half a week judged at
+    // each of two targets is a number nobody could check.
+    const onThatWeek = goalOn(history, wk, goal);
+    if (!onThatWeek || onThatWeek.period !== "week") continue;
+    total++;
+    if (meetsGoal(weekly.get(wk) ?? 0, onThatWeek)) met++;
+  }
+  return total > 0 ? { met, total } : null;
 }
 
 export async function GET(req: Request) {
@@ -375,7 +404,14 @@ export async function GET(req: Request) {
       bestDate: r.bestDate,
       avgPerDay: aggregate === "sum" ? r.sum / days : 0,
       avgPerLoggedDay: r.days > 0 ? r.sum / r.days : 0,
-      goal: goalProgress(tracker.goal, r, start, end, days),
+      goal: goalProgress(
+        tracker.goal,
+        tracker.goalHistory ?? null,
+        r,
+        start,
+        end,
+        days
+      ),
       previous: { sum: p.sum, days: p.days, value: prevValue },
       changePct,
       streak: streaks.get(tracker.id) ?? null,

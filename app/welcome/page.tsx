@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
+import { AUTHOR, siteUrl } from "@/lib/site";
 
 /**
  * The front door for someone who isn't signed in — the home page itself.
@@ -11,11 +12,104 @@ import Logo from "@/components/Logo";
  * the pitch is for people who don't have the habit yet.
  */
 
+/**
+ * Everything a crawler and a link preview get.
+ *
+ * Written out rather than left to the defaults because this is the only page
+ * of the app a search engine will ever see — everything else redirects to
+ * /login — so it carries the whole description of what PIT is. The canonical
+ * is absolute and points at the production host, so a Vercel preview
+ * deployment cannot compete with the real page in an index (`lib/site.ts`).
+ */
 export const metadata: Metadata = {
-  title: "PIT — Track everything that makes a day good",
+  metadataBase: new URL(siteUrl()),
+  title: "PIT — Habit, Sleep & Productivity Tracker You Log in Taps",
   description:
-    "Sleep, study, work, workouts, namaz, habits and streaks — logged in taps, charted over time, scored out of 100, and read back by an AI coach that says what to fix first.",
+    "A free personal tracker for sleep, study, work, workouts, namaz, water, habits and clean streaks. Log a day in taps, get it scored out of 100, watch the trends, and read a plain-English coach that tells you what to fix first. Works offline, installs to your phone, and your data exports in one click.",
+  keywords: [
+    "habit tracker",
+    "sleep tracker",
+    "productivity tracker",
+    "daily log app",
+    "streak tracker",
+    "namaz tracker",
+    "study time tracker",
+    "self improvement app",
+    "offline habit tracker",
+    "free habit tracker",
+    "PWA habit tracker",
+  ],
+  applicationName: "PIT",
+  authors: [{ name: AUTHOR.name, url: AUTHOR.url }],
+  creator: AUTHOR.name,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: siteUrl(),
+    siteName: "PIT",
+    title: "PIT — Track everything that makes a day good",
+    description:
+      "Sleep, study, work, workouts, namaz, habits and streaks — logged in taps, scored out of 100, and read back in plain English. Free, offline-first, and your data is yours.",
+    images: [
+      {
+        url: "/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "PIT — Productivity Improvement Tracker",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PIT — Track everything that makes a day good",
+    description:
+      "Log your day in taps. Get it scored. See what to fix first. Free and offline-first.",
+    images: ["/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
 };
+
+/**
+ * The questions people actually ask before signing up for a tracker — which
+ * is also, not coincidentally, the shape search engines reward. Rendered on
+ * the page AND as FAQPage structured data below, because an answer that only
+ * exists in a script tag is an answer written for a crawler rather than for
+ * a person, and this app does not do that.
+ */
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: "Is PIT free?",
+    a: "Yes. Logging, charts, the day score, grades, the report card, reminders, streaks, the calendar and the full export are free and open to anyone who signs up. The only part that is not is the AI coach, which runs on a shared free-tier allowance and goes to invited members for now.",
+  },
+  {
+    q: "Do I need an invite code?",
+    a: "No. Sign up without one and everything in the app works. An invite code switches on the AI coach — the daily read, the question box and the Sunday week in review.",
+  },
+  {
+    q: "Does it work offline?",
+    a: "Yes. PIT is a progressive web app: it installs to your home screen, opens with no signal, and queues anything you log until the connection comes back. Nothing you type is lost to a dead zone.",
+  },
+  {
+    q: "What can I track?",
+    a: "Time spent (with a stopwatch), sleep with bedtimes and wake times, counts like water or meals, 1-to-5 ratings, yes-or-no checks, measurements like weight, the five daily prayers, and clean streaks for a habit you are cutting. Start from a ready-made pack or write your own.",
+  },
+  {
+    q: "How is the day score worked out?",
+    a: "Arithmetic on your own numbers, never an AI: goals hit, showing up, sleep inside a healthy band, streaks kept and bad habits at zero. It means the same thing every day, which is the whole point of it.",
+  },
+  {
+    q: "Who can see my data?",
+    a: "Only you. Every account is private, notes and email are never sent to any AI, and you can export everything as JSON or CSV — or delete it — whenever you like.",
+  },
+  {
+    q: "Is there an Android app?",
+    a: "There is an APK that wraps the same site, so it updates itself with no reinstall. The web app installs to iPhone and Android home screens too.",
+  },
+];
 
 /** The path from an empty account to knowing what to do about your week. */
 const STEPS: { title: string; text: string }[] = [
@@ -105,7 +199,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   {
     icon: "🔒",
     title: "Yours, and yours only",
-    text: "Works offline and syncs when you're back. Export everything as CSV or JSON any time, import it back anywhere. Accounts are invite-only.",
+    text: "Works offline and syncs when you're back. Export everything as CSV or JSON any time, import it back anywhere. Every account is private, and nothing you write is ever sent to an AI.",
   },
 ];
 
@@ -226,6 +320,10 @@ export default function WelcomePage() {
               headline, what&apos;s working, what&apos;s slipping, and the one
               thing to fix first, starting tonight.
             </p>
+            <p className="mt-3 inline-block rounded-lg bg-white/15 px-3 py-1.5 text-xs font-medium text-white">
+              ✨ For invited members, for now — everything else in PIT is open
+              to everyone
+            </p>
           </div>
           <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
             {COACH.map((c) => (
@@ -247,6 +345,30 @@ export default function WelcomePage() {
       </section>
 
       {/* Why it sticks */}
+      {/* Why the one paid-shaped thing is paid-shaped. Said in the open,
+          because "premium" with no reason behind it is the oldest and least
+          convincing sentence on the internet. */}
+      <section className="mx-auto w-full max-w-3xl px-4 pb-16">
+        <div className="rounded-xl border border-edge card p-5 text-sm text-secondary shadow-sm">
+          <h2 className="text-base font-semibold text-foreground">
+            Why the coach is the one thing behind an invite
+          </h2>
+          <p className="mt-2">
+            Everything else here is arithmetic on your own numbers — it costs
+            nothing to run, so it costs nothing to use, and it always will.
+            The coach is a language model, and it runs on a free allowance
+            that belongs to <em>one key</em> and is shared by everybody at
+            once. A thousand people cannot each have a daily read of it.
+          </p>
+          <p className="mt-2">
+            So: sign up with no code and the whole tracker is yours — logging,
+            charts, the score, grades, streaks, reminders, the calendar,
+            export. An invite code switches on the daily read, the question
+            box and the Sunday week in review. Ask, and you may well get one.
+          </p>
+        </div>
+      </section>
+
       <section className="mx-auto w-full max-w-5xl px-4 pb-16">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
@@ -263,6 +385,92 @@ export default function WelcomePage() {
           ))}
         </div>
       </section>
+
+      {/* Questions people actually ask before they sign up for a tracker.
+          Rendered as real text, not only as structured data — an answer that
+          exists solely in a script tag was written for a crawler. */}
+      <section className="mx-auto w-full max-w-3xl px-4 pb-16">
+        <h2 className="text-center text-2xl font-bold tracking-tight">
+          Questions
+        </h2>
+        <dl className="mt-6 space-y-3">
+          {FAQ.map((f) => (
+            <div
+              key={f.q}
+              className="rounded-xl border border-edge card p-4 shadow-sm"
+            >
+              <dt className="font-semibold">{f.q}</dt>
+              <dd className="mt-1.5 text-sm text-secondary">{f.a}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* Contact */}
+      <section className="mx-auto w-full max-w-3xl px-4 pb-16">
+        <div className="rounded-xl border border-edge card p-5 text-center shadow-sm">
+          <h2 className="text-base font-semibold">Built by one person</h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-secondary">
+            PIT is made and maintained by {AUTHOR.name}. Bugs, ideas, an
+            invite code, or a question about how something is calculated — the
+            way to reach me is on my site.
+          </p>
+          <a
+            href={AUTHOR.url}
+            target="_blank"
+            rel="noopener noreferrer me"
+            className="mt-4 inline-block rounded-lg border border-edge px-5 py-2.5 text-sm font-medium hover:bg-surface-2"
+          >
+            Get in touch →
+          </a>
+        </div>
+      </section>
+
+      {/*
+        Structured data. Two objects, both describing exactly what is on the
+        page above and nothing that isn't: a SoftwareApplication so a result
+        can carry the price (free) and what it runs on, and an FAQPage built
+        from the same `FAQ` array the section above renders — so the two can
+        never drift into saying different things, which is the failure mode
+        that gets structured data ignored.
+      */}
+      <script
+        type="application/ld+json"
+        // The content is this file's own constants, not user input.
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            {
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "PIT — Productivity Improvement Tracker",
+              url: siteUrl(),
+              applicationCategory: "HealthApplication",
+              operatingSystem: "Web, Android, iOS",
+              description:
+                "A personal tracker for sleep, study, work, workouts, namaz, water, habits and clean streaks. Log a day in taps, get it scored out of 100, and read back what to fix first.",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
+              author: {
+                "@type": "Person",
+                name: AUTHOR.name,
+                url: AUTHOR.url,
+              },
+            },
+            {
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              mainEntity: FAQ.map((f) => ({
+                "@type": "Question",
+                name: f.q,
+                acceptedAnswer: { "@type": "Answer", text: f.a },
+              })),
+            },
+          ]),
+        }}
+      />
 
       {/* Last word */}
       <section className="border-t border-edge bg-surface">
@@ -292,7 +500,7 @@ export default function WelcomePage() {
               rel="noopener noreferrer"
               className="underline-offset-2 hover:underline"
             >
-              Rohan
+              {AUTHOR.name}
             </a>
           </p>
         </div>

@@ -19,16 +19,25 @@ export async function POST(req: Request) {
   const password = typeof body?.password === "string" ? body.password : "";
   const invite = typeof body?.invite === "string" ? body.invite.trim() : "";
 
+  /**
+   * The invite code stopped being a door and became a key to one room.
+   *
+   * Anyone may have an account: the log, the charts, the score, the grades,
+   * the report card and the export are arithmetic on your own numbers and
+   * cost nothing to run. What the code buys is the **AI coach**, which runs
+   * on a single shared free-tier allowance that cannot be divided between
+   * strangers (`lib/access.ts`).
+   *
+   * A *wrong* code is still refused rather than quietly downgraded: someone
+   * typing one meant to use one, and silently handing them a lesser account
+   * would be the app deciding not to mention it. An *empty* one is simply
+   * somebody signing up.
+   */
   const expectedInvite = process.env.INVITE_CODE;
-  if (!expectedInvite) {
-    return NextResponse.json(
-      { error: "Sign-up is not configured (INVITE_CODE missing)" },
-      { status: 500 }
-    );
-  }
-  if (invite !== expectedInvite) {
+  if (invite && invite !== expectedInvite) {
     return NextResponse.json({ error: "Invalid invite code" }, { status: 403 });
   }
+  const invited = Boolean(expectedInvite) && invite === expectedInvite;
   if (!name || name.length > 60) {
     return NextResponse.json({ error: "Please enter your name" }, { status: 400 });
   }
@@ -55,6 +64,7 @@ export async function POST(req: Request) {
     email,
     name,
     passwordHash: hashPassword(password),
+    invited,
     createdAt: new Date(),
   });
 

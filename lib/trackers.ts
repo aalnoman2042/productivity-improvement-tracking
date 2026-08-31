@@ -1,4 +1,5 @@
 import type { Target } from "./targets";
+import type { GoalPeriod } from "./goalHistory";
 
 export type TrackerType =
   | "duration"
@@ -35,6 +36,12 @@ export type Tracker = {
   color: string;
   category: Category;
   goal: Goal;
+  /**
+   * The goals this tracker has carried before, each from the day it started.
+   * Null while the goal has never changed. `goal` above is always the one in
+   * force now; see `lib/goalHistory.ts` for why the past needs its own copy.
+   */
+  goalHistory?: GoalPeriod[] | null;
   habit?: Habit;
   /** Daily push times "HH:MM" in the owner's local day, or null for none. */
   reminder?: string[] | null;
@@ -189,6 +196,12 @@ export type Template = {
   category: Category;
   color: string;
   goal: Goal;
+  /**
+   * The goals this tracker has carried before, each from the day it started.
+   * Null while the goal has never changed. `goal` above is always the one in
+   * force now; see `lib/goalHistory.ts` for why the past needs its own copy.
+   */
+  goalHistory?: GoalPeriod[] | null;
   habit?: Habit;
 };
 

@@ -167,7 +167,7 @@ describe("spendLine on a very short window", () => {
       trackers: [
         { id: "scroll", name: "Scrolling", color: "#111", type: "duration", habit: "bad" },
       ],
-      entries: [{ trackerId: "scroll", date: "2026-08-31", value: 45 }],
+      entries: [{ trackerId: "scroll", value: 45 }],
       from: "2026-08-31",
       to: "2026-08-31",
       days,
