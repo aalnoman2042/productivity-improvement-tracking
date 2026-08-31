@@ -70,7 +70,13 @@ export default async function proxy(req: NextRequest) {
 export const config = {
   // The manifest, service worker and icons must stay reachable while signed
   // out, or the browser can't offer to install the app.
+  //
+  // So must **robots.txt and sitemap.xml**, and they were not: the gate
+  // 307'd both to /login, so the one file whose entire job is to be read by
+  // a machine that has never signed in was answering "sign in first". Caught
+  // by curling the live deploy — a middleware matcher is invisible to
+  // `next build`, to `tsc`, and to every test in this repo.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
