@@ -6,6 +6,7 @@ import { toTracker } from "@/lib/trackerDoc";
 import { typeMeta, type Goal, type TrackerType } from "@/lib/trackers";
 import { toNight } from "@/lib/clock";
 import { streakInfo } from "@/lib/streak";
+import { loggingRun } from "@/lib/rest";
 import type { ClockSummary, StreakInfo } from "@/lib/stats";
 import {
   PERIOD_BUCKET,
@@ -15,6 +16,7 @@ import {
   bucketsForRange,
   isValidDateStr,
   periodRange,
+  previousRange,
   type Period,
 } from "@/lib/dates";
 
@@ -153,10 +155,21 @@ function goalProgress(
     const wk = bucketOf(date, "week");
     weekly.set(wk, (weekly.get(wk) ?? 0) + value);
   }
-  const weeks = bucketsForRange(start, end, "week");
+  // Only weeks that lie WHOLLY inside the unit can be judged. A calendar
+  // month almost never starts on a Monday, so its first and last weeks are
+  // clipped — and a "5 per week" goal cannot be met in the two days of a
+  // week that fall inside the month, which used to score it 0/1 and call a
+  // perfect month a failure. Under the old rolling windows the length was
+  // fixed and this could not happen.
+  const weeks = bucketsForRange(start, end, "week").filter(
+    (wk) => wk >= start && addDays(wk, 6) <= end
+  );
+  // Unless there are none at all — a short unit still deserves an answer,
+  // and its one clipped week is the best available.
+  const judged = weeks.length > 0 ? weeks : bucketsForRange(start, end, "week");
   let met = 0;
-  for (const wk of weeks) if (meetsGoal(weekly.get(wk) ?? 0, goal)) met++;
-  return { met, total: weeks.length };
+  for (const wk of judged) if (meetsGoal(weekly.get(wk) ?? 0, goal)) met++;
+  return { met, total: judged.length };
 }
 
 export async function GET(req: Request) {
@@ -166,17 +179,24 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const period = params.get("period") as Period | null;
   const today = params.get("today");
+  // Which August: any day inside the wanted unit, defaulting to the one the
+  // reader is living in. Normalised below, so a client can't ask for half a
+  // month by sending a stray date.
+  const anchor = params.get("anchor");
   if (!period || !VALID_PERIODS.includes(period) || !isValidDateStr(today)) {
     return NextResponse.json(
       { error: "period and today=YYYY-MM-DD required" },
       { status: 400 }
     );
   }
+  if (anchor !== null && !isValidDateStr(anchor)) {
+    return NextResponse.json({ error: "anchor must be YYYY-MM-DD" }, { status: 400 });
+  }
 
-  const { start, end, days } = periodRange(period, today);
-  // The equally long stretch just before this one, for "up or down?".
-  const prevStart = addDays(start, -days);
-  const prevEnd = addDays(start, -1);
+  const range = periodRange(period, anchor ?? today, today);
+  const { start, end, days, unitEnd, partial } = range;
+  // The unit just before this one, for "up or down?".
+  const { start: prevStart, end: prevEnd } = previousRange(period, range);
   const granularity = PERIOD_BUCKET[period];
   const d = await db();
 
@@ -213,34 +233,52 @@ export async function GET(req: Request) {
       .toArray();
   });
 
-  const [trackerDocs, allEntries, loggedDates, streakRows] = await Promise.all([
-    trackersQ,
-    d
-      .collection("entries")
-      .find(
-        { userId, date: { $gte: prevStart, $lte: end } },
-        // Up to two years of rows on the year view — ship only the fields
-        // the roll-ups read: not notes or timestamps, and of `meta` just the
-        // sleep times and quality, not prayer parts or streak status.
-        {
-          projection: {
-            trackerId: 1,
-            date: 1,
-            value: 1,
-            "meta.start": 1,
-            "meta.end": 1,
-            "meta.quality": 1,
-            _id: 0,
-          },
-        }
-      )
-      .toArray(),
-    d.collection("entries").distinct("date", {
-      userId,
-      date: { $gte: addDays(today, -400), $lte: today },
-    }),
-    streaksQ,
-  ]);
+  const [trackerDocs, allEntries, loggedDates, streakRows, restDocs, firstDoc] =
+    await Promise.all([
+      trackersQ,
+      d
+        .collection("entries")
+        .find(
+          { userId, date: { $gte: prevStart, $lte: end } },
+          // Up to two years of rows on the year view — ship only the fields
+          // the roll-ups read: not notes or timestamps, and of `meta` just the
+          // sleep times and quality, not prayer parts or streak status.
+          {
+            projection: {
+              trackerId: 1,
+              date: 1,
+              value: 1,
+              "meta.start": 1,
+              "meta.end": 1,
+              "meta.quality": 1,
+              _id: 0,
+            },
+          }
+        )
+        .toArray(),
+      d.collection("entries").distinct("date", {
+        userId,
+        date: { $gte: addDays(today, -400), $lte: today },
+      }),
+      streaksQ,
+      // Days taken off on purpose. Sparse enough to read whole — a few dozen
+      // rows over years — and needed twice: to count the ones inside this
+      // period, and to keep the streak from breaking on one.
+      d
+        .collection("restDays")
+        .find({ userId, date: { $lte: today } }, { projection: { date: 1, _id: 0 } })
+        .toArray(),
+      // The first day ever logged, which is as far back as the period picker
+      // can offer to go.
+      d
+        .collection("entries")
+        .find({ userId }, { projection: { date: 1, _id: 0 }, sort: { date: 1 }, limit: 1 })
+        .toArray(),
+    ]);
+
+  const restDates = new Set(restDocs.map((r) => String(r.date)));
+  const restDays = [...restDates].filter((x) => x >= start && x <= end).length;
+  const firstLogged = firstDoc.length > 0 ? String(firstDoc[0].date) : null;
 
   const trackers = trackerDocs.map(toTracker);
 
@@ -253,7 +291,9 @@ export async function GET(req: Request) {
   }
 
   const current = allEntries.filter((e) => String(e.date) >= start);
-  const previous = allEntries.filter((e) => String(e.date) < start);
+  const previous = allEntries.filter(
+    (e) => String(e.date) >= prevStart && String(e.date) <= prevEnd
+  );
 
   const now = rollupEntries(current);
   const before = rollupEntries(previous);
@@ -347,13 +387,11 @@ export async function GET(req: Request) {
   }
 
   // --- Streak ------------------------------------------------------------
+  // Through rest days, not over them: a day you meant to take off is not the
+  // day you gave up, and this has to say the same number the report card
+  // says — both go through `loggingRun`.
   const logged = new Set(loggedDates as string[]);
-  let streak = 0;
-  let cursor = logged.has(today) ? today : addDays(today, -1);
-  while (logged.has(cursor)) {
-    streak++;
-    cursor = addDays(cursor, -1);
-  }
+  const streak = loggingRun(logged, today, restDates);
 
   const daysLogged = new Set(current.map((e) => String(e.date))).size;
   const prevDaysLogged = new Set(previous.map((e) => String(e.date))).size;
@@ -362,6 +400,15 @@ export async function GET(req: Request) {
     period,
     start,
     end,
+    unitEnd,
+    partial,
+    // Whether this unit is the one being lived. Everything computed against
+    // `today` — the logging streak, "N days clean", "last slip was" — is only
+    // a true sentence inside it; browse back to July and those facts are
+    // still about September. The readers check this rather than each one
+    // reinventing the test.
+    live: today >= start && today <= unitEnd,
+    firstLogged,
     prevStart,
     prevEnd,
     days,
@@ -370,6 +417,7 @@ export async function GET(req: Request) {
     buckets,
     summary,
     streak,
+    restDays,
     daysLogged,
     prevDaysLogged,
     hasEntries: current.length > 0,

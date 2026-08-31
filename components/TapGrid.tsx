@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import TrackerInput from "@/components/TrackerInput";
-import { EMPTY, isLogged, type Draft } from "@/lib/draft";
+import { EMPTY, isLogged, slipNeedsReason, type Draft } from "@/lib/draft";
+import { MAX_TRACKER_NOTE } from "@/lib/notes";
 import { seriesColor } from "@/lib/palette";
 import type { Tracker, TrackerType } from "@/lib/trackers";
 
@@ -33,6 +35,9 @@ export default function TapGrid({
   set: (id: string, patch: Partial<Draft>) => void;
   date: string;
 }) {
+  // Which card's Slipped button was just pressed, so its reason box can take
+  // the caret without every stored slip grabbing focus on load.
+  const openReason = useRef<string | null>(null);
   const card = "rounded-xl border card p-3 shadow-sm transition-colors";
   const name = (t: Tracker) => (
     <span className="flex min-w-0 items-center gap-2">
@@ -80,6 +85,9 @@ export default function TapGrid({
         }
 
         if (type === "streak") {
+          // A slip opens a box and asks why. It is logged either way — the
+          // ask never gates the save; see slipNeedsReason in lib/draft.
+          const needsReason = slipNeedsReason(type, dr);
           return (
             <div
               key={t.id}
@@ -110,9 +118,10 @@ export default function TapGrid({
                 <button
                   type="button"
                   aria-pressed={dr.status === "slip"}
-                  onClick={() =>
-                    set(t.id, { status: dr.status === "slip" ? null : "slip" })
-                  }
+                  onClick={() => {
+                    openReason.current = dr.status === "slip" ? null : t.id;
+                    set(t.id, { status: dr.status === "slip" ? null : "slip" });
+                  }}
                   className={`rounded-md border px-2 py-1.5 text-xs font-medium ${
                     dr.status === "slip"
                       ? "border-red-600 bg-red-600 text-white"
@@ -122,6 +131,26 @@ export default function TapGrid({
                   Slipped
                 </button>
               </div>
+              {dr.status === "slip" && (
+                <input
+                  ref={(el) => {
+                    if (el && openReason.current === t.id) {
+                      openReason.current = null;
+                      el.focus();
+                    }
+                  }}
+                  value={dr.note}
+                  onChange={(e) => set(t.id, { note: e.target.value })}
+                  maxLength={MAX_TRACKER_NOTE}
+                  placeholder="Why did it slip?"
+                  aria-label={`Why ${t.name} slipped`}
+                  className={`mt-1.5 w-full rounded-md border bg-transparent px-2 py-1.5 text-xs outline-none ${
+                    needsReason
+                      ? "border-amber-600 placeholder:text-amber-700 dark:placeholder:text-amber-500"
+                      : "border-edge focus:border-accent"
+                  }`}
+                />
+              )}
             </div>
           );
         }

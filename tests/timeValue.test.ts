@@ -151,3 +151,36 @@ describe("spendLine", () => {
     expect(spendLine(spend([]), "৳")).toContain("mark a tracker as a bad habit");
   });
 });
+
+/**
+ * A rate needs enough days to be a rate.
+ *
+ * Periods are calendar units, so on the 1st of a month the window is one
+ * partly-lived day — and 45 minutes before lunch multiplied by 365 is
+ * arithmetic, not information. Found by the pre-deploy review, which is
+ * exactly the class of bug a rolling 7/15/30-day window could never have.
+ */
+describe("spendLine on a very short window", () => {
+  const value = { perMinute: 5, currency: "৳" };
+  const spendFor = (days: number) =>
+    timeSpend({
+      trackers: [
+        { id: "scroll", name: "Scrolling", color: "#111", type: "duration", habit: "bad" },
+      ],
+      entries: [{ trackerId: "scroll", date: "2026-08-31", value: 45 }],
+      from: "2026-08-31",
+      to: "2026-08-31",
+      days,
+      value,
+    });
+
+  it("keeps quiet about a yearly rate on day one of a unit", () => {
+    const line = spendLine(spendFor(1), "৳");
+    expect(line).toContain("45m went to habits");
+    expect(line).not.toContain("a year costs");
+  });
+
+  it("says it once the window is long enough to mean it", () => {
+    expect(spendLine(spendFor(30), "৳")).toContain("a year costs");
+  });
+});

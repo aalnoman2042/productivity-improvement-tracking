@@ -221,6 +221,18 @@ export function timeSpend(input: {
  * scold, and when there is nothing to report it says that instead of
  * inventing a worry.
  */
+/**
+ * How many days a window needs before extrapolating from it is honest.
+ *
+ * Periods are calendar units now, so on the 1st of a month the window is
+ * ONE day — and one partly-lived day. Forty-five minutes of scrolling before
+ * lunch became "at that rate a year costs ৳82,000", which is arithmetic
+ * rather than information: the rate is a rounding error times 365. Under the
+ * old rolling windows the denominator was a fixed 7, 15 or 30 and a single
+ * day could never dominate it like this.
+ */
+const RATE_NEEDS_DAYS = 5;
+
 export function spendLine(spend: TimeSpend, currency: string): string {
   if (spend.burned.minutes === 0) {
     return spend.invested.minutes > 0
@@ -230,6 +242,8 @@ export function spendLine(spend: TimeSpend, currency: string): string {
       : "No hours priced yet — mark a tracker as a bad habit and this fills in.";
   }
   const money = formatMoney(spend.burned.cost, currency);
+  const spent = `${formatMinutes(spend.burned.minutes)} went to habits you'd rather drop — ${money} of your own time.`;
+  if (spend.days < RATE_NEEDS_DAYS) return spent;
   const perYear = formatMoney(spend.perYear.cost, currency);
-  return `${formatMinutes(spend.burned.minutes)} went to habits you'd rather drop — ${money} of your own time. At that rate a year costs ${perYear}.`;
+  return `${spent} At that rate a year costs ${perYear}.`;
 }

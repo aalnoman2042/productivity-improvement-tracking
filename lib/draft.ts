@@ -101,6 +101,44 @@ export function draftNote(dr: Draft | undefined): string | null {
   return text ? text.slice(0, MAX_TRACKER_NOTE) : null;
 }
 
+/**
+ * A slip that hasn't said why yet.
+ *
+ * A clean-streak tracker is the one place in the app where a tap records a
+ * failure, and "0" is the least useful thing you can know about one. Three
+ * months later the run is a row of red squares with nothing to learn from;
+ * with a line each — *tired*, *argument*, *3am*, *nothing, just did it* —
+ * it is a list of the things that actually break you, which is the only
+ * part of a slip worth keeping. So the reason box opens with the tap, takes
+ * the caret, and is outlined until it has words in it.
+ *
+ * **It is an ask, and never a gate.** It was a gate for exactly one
+ * afternoon: the server returned 400 for a note-less slip, the daily page
+ * refused the whole day over one, and Catch up quietly declined to send the
+ * tap at all. The owner went to backfill a month and the month did not go
+ * in — no error, no clue, just days that wouldn't save. Which is the
+ * opposite of the point: a slip you couldn't put words to is still a slip
+ * that happened, and an app that refuses to record it teaches you to log
+ * nothing rather than to log honestly. Same rule as rest days and notes —
+ * nothing in this app may stand between a person and their own record.
+ *
+ * What this function is for now: the outline on the box, and the line on the
+ * daily page listing what is still unexplained. Both ask. Neither blocks.
+ */
+export function slipNeedsReason(type: TrackerType, dr: Draft | undefined): boolean {
+  return type === "streak" && dr?.status === "slip" && draftNote(dr) === null;
+}
+
+/** Every tracker on the day marked slipped with no reason written on it. */
+export function slipsMissingReason(
+  trackers: Tracker[],
+  draft: Record<string, Draft>
+): Tracker[] {
+  return trackers.filter((t) =>
+    slipNeedsReason(t.type as TrackerType, draft[t.id])
+  );
+}
+
 /** Turn what's typed into the value + meta the API stores. */
 export function draftToEntry(type: TrackerType, dr: Draft) {
   if (type === "duration") {

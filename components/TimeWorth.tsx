@@ -77,22 +77,35 @@ function Side({
   );
 }
 
-export default function TimeWorth({ period }: { period: Period }) {
+export default function TimeWorth({
+  period,
+  anchor,
+}: {
+  period: Period;
+  /** First day of the unit being priced — the same one the page is showing. */
+  anchor: string;
+}) {
   const [ref, near] = useNearViewport<HTMLDivElement>();
-  const [data, setData] = useState<Payload | null>(null);
+  // Tagged with the window it answers, so stepping to another month shows
+  // the skeleton again instead of last month's money under this month's name.
+  const [answer, setAnswer] = useState<{ key: string; body: Payload } | null>(
+    null
+  );
   const today = toDateStr(new Date());
+  const key = `${period}:${anchor}:${today}`;
+  const data = answer?.key === key ? answer.body : null;
 
   useEffect(() => {
     if (!near) return;
     let live = true;
-    fetch(`/api/stats/spend?period=${period}&today=${today}`)
+    fetch(`/api/stats/spend?period=${period}&anchor=${anchor}&today=${today}`)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((body: Payload) => live && setData(body))
-      .catch(() => live && setData({ value: null }));
+      .then((body: Payload) => live && setAnswer({ key, body }))
+      .catch(() => live && setAnswer({ key, body: { value: null } }));
     return () => {
       live = false;
     };
-  }, [near, today, period]);
+  }, [near, today, period, anchor, key]);
 
   // Everything computed before the early returns — see npm run check:shape.
   const value = data?.value ?? null;

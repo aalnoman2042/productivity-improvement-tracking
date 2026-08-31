@@ -33,6 +33,11 @@ export async function GET(req: Request) {
   if (!VALID.includes(period)) {
     return NextResponse.json({ error: "Unknown period" }, { status: 400 });
   }
+  // Which month's spend — any day inside it. Defaults to the one being lived.
+  const anchor = params.get("anchor");
+  if (anchor !== null && !isValidDateStr(anchor)) {
+    return NextResponse.json({ error: "anchor must be YYYY-MM-DD" }, { status: 400 });
+  }
 
   const d = await db();
   const user = await d
@@ -41,7 +46,7 @@ export async function GET(req: Request) {
   const value = parseTimeValue(user?.timeValue);
   if (!value) return NextResponse.json({ value: null });
 
-  const { start, end, days } = periodRange(period, today);
+  const { start, end, days } = periodRange(period, anchor ?? today, today);
 
   const [trackerDocs, rows] = await Promise.all([
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),

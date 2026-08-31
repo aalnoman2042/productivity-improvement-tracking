@@ -136,7 +136,7 @@ function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
       <span className="flex items-center gap-1.5">
-        <span className="h-4 w-4 rounded-md border border-dashed border-edge" />
+        <span className="h-4 w-4 rounded-[4px] border border-dashed border-edge" />
         not logged
       </span>
       <span className="flex items-center gap-1.5">
@@ -155,7 +155,7 @@ function Legend() {
           <span
             key={s.label}
             title={s.label}
-            className="h-4 w-4 rounded-md border border-accent/60 bg-accent"
+            className="h-4 w-4 rounded-[4px] border border-accent/60 bg-accent"
             style={{ opacity: Math.max(0.14, fillOpacity(s.score)) }}
           />
         ))}

@@ -8,12 +8,20 @@ import CatchupCard from "@/components/CatchupCard";
 import Targets from "@/components/Targets";
 import LoadError from "@/components/LoadError";
 import LifeNow from "@/components/LifeNow";
+import MotivationLine from "@/components/MotivationLine";
 import PeriodCompare from "@/components/PeriodCompare";
+import PeriodPicker from "@/components/PeriodPicker";
 import ReportCard from "@/components/ReportCard";
 import ShareStatus, { type StatusShareData } from "@/components/ShareStatus";
 import WeeklyReviews from "@/components/WeeklyReviews";
 import { buildAdvice } from "@/lib/advice";
-import { prettyDate, toDateStr, type Period } from "@/lib/dates";
+import {
+  periodLabel,
+  periodStart,
+  prettyDate,
+  toDateStr,
+  type Period,
+} from "@/lib/dates";
 import { buildInsights, type InsightLevel } from "@/lib/insights";
 import { BUNDLED } from "@/lib/motivation";
 import { reportLines, type ReportCard as Report } from "@/lib/report";
@@ -21,6 +29,7 @@ import { scoresFromStats } from "@/lib/score";
 import type { Stats, Summary } from "@/lib/stats";
 import { formatValue, typeMeta, type Tracker, type TrackerType } from "@/lib/trackers";
 import { useCached } from "@/lib/useCached";
+import { useMounted } from "@/lib/useMounted";
 
 /**
  * The status page: where you stand, said plainly.
@@ -30,9 +39,11 @@ import { useCached } from "@/lib/useCached";
  * month. The dashboard is for reading trends; this is for reading yourself.
  */
 
+/** The three that answer "how am I doing?" — the longer views are the
+ *  dashboard's job. Each is a calendar unit you can pick by name. */
 const RANGES: { value: Period; label: string }[] = [
-  { value: "week", label: "1 week" },
-  { value: "15d", label: "2 weeks" },
+  { value: "week", label: "Week" },
+  { value: "15d", label: "Half month" },
   { value: "month", label: "Month" },
 ];
 
@@ -138,14 +149,36 @@ function GoalList({
 }
 
 export default function StatusPage() {
-  const [period, setPeriod] = useState<Period>("week");
+  const mounted = useMounted();
   const today = toDateStr(new Date());
+  const [period, setPeriod] = useState<Period>("week");
+  // Which week or month, as that unit's first day — see components/PeriodPicker.
+  const [anchor, setAnchor] = useState(() => periodStart("week", today));
 
   const statsQ = useCached<Stats>(
-    `/api/stats?period=${period}&today=${today}`,
+    `/api/stats?period=${period}&anchor=${anchor}&today=${today}`,
     `stats:${period}`
   );
-  const stats = statsQ.data;
+  // The cached copy is whichever unit was read last, so it only counts when
+  // it answers the question on screen.
+  const stats =
+    statsQ.data && statsQ.data.period === period && statsQ.data.start === anchor
+      ? statsQ.data
+      : null;
+
+  // Settled, and still not the unit that was asked for.
+  //
+  // This is the hole the coarse cache key leaves, and it has to be handled
+  // here because `useCached` cannot see it: the key is `stats:<period>` while
+  // the *question* also carries an anchor, so a failed fetch for July finds
+  // August's payload still in the slot — and `refresh()` only records a
+  // failure when the slot is empty (lib/useCached.ts). So `error` stays null,
+  // `loading` stays false, `refreshing` settles back to false, and nothing
+  // downstream knows the request died. Step back a month on a phone with no
+  // signal and the page has to say so, rather than showing an empty month or
+  // a skeleton that never resolves.
+  const unanswered =
+    stats === null && !statsQ.loading && !statsQ.refreshing;
 
   // The all-time report card feeds two things here: the card at the bottom,
   // and the line at the top — fetched once, shared by both.
@@ -200,7 +233,7 @@ export default function StatusPage() {
   const shareData = useMemo<StatusShareData | null>(() => {
     if (!stats || !stats.hasEntries) return null;
     return {
-      rangeLabel: `Last ${stats.days} days`,
+      rangeLabel: periodLabel(period, stats.start),
       dateLabel: prettyDate(today),
       daysLogged: stats.daysLogged,
       days: stats.days,
@@ -214,7 +247,7 @@ export default function StatusPage() {
       wins: wins.map((g) => `${g.tracker.name} — ${g.met}/${g.total}`),
       fails: fails.map((g) => `${g.tracker.name} — ${g.met}/${g.total}`),
     };
-  }, [stats, today, goalsMet, goalsTotal, toImprove, wins, fails]);
+  }, [stats, today, period, goalsMet, goalsTotal, toImprove, wins, fails]);
 
   return (
     // One column on a phone, two on a big screen — the cap was 36rem of
@@ -264,36 +297,46 @@ export default function StatusPage() {
       </CardBoundary>
 
       {/* Range picker, and the way to show someone */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {RANGES.map((r) => (
-          <button
-            key={r.value}
-            onClick={() => setPeriod(r.value)}
-            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium ${
-              period === r.value
-                ? "border-accent bg-accent/10 text-accent"
-                : "border-edge text-secondary hover:bg-surface-2"
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        {/* Held back until there is a browser: this page is prerendered, and
+            the picker's labels are the reader's clock — see lib/useMounted. */}
+        {mounted ? (
+          <PeriodPicker
+            period={period}
+            anchor={anchor}
+            today={today}
+            firstLogged={statsQ.data?.firstLogged ?? null}
+            options={RANGES}
+            onChange={(p, a) => {
+              setPeriod(p);
+              setAnchor(a);
+            }}
+          />
+        ) : (
+          <div className="h-[5.5rem]" aria-hidden="true" />
+        )}
         <ShareStatus data={shareData} />
       </div>
 
-      {statsQ.loading && !stats ? (
-        <div className="space-y-3" aria-hidden="true">
-          <div className="skeleton h-20 rounded-lg" />
-          <div className="skeleton h-40 rounded-lg" />
-          <div className="skeleton h-40 rounded-lg" />
+      {/* Stepping back to July has nothing to show *yet* — which is not the
+          same as July having nothing in it, so it waits rather than saying
+          the wrong thing. */}
+      {!stats && (statsQ.loading || statsQ.refreshing) ? (
+        <div className="space-y-3">
+          <div aria-hidden="true" className="space-y-3">
+            <div className="skeleton h-20 rounded-lg" />
+            <div className="skeleton h-40 rounded-lg" />
+            <div className="skeleton h-40 rounded-lg" />
+          </div>
+          <MotivationLine className="pt-1" />
         </div>
-      ) : !stats && statsQ.error ? (
+      ) : !stats && (statsQ.error || unanswered) ? (
         // Before this branch existed, a failed request fell through to
         // "Nothing logged in this range yet" — which is not a slow screen or
         // an empty one, it is the app telling someone they did nothing.
         <LoadError
           what="your status"
-          message={statsQ.error}
+          message={statsQ.error ?? "Couldn't load that stretch — check your connection"}
           onRetry={() => void statsQ.refresh()}
         />
       ) : !stats || !stats.hasEntries ? (

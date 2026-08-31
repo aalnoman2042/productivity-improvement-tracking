@@ -3,7 +3,13 @@
 import LoadError from "@/components/LoadError";
 import { memo, useMemo, useState } from "react";
 import Link from "next/link";
-import { PERIODS, parseDateStr, toDateStr, type Period } from "@/lib/dates";
+import {
+  parseDateStr,
+  periodLabel,
+  periodStart,
+  toDateStr,
+  type Period,
+} from "@/lib/dates";
 import {
   categoryMeta,
   formatValue,
@@ -14,11 +20,13 @@ import {
   type TrackerType,
 } from "@/lib/trackers";
 import { useCached } from "@/lib/useCached";
+import { useMounted } from "@/lib/useMounted";
 import type { Stats, Summary } from "@/lib/stats";
 import { seriesColor } from "@/lib/palette";
 import Correlations from "@/components/Correlations";
 import TimeWorth from "@/components/TimeWorth";
 import CardBoundary from "@/components/CardBoundary";
+import PeriodPicker from "@/components/PeriodPicker";
 import MotivationLine from "@/components/MotivationLine";
 import { nightLabel, shiftLabel } from "@/lib/clock";
 import {
@@ -34,12 +42,13 @@ import type { ClockPoint } from "@/components/charts/SleepClockChart";
 const shortTime = (v: number) =>
   v >= 60 ? `${Math.round((v / 60) * 10) / 10}h` : `${Math.round(v)}m`;
 
+/** What a change is measured against: the calendar unit before this one. */
 const PERIOD_WORD: Record<Period, string> = {
-  week: "last week",
-  "15d": "the previous 15 days",
-  month: "last month",
-  "6mo": "the previous 6 months",
-  year: "last year",
+  week: "the week before",
+  "15d": "the half before",
+  month: "the month before",
+  "6mo": "the six months before",
+  year: "the year before",
 };
 
 function prettyDate(date: string): string {
@@ -308,6 +317,10 @@ const StreakCard = memo(function StreakCard({
         <span className="text-4xl font-bold tabular-nums">{days}</span>
         <span className="text-sm text-secondary">
           day{days === 1 ? "" : "s"} clean
+          {/* The run is measured from today whatever period is on screen —
+              so when the reader has browsed back, the number is labelled
+              rather than left to look like a fact about that month. */}
+          {stats.live === false && " — as of today"}
         </span>
       </div>
       <p className="mt-1 text-xs text-muted">
@@ -458,15 +471,41 @@ const TrackerCard = memo(function TrackerCard({
 /* ------------------------------ the page ------------------------------- */
 
 export default function DashboardPage() {
+  const mounted = useMounted();
+  const today = toDateStr(new Date());
   const [period, setPeriod] = useState<Period>("week");
+  // Which week, month or year — always that unit's first day. Starts on the
+  // one being lived.
+  const [anchor, setAnchor] = useState(() => periodStart("week", today));
 
   // The numbers from the last visit go up straight away and are replaced when
   // the fresh ones arrive — opening the dashboard shouldn't be a blank wait.
   const statsQ = useCached<Stats>(
-    `/api/stats?period=${period}&today=${toDateStr(new Date())}`,
+    `/api/stats?period=${period}&anchor=${anchor}&today=${today}`,
     `stats:${period}`
   );
-  const stats = statsQ.data;
+  // One cached copy per size, holding whichever unit was read last. Stepping
+  // back to July must not paint August's numbers under July's heading, so
+  // anything that doesn't answer the question being asked counts as not
+  // loaded yet.
+  const stats =
+    statsQ.data && statsQ.data.period === period && statsQ.data.start === anchor
+      ? statsQ.data
+      : null;
+
+  // Settled, and still not the unit that was asked for.
+  //
+  // This is the hole the coarse cache key leaves, and it has to be handled
+  // here because `useCached` cannot see it: the key is `stats:<period>` while
+  // the *question* also carries an anchor, so a failed fetch for July finds
+  // August's payload still in the slot — and `refresh()` only records a
+  // failure when the slot is empty (lib/useCached.ts). So `error` stays null,
+  // `loading` stays false, `refreshing` settles back to false, and nothing
+  // downstream knows the request died. Step back a month on a phone with no
+  // signal and the page has to say so, rather than showing an empty month or
+  // a skeleton that never resolves.
+  const unanswered =
+    stats === null && !statsQ.loading && !statsQ.refreshing;
 
   const active = useMemo(
     () => (stats?.trackers ?? []).filter((t) => !t.archived),
@@ -543,12 +582,19 @@ export default function DashboardPage() {
 
   return (
     <div className="card-stack">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           {stats && (
             <>
               <p className="mt-1 text-sm text-secondary">
+                {/* Which unit, in the sentence itself — the numbers below
+                    mean nothing without it, and the picker is a control
+                    rather than a statement. */}
+                <strong className="text-foreground">
+                  {periodLabel(period, anchor)}
+                </strong>
+                {" — "}
                 <strong className="text-foreground tabular-nums">
                   {formatValue(accountedMinutes, "duration", "min")}
                 </strong>{" "}
@@ -560,8 +606,8 @@ export default function DashboardPage() {
                 <span className="text-muted"> ({coveragePct}%)</span>
               </p>
               <p className="mt-0.5 text-xs text-muted">
-                {prettyDate(stats.start)} – {prettyDate(stats.end)} ·{" "}
-                {stats.days} days · activities{" "}
+                {prettyDate(stats.start)} – {prettyDate(stats.end)}
+                {stats.partial && " so far"} · {stats.days} days · activities{" "}
                 <span className="tabular-nums">
                   {formatValue(totalTime, "duration", "min")}
                 </span>
@@ -587,28 +633,31 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-        <div className="flex flex-wrap gap-1 rounded-xl border border-edge card p-1 shadow-sm">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                period === p.value
-                  ? "bg-brand-gradient text-white shadow-sm"
-                  : "text-secondary hover:bg-surface-2"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {/* Held back until there is a browser: this page is prerendered, and
+            the picker's labels are the reader's clock — see lib/useMounted. */}
+        {mounted ? (
+          <PeriodPicker
+            period={period}
+            anchor={anchor}
+            today={today}
+            firstLogged={statsQ.data?.firstLogged ?? null}
+            onChange={(p, a) => {
+              setPeriod(p);
+              setAnchor(a);
+            }}
+          />
+        ) : (
+          <div className="h-[5.5rem]" aria-hidden="true" />
+        )}
       </div>
 
       {stats === null ? (
-        statsQ.error ? (
+        statsQ.error || unanswered ? (
           <LoadError
             what="your stats"
-            message={statsQ.error}
+            message={
+              statsQ.error ?? "Couldn't load that stretch — check your connection"
+            }
             onRetry={() => void statsQ.refresh()}
           />
         ) : (
@@ -677,6 +726,11 @@ export default function DashboardPage() {
               footer={
                 <span className="text-xs text-muted">
                   {stats.daysLogged}/{stats.days} days logged
+                  {/* Days you meant to take, said out loud. Without this the
+                      gap between "logged" and "days" reads as days you lost,
+                      which is the one thing a rest day is not. */}
+                  {stats.restDays > 0 &&
+                    ` · ${stats.restDays} ${stats.restDays === 1 ? "day" : "days"} off`}
                 </span>
               }
             />
@@ -813,7 +867,7 @@ export default function DashboardPage() {
             title="⏳ What your time was worth"
             message="Couldn't price your time. Everything else on this page is unaffected."
           >
-            <TimeWorth period={period} />
+            <TimeWorth period={period} anchor={anchor} />
           </CardBoundary>
         </>
       )}

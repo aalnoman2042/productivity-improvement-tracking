@@ -148,7 +148,7 @@ function streakAdvice(t: Tracker, s: Summary, days: number): Advice | null {
       score: 70,
       level: "warn",
       focus: `Break the ${t.name} slip pattern`,
-      why: `${recentSlips} slips in the last ${days} days; you're on ${run.current} day${run.current === 1 ? "" : "s"} now, against a best of ${run.best}.`,
+      why: `${recentSlips} slips in these ${days} days; you're on ${run.current} day${run.current === 1 ? "" : "s"} now, against a best of ${run.best}.`,
       how: "Slips cluster around the same hour and mood — find yours and put something else in that slot.",
     };
   }

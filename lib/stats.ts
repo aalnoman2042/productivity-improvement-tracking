@@ -62,14 +62,29 @@ export type Summary = {
 
 export type Stats = {
   period: Period;
+  /** First day of the calendar unit being shown — 2026-08-01 for August. */
   start: string;
+  /** Last day counted: the unit's end, or today while the unit is running. */
   end: string;
+  /** The unit's own last day, reached or not. */
+  unitEnd: string;
+  /** The unit hasn't finished, so `end` stops at today. */
+  partial: boolean;
+  /**
+   * Today falls inside this unit. Streaks, "days clean" and "last slip" are
+   * all measured from today, so they may only be *said* when this is true.
+   */
+  live: boolean;
+  /** The first day ever logged — how far back the period picker may go. */
+  firstLogged: string | null;
   days: number;
   granularity: "day" | "week" | "month";
   trackers: Tracker[];
   buckets: Bucket[];
   summary: Record<string, Summary>;
   streak: number;
+  /** Days inside the period that were flagged as deliberate days off. */
+  restDays: number;
   daysLogged: number;
   prevDaysLogged: number;
   hasEntries: boolean;

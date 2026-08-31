@@ -36,17 +36,27 @@ function currentLine(): Line {
 const noLine = () => null;
 
 /**
- * A line to read while something loads.
+ * The one line that never rotates, and a line to read under it.
  *
- * Deliberately never fetches on the way to showing something. A skeleton is
- * on screen for a few hundred milliseconds and a quote API takes longer than
- * that, so a line requested now would arrive after the spinner had gone. The
- * pool is filled in the background *after* a page has settled and kept in
- * `localStorage`; showing one is then just an array lookup.
+ * **Giving up is not in the blood.** That one is the owner's, it is fixed,
+ * and it is set in the brand gradient because it is the only sentence in the
+ * app that is not about the data — it is the reason the data exists. It
+ * renders on the server too, so it is on screen from the very first frame of
+ * a load rather than appearing on hydration like the quote below it.
+ *
+ * The rotating line below it deliberately never fetches on the way to showing
+ * something. A skeleton is on screen for a few hundred milliseconds and a
+ * quote API takes longer than that, so a line requested now would arrive
+ * after the spinner had gone. The pool is filled in the background *after* a
+ * page has settled and kept in `localStorage`; showing one is then just an
+ * array lookup.
  *
  * Which means it works offline, and the first ever load — before anything has
  * been fetched — still gets a line, from the bundled set.
  */
+
+/** Fixed, never rotated, never fetched. */
+const CREED = "Giving up is not in the blood.";
 export default function MotivationLine({
   className = "",
 }: {
@@ -92,17 +102,21 @@ export default function MotivationLine({
     };
   }, []);
 
-  if (!line) return null;
-
   return (
-    <p
-      className={`animate-fade-in text-center text-sm text-muted ${className}`}
-      // It's decoration for a wait, not content. A screen reader announcing a
-      // quote every time a page loads would be noise.
-      aria-hidden="true"
-    >
-      <span className="italic">{line.text}</span>
-      {line.author && <span className="not-italic"> — {line.author}</span>}
-    </p>
+    // Decoration for a wait, not content. A screen reader announcing a quote
+    // every time a page loads would be noise.
+    <div className={`animate-fade-in text-center ${className}`} aria-hidden="true">
+      <p className="text-brand-gradient text-base font-semibold tracking-tight">
+        {CREED}
+      </p>
+      {/* The rotating line is null on the server and on the very first client
+          render — the creed above carries the wait until it arrives. */}
+      {line && (
+        <p className="mt-1.5 text-sm text-muted">
+          <span className="italic">{line.text}</span>
+          {line.author && <span className="not-italic"> — {line.author}</span>}
+        </p>
+      )}
+    </div>
   );
 }

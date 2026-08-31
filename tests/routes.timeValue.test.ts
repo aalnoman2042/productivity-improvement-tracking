@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { FakeDb } from "./helpers/fakeDb";
-import { toDateStr, addDays } from "../lib/dates";
+import { addDays } from "../lib/dates";
 
 /**
  * Pricing an hour, and what the Stats page reads back.
@@ -26,7 +26,13 @@ vi.mock("@/lib/db", () => ({ db: async () => fake, dbReady: async () => fake }))
 const timeValue = await import("@/app/api/time-value/route");
 const spend = await import("@/app/api/stats/spend/route");
 
-const TODAY = toDateStr(new Date());
+/**
+ * A fixed Thursday, because periods are calendar units now: "this week" is
+ * Monday to Sunday, so a test that logs "two days ago" against the real
+ * clock passes or fails depending on what day it is run. Mid-week keeps the
+ * days behind it inside the same week and the same month.
+ */
+const TODAY = "2026-08-20";
 
 const setPrice = (body: unknown) =>
   timeValue.PATCH(

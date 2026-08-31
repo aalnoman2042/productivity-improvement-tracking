@@ -94,11 +94,72 @@ describe("POST /api/entries", () => {
     await post({
       date: DAY,
       entries: [
-        { trackerId: String(WATER), value: 0, meta: { status: "slip" } },
+        {
+          trackerId: String(WATER),
+          value: 0,
+          meta: { status: "slip" },
+          note: "up until 3",
+        },
       ],
     });
     expect(fake.rows("entries")).toHaveLength(1);
     expect(fake.rows("entries")[0].value).toBe(0);
+  });
+
+  /**
+   * Invariant: **nothing stands between a person and their own record.**
+   *
+   * The app asks why a slip happened — the box opens with the tap, and the
+   * daily page lists what is still unexplained. It must never *refuse* one.
+   * This test exists because for one afternoon it did: a 400 here, a
+   * blocked save on the daily page, and a Catch up that silently declined
+   * to send the tap. Backfilling a month failed with no error and no clue.
+   * A slip you couldn't put words to is still a slip that happened.
+   */
+  it("records a slip that doesn't say why", async () => {
+    const res = await post({
+      date: DAY,
+      entries: [
+        { trackerId: String(WATER), value: 0, meta: { status: "slip" } },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(fake.rows("entries")).toHaveLength(1);
+    expect((fake.rows("entries")[0].meta as { status: string }).status).toBe(
+      "slip"
+    );
+    expect(fake.rows("entries")[0].note).toBe(null);
+  });
+
+  it("records a whole month of them, one after another", async () => {
+    // The shape of the bug: backfilling day after day, every one refused.
+    for (let d = 1; d <= 28; d++) {
+      const date = `2026-07-${String(d).padStart(2, "0")}`;
+      const res = await post({
+        date,
+        entries: [
+          { trackerId: String(WATER), value: 0, meta: { status: "slip" } },
+        ],
+      });
+      expect(res.status).toBe(200);
+    }
+    expect(fake.rows("entries")).toHaveLength(28);
+  });
+
+  it("keeps the reason when there is one", async () => {
+    const res = await post({
+      date: DAY,
+      entries: [
+        {
+          trackerId: String(WATER),
+          value: 0,
+          meta: { status: "slip" },
+          note: "up until 3",
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(fake.rows("entries")[0].note).toBe("up until 3");
   });
 
   /** Invariant 1: a day only has 24 hours, and the server is what enforces it. */

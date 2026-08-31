@@ -92,12 +92,13 @@ export default function CatchupPage() {
     day[id] = { ...(day[id] ?? EMPTY), ...patch };
     latest.current = { ...latest.current, [date]: day };
     setDrafts(latest.current);
+
     setState((prev) => ({ ...prev, [date]: "saving" }));
 
     const key = `${date}:${id}`;
     clearTimeout(timers.current[key]);
     timers.current[key] = setTimeout(() => {
-      const tracker = taps.find((t) => t.id === id);
+      const tracker = taps.find((x) => x.id === id);
       if (!tracker) return;
       const dr = latest.current[date]?.[id] ?? EMPTY;
       void post("/api/entries", {

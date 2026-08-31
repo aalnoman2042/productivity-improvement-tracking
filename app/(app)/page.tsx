@@ -17,7 +17,8 @@ import TapGrid from "@/components/TapGrid";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
 import { useCached, useStored } from "@/lib/useCached";
-import { addDays, isValidDateStr, toDateStr } from "@/lib/dates";
+import { useMinutesElapsed } from "@/lib/useElapsed";
+import { addDays, formatMinutes, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import { buildPrefills, type RecentEntry } from "@/lib/prefill";
 import {
@@ -28,6 +29,7 @@ import {
   draftNote,
   draftToEntry,
   isLogged,
+  slipsMissingReason,
   type Draft,
   type Entry,
 } from "@/lib/draft";
@@ -445,6 +447,36 @@ function TodayLog() {
   );
   const overDay = dayTimeMinutes > DAY_MINUTES;
 
+  // Slips still waiting on a reason. Asked for, never enforced — see the
+  // note on `slipNeedsReason` in lib/draft: the day saves either way.
+  const unexplained = useMemo(
+    () => slipsMissingReason(trackers, draft),
+    [trackers, draft]
+  );
+
+  // How much of *today* has happened, and how much of that is unaccounted
+  // for. Both null on any other day: yesterday is not behind, it is over.
+  const elapsed = useMinutesElapsed(date);
+  const adrift =
+    elapsed === null || overDay ? 0 : Math.max(0, elapsed - dayTimeMinutes);
+  // Not before the morning is properly under way, and not for a gap small
+  // enough to be a coffee: this is a nudge, and a nudge that fires all day
+  // is a scold.
+  // Only where the advice can actually be taken: a day being *lived* (not a
+  // planned tomorrow), with the trackers loaded, and with at least one
+  // tracker that counts minutes. Without those three it fired over the
+  // loading skeleton, and on an empty account it said to start a timer on a
+  // tracker that does not exist.
+  const hasTimeTracker = trackers.some(
+    (t) => t.type === "duration" || t.type === "sleep"
+  );
+  const nudge =
+    elapsed !== null &&
+    elapsed >= 8 * 60 &&
+    adrift >= 2 * 60 &&
+    hasTimeTracker &&
+    !trackersQ.loading;
+
   const doneInGroup = (items: Tracker[]) =>
     items.filter((t) => isLogged(t.type as TrackerType, draft[t.id] ?? EMPTY))
       .length;
@@ -496,8 +528,42 @@ function TodayLog() {
         </div>
         {/* Twenty-four hours, and how much of them is on record — the gap in
             the ring is the part of the day nobody wrote down. */}
-        {trackers.length > 0 && <DayDial trackers={trackers} draft={draft} />}
+        {trackers.length > 0 && (
+          <DayDial trackers={trackers} draft={draft} date={date} />
+        )}
       </div>
+
+      {/* The hours that went somewhere you didn't write down. It says the
+          number and then what to do about it, because "4h unaccounted" on
+          its own is a complaint rather than a suggestion. */}
+      {nudge && (
+        <p className="animate-fade-in rounded-lg border border-amber-600/40 bg-amber-600/5 p-3 text-sm text-secondary">
+          <strong className="text-foreground tabular-nums">
+            {formatMinutes(adrift)}
+          </strong>{" "}
+          of the {Math.floor(elapsed / 60)} hours today has had so far
+          isn&apos;t logged. Top it up every half hour while you still
+          remember it — or start the ⏱ timer on a tracker and let it count
+          for you.
+        </p>
+      )}
+
+      {/* Slips with nothing written on them. An ASK, never a gate — the day
+          has already saved, and the words can come whenever they come.
+          It was a gate for one afternoon and the afternoon was enough: it
+          silently refused a month of backfilled days, which is the exact
+          opposite of what a tracker is for. */}
+      {unexplained.length > 0 && (
+        <p className="animate-fade-in rounded-lg border border-amber-600/40 bg-amber-600/5 p-3 text-sm text-secondary">
+          <strong className="text-foreground">
+            {unexplained.map((t) => t.name).join(", ")}
+          </strong>{" "}
+          {unexplained.length === 1 ? "is" : "are"} marked slipped with no
+          reason. It&apos;s saved either way — but a word now (
+          <em>tired</em>, <em>argument</em>, <em>3am</em>) is the part you
+          can actually learn from three months later.
+        </p>
+      )}
 
       <InstallPrompt />
 

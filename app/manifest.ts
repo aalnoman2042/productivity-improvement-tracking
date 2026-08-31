@@ -10,7 +10,9 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#f3f4f6",
+    // The milky base from globals.css — this is the colour a phone paints
+    // while the app is opening, so it has to be the app's own page.
+    background_color: "#f7f5f1",
     theme_color: "#1c5cab",
     categories: ["productivity", "health", "lifestyle"],
     icons: [

@@ -136,10 +136,35 @@ function prayerInsight(t: Tracker, s: Summary, days: number): Insight | null {
   };
 }
 
-/** Clean streaks: what matters is the run and how often it breaks. */
-function streakInsight(t: Tracker, s: Summary, days: number): Insight | null {
+/**
+ * Clean streaks: what matters is the run and how often it breaks.
+ *
+ * `live` is whether the period on screen is the one being lived. The run
+ * itself (`s.streak.current`) is always measured from *today*, so under a
+ * browsed past month it is a fact about now printed inside a card about
+ * July — "5 slips in 31 days, you're on 40 days now" contradicts itself,
+ * since 40 days ago is inside the same 31 days it just counted slips in.
+ * Off the live unit this says only what the period itself contains.
+ */
+function streakInsight(
+  t: Tracker,
+  s: Summary,
+  days: number,
+  live: boolean
+): Insight | null {
   const run = s.streak;
   if (!run || run.since === null) return null;
+
+  // Slips inside the period, which is the one thing that is true of it.
+  if (!live) {
+    const slips = Math.max(0, s.days - s.sum);
+    if (slips === 0) return null;
+    return {
+      level: slips >= 3 ? "bad" : "warn",
+      title: `${t.name}: ${slips} slip${slips === 1 ? "" : "s"} in these ${days} days`,
+      detail: `Counted inside this period. The run itself is measured from today — switch back to now to see where it stands.`,
+    };
+  }
 
   // Slips inside the period, which is what "lately" actually means.
   const recentSlips = Math.max(0, s.days - s.sum);
@@ -207,9 +232,22 @@ function goalInsight(t: Tracker, s: Summary): Insight | null {
   return null;
 }
 
-/** A time tracker you set up and then never filled in. */
-function idleInsight(t: Tracker, s: Summary, days: number): Insight | null {
-  if (s.days > 0 || days < 14) return null;
+/**
+ * A time tracker you set up and then never filled in.
+ *
+ * Only on the live period. On a browsed past one this told people to archive
+ * a tracker they created yesterday — of course August is empty for it — and
+ * "idle for 31 days" implied "right up to now", which it no longer does.
+ * There is no creation date on a tracker to test against, and the period
+ * reaching today is the honest substitute.
+ */
+function idleInsight(
+  t: Tracker,
+  s: Summary,
+  days: number,
+  live: boolean
+): Insight | null {
+  if (!live || s.days > 0 || days < 14) return null;
   return {
     level: "warn",
     title: `Nothing logged for ${t.name}`,
@@ -228,6 +266,8 @@ export function buildInsights(stats: Stats | null): Insight[] {
   const out: Insight[] = [];
   const active = stats.trackers.filter((t) => !t.archived);
   const days = stats.days;
+  // Older cached payloads pre-date the field; they were all live windows.
+  const live = stats.live !== false;
 
   // Everything below is only as good as what got typed in, so this goes first.
   if (days > 0 && stats.daysLogged < days * 0.5) {
@@ -260,12 +300,12 @@ export function buildInsights(stats: Stats | null): Insight[] {
       continue;
     }
     if (type === "streak") {
-      const i = streakInsight(t, s, days);
+      const i = streakInsight(t, s, days, live);
       if (i) out.push(i);
       continue;
     }
 
-    const idle = idleInsight(t, s, days);
+    const idle = idleInsight(t, s, days, live);
     if (idle) {
       out.push(idle);
       continue;

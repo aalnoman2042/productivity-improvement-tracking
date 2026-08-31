@@ -10,6 +10,8 @@ import Books from "@/components/Books";
 import Challenges from "@/components/Challenges";
 import PrayerTimesPicker from "@/components/PrayerTimesPicker";
 import MotivationLine from "@/components/MotivationLine";
+import WaterTarget from "@/components/WaterTarget";
+import { GLASS_ML, looksLikeWater } from "@/lib/water";
 import { cacheRemove } from "@/lib/sync";
 import { PERIODS, prettyDate, toDateStr } from "@/lib/dates";
 import { prayerTimesFor, type PrayerPlace } from "@/lib/prayerTimes";
@@ -177,7 +179,9 @@ function goalLabel(t: Tracker): string | null {
     ? `${Math.round((t.goal.target / 60) * 10) / 10}h`
     : `${t.goal.target}${t.unit ? " " + t.unit : ""}`;
   const verb = t.goal.direction === "min" ? "at least" : "at most";
-  return `Goal: ${verb} ${amount} / ${t.goal.period}`;
+  // "8 glasses" is not a quantity of water until a glass has a size.
+  const glass = looksLikeWater(t.name, t.unit) ? ` · ${GLASS_ML} ml a glass` : "";
+  return `Goal: ${verb} ${amount} / ${t.goal.period}${glass}`;
 }
 
 function TrackersList() {
@@ -792,6 +796,21 @@ function TrackersList() {
                 </select>
               </div>
             )}
+            {/* Eight glasses is a number everyone has heard and nobody has
+                checked. Offered only for the water tracker, and only as an
+                offer — it fills the field above and leaves it editable.
+                See lib/water.ts. */}
+            {form.goalOn &&
+              form.goalPeriod === "day" &&
+              looksLikeWater(form.name, form.unit) && (
+                <WaterTarget
+                  unit={form.unit}
+                  onPick={(glasses) => {
+                    setF("goalTarget", String(glasses));
+                    setF("goalDirection", "min");
+                  }}
+                />
+              )}
           </div>
 
           {/* The other kind of number: one with a date on it. A daily goal

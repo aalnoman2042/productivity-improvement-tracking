@@ -6,29 +6,40 @@
 :root {
   color-scheme: light;
 
-  --background: #f4f6fa;
-  --foreground: #111827;
-  --surface: #ffffff;
-  --surface-2: #f7f9fc;
-  --ink-secondary: #4b5563;
-  --ink-muted: #6b7280;
-  --chart-grid: #eaecf0;
-  --chart-axis: #d5d8de;
-  --edge: #e5e7eb;
+  /* Milky, not white.
+     The light theme used to be pure #ffffff cards on a blue-grey page, and
+     the blue was the problem: a cold white next to this app's blue accent
+     reads as a screenshot of a form. These are warm off-whites — paper
+     rather than paint — which lets the brand blue and purple sit on them as
+     colour instead of as the only warmth in the room. Nothing here is a
+     tint of the accent; the neutrals lean a few degrees to cream on their
+     own, and every ink was re-checked against them for contrast (secondary
+     7.4:1, muted 4.8:1 on --surface). */
+  --background: #f7f5f1;
+  --foreground: #1c1917;
+  --surface: #fdfcf9;
+  --surface-2: #f4f1ea;
+  --ink-secondary: #57534e;
+  --ink-muted: #78716c;
+  --chart-grid: #ece8e0;
+  --chart-axis: #d8d2c7;
+  --edge: #e8e3da;
 
   --accent: #1c5cab;
   --accent-hover: #184f95;
-  --accent-soft: #eef4fd;
+  --accent-soft: #eef3fb;
 
   --grad-brand: linear-gradient(135deg, #2a78d6 0%, #1c5cab 55%, #4a3aa7 100%);
-  --grad-card: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  --grad-card: linear-gradient(180deg, #fffefb 0%, #faf8f2 100%);
 
   /* Soft colour wash behind everything — three fixed radial tints. Painted
-     by `body::before`, never on the body itself; see the note down there. */
-  --wash-1: rgba(42, 120, 214, 0.2);
-  --wash-2: rgba(74, 58, 167, 0.17);
-  --wash-3: rgba(27, 175, 122, 0.13);
-  --wash-base: #f4f6fa;
+     by `body::before`, never on the body itself; see the note down there.
+     Pulled back from the old opacities: the same blue over a cream base is
+     a stronger note than it was over a blue-grey one. */
+  --wash-1: rgba(42, 120, 214, 0.15);
+  --wash-2: rgba(74, 58, 167, 0.12);
+  --wash-3: rgba(27, 175, 122, 0.1);
+  --wash-base: #f7f5f1;
 
   /* Categorical series — validated light steps */
   --series-1: #2a78d6;
@@ -96,6 +107,16 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
+
+  /* The corner scale, nudged once instead of in eighty-three class lists.
+     The convention in §"The radius scale" below is unchanged — cards are
+     still `rounded-xl`, chips still `rounded-md` — but each step is a
+     little rounder than Tailwind's default, which is most of the
+     difference between a card that looks drawn and one that looks made. */
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.375rem;
 }
 
 /* =====================================================================
@@ -110,6 +131,11 @@ html {
 body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Thinner, cleaner glyphs where the platform draws them heavy. A no-op
+     on Windows and Android; on a Mac it is the difference between text
+     that looks set and text that looks printed with a marker. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
   /* Deliberately no background of its own: an opaque body would paint over
@@ -303,8 +329,80 @@ body::before {
   color: transparent;
 }
 
+/* =====================================================================
+   Cards.
+
+   One rule for every surface in the app, because eighty-three of them were
+   `border border-edge card shadow-sm` and the shadow was doing almost
+   nothing: a single 1px drop that reads as a smudge rather than as height.
+   What lifts a card is two shadows rather than one: a tight contact shadow
+   directly under it, and a wide faint ambient one that gives it a room to
+   sit in.
+
+   These are plain (unlayered) rules, so they beat Tailwind's `shadow-sm`
+   utility whatever the class order. The two heavier steps are spelled out
+   for the handful of cards that ask for them — the undo bar, the sheets —
+   because otherwise this would flatten them.
+   ===================================================================== */
 .card {
   background: var(--grad-card);
+  /* Warm-grey shadows, not navy ones: a cool shadow on a cream card reads
+     as dirt rather than as depth. */
+  box-shadow:
+    0 1px 2px rgba(60, 50, 38, 0.05),
+    0 6px 16px -8px rgba(60, 50, 38, 0.11);
+}
+
+.card.shadow-md {
+  box-shadow:
+    0 2px 4px rgba(60, 50, 38, 0.07),
+    0 12px 28px -12px rgba(60, 50, 38, 0.2);
+}
+
+.card.shadow-lg {
+  box-shadow:
+    0 4px 8px rgba(60, 50, 38, 0.08),
+    0 24px 48px -20px rgba(60, 50, 38, 0.3);
+}
+
+/* Dark mode needs a third layer the light one doesn't: a black card on a
+   black page casts a shadow nobody can see, so a hairline of light along
+   its top edge does the separating instead. (In light mode that highlight
+   would be white on white — which is why it isn't up there.) */
+:root[data-theme="dark"] .card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 16px -8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+:root[data-theme="dark"] .card.shadow-md {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.55),
+    0 12px 28px -12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+:root[data-theme="dark"] .card.shadow-lg {
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    0 24px 48px -20px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+/* Headings pull in slightly as they grow, the way type is set on paper: at
+   24px the default tracking is a hair loose and it reads as slack. The body
+   text is left exactly as it was — this is about the two or three large
+   lines on a screen, not about the reading.
+
+   IN `@layer base`, and that is the whole point of this comment. Unlayered
+   it would beat Tailwind's own `tracking-tight` — the same mechanism the
+   `.card` shadows below rely on deliberately — and eighteen headings across
+   the app that ask for tighter tracking would silently get looser tracking
+   instead. A default belongs in `base`, where a utility can still win. */
+@layer base {
+  h1,
+  h2 {
+    letter-spacing: -0.015em;
+  }
 }
 
 button,
@@ -317,6 +415,67 @@ input {
     color 140ms ease,
     box-shadow 140ms ease,
     transform 120ms ease;
+}
+
+/* =====================================================================
+   Dropdowns.
+
+   All nine of them in one rule, because a native <select> is the one control
+   a browser refuses to make look like the rest of your app. Left alone they
+   arrived three different heights on three platforms wearing the OS's own
+   arrow — a grey triangle on Windows, a blue one on iOS, and on some Android
+   WebViews nothing at all — on a card that has no grey or blue anywhere else
+   in it. Next to the app's own buttons they read as something pasted in.
+
+   So `appearance: none` takes the platform's chrome off and the chevron is
+   drawn here. It is a background image per theme rather than one image in
+   `currentColor`, because a data-URI SVG cannot see `currentColor` — it is
+   a separate document, and the property does not cross that boundary. Two
+   small images is the honest fix; a mask would clip the select's own text.
+
+   `padding-inline-end` leaves room for the arrow, logical rather than
+   `padding-right` so a right-to-left locale puts it on the correct side.
+   The closed control gets a real surface so it reads as pressable; the open
+   list is the browser's, and follows the `color-scheme` each theme block at
+   the top of this file already declares.
+   ===================================================================== */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6 8 10.5 12.5 6' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.85rem 0.85rem;
+  padding-inline-end: 2.1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+select:hover:not(:disabled) {
+  background-color: var(--surface-2);
+}
+
+select:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* In dark mode the card sits a step above the page, so the control has to
+   sit a step above the card — and the arrow needs the lighter ink. */
+:root[data-theme="dark"] select {
+  background-color: var(--surface-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6 8 10.5 12.5 6' fill='none' stroke='%23c3c2b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] select:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--surface-2) 82%, var(--foreground) 10%);
+}
+
+/* The open list is drawn by the browser; only the colours are ours. Windows
+   in particular renders it white-on-white without this in dark mode. */
+option {
+  background-color: var(--surface);
+  color: var(--foreground);
 }
 
 /* =====================================================================
@@ -487,7 +646,9 @@ button:active:not(:disabled) {
   position: relative;
   overflow: hidden;
   background: var(--surface-2);
-  border-radius: 0.5rem;
+  /* The same corner as the card it stands in for, so nothing squares off
+     for a second when the real thing arrives. */
+  border-radius: 0.75rem;
 }
 .skeleton::after {
   content: "";

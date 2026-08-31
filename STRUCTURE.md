@@ -231,13 +231,19 @@ All of it pure, all of it in `lib/`, all of it tested.
   arithmetic for both, matched to the *same days* of the previous stretch.
 
 **Time and the calendar**
-- `dates.ts` — parsing, ranges, buckets, and `isBeyondToday`, the guard that
-  makes the Tomorrow tab safe (§13).
+- `dates.ts` — parsing, buckets, and `isBeyondToday`, the guard that makes
+  the Tomorrow tab safe (§13). Also the **calendar periods**: every range in
+  this app is a unit you can name — a Monday-to-Sunday week, a half-month, a
+  calendar month, Jan–Jun or Jul–Dec, a year — identified by its first day
+  and picked by `components/PeriodPicker`. `periodRange(period, anchor,
+  today)` counts a finished unit whole and a running one up to today;
+  `previousRange` is what it is compared against.
 - `clock.ts` — the night axis, so a 1am bedtime sorts after a 11pm one.
 - `streak.ts`, `milestones.ts`, `challenges.ts`.
 
 **The day itself**
-- `draft.ts` — the day-draft model and the strict 24-hour cap.
+- `draft.ts` — the day-draft model, the strict 24-hour cap, and
+  `slipNeedsReason` (a streak slip must say why).
 - `trackers.ts` — the eight tracker types, categories, template packs.
 - `tasks.ts`, `notes.ts`, `books.ts` — the three that count for nothing.
 - `prayerTimes.ts` — the five waqts from solar position. No API, no key, no

@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import Timer from "@/components/Timer";
-import { EMPTY, digits, isLogged, type Draft } from "@/lib/draft";
+import { EMPTY, digits, isLogged, slipNeedsReason, type Draft } from "@/lib/draft";
+import { MAX_TRACKER_NOTE } from "@/lib/notes";
 import type { Prefill } from "@/lib/prefill";
 import {
   PRAYERS,
@@ -46,6 +48,11 @@ export default function TrackerInput({
   const dr = draft ?? EMPTY;
   const type = t.type as TrackerType;
   const big = size === "large";
+
+  // Set by the Slipped button so the reason box takes the caret the moment
+  // it appears — but only then. Focusing it on mount instead would open the
+  // keyboard every time a day with a slip on it is opened.
+  const openReason = useRef(false);
 
   // The offer disappears the moment anything real is entered — it's a way to
   // skip typing, not a value competing with what you typed.
@@ -203,29 +210,58 @@ export default function TrackerInput({
 
   if (type === "streak") {
     return (
-      <div className={`flex items-center gap-1.5 ${big ? "justify-center" : ""}`}>
-        <button
-          type="button"
-          onClick={() => set(t.id, { status: dr.status === "clean" ? null : "clean" })}
-          className={`rounded-md border ${chip} ${
-            dr.status === "clean"
-              ? "border-green-700 bg-green-700 text-white"
-              : "border-edge text-secondary hover:bg-surface-2"
-          }`}
-        >
-          ✓ Clean
-        </button>
-        <button
-          type="button"
-          onClick={() => set(t.id, { status: dr.status === "slip" ? null : "slip" })}
-          className={`rounded-md border ${chip} ${
-            dr.status === "slip"
-              ? "border-red-600 bg-red-600 text-white"
-              : "border-edge text-secondary hover:bg-surface-2"
-          }`}
-        >
-          Slipped
-        </button>
+      <div className={`flex flex-col gap-1.5 ${big ? "items-center" : "items-end"}`}>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => set(t.id, { status: dr.status === "clean" ? null : "clean" })}
+            className={`rounded-md border ${chip} ${
+              dr.status === "clean"
+                ? "border-green-700 bg-green-700 text-white"
+                : "border-edge text-secondary hover:bg-surface-2"
+            }`}
+          >
+            ✓ Clean
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              openReason.current = dr.status !== "slip";
+              set(t.id, { status: dr.status === "slip" ? null : "slip" });
+            }}
+            className={`rounded-md border ${chip} ${
+              dr.status === "slip"
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-edge text-secondary hover:bg-surface-2"
+            }`}
+          >
+            Slipped
+          </button>
+        </div>
+        {/* A slip has to say why, so the box for it opens with the tap —
+            asking afterwards is how you get "0" and no idea. */}
+        {dr.status === "slip" && (
+          <input
+            ref={(el) => {
+              if (el && openReason.current) {
+                openReason.current = false;
+                el.focus();
+              }
+            }}
+            value={dr.note}
+            onChange={(e) => set(t.id, { note: e.target.value })}
+            maxLength={MAX_TRACKER_NOTE}
+            placeholder="Why did it slip?"
+            aria-label={`Why ${t.name} slipped`}
+            className={`w-full rounded-md border bg-transparent px-2.5 py-1.5 outline-none ${
+              big ? "text-base" : "text-sm"
+            } ${
+              slipNeedsReason(type, dr)
+                ? "border-amber-600 placeholder:text-amber-700 dark:placeholder:text-amber-500"
+                : "border-edge focus:border-accent"
+            }`}
+          />
+        )}
       </div>
     );
   }

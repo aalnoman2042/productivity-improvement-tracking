@@ -6,6 +6,8 @@ import {
   draftNote,
   draftToEntry,
   isLogged,
+  slipNeedsReason,
+  slipsMissingReason,
   timeSlices,
   toDraft,
 } from "../lib/draft";
@@ -192,5 +194,66 @@ describe("timeSlices", () => {
     const sum = timeSlices(trackers, draft).reduce((n, s) => n + s.minutes, 0);
     expect(sum).toBe(dayTimeTotal(trackers, draft));
     expect(sum).toBeLessThan(DAY_MINUTES);
+  });
+});
+
+/**
+ * A slip that hasn't said why yet.
+ *
+ * Drives the outline on the reason box and the line on the daily page —
+ * an ask, never a gate. `tests/routes.entries.test.ts` holds the other half
+ * of the rule: the server records a note-less slip regardless.
+ */
+describe("slipNeedsReason", () => {
+  const streak = (over: Partial<Tracker> = {}): Tracker => ({
+    id: "clean",
+    name: "No smoking",
+    type: "streak",
+    unit: "",
+    color: "#2a78d6",
+    category: "other",
+    goal: null,
+    archived: false,
+    order: 0,
+    ...over,
+  });
+
+  it("spots a slip with nothing written on it", () => {
+    expect(slipNeedsReason("streak", { ...EMPTY, status: "slip" })).toBe(true);
+    expect(
+      slipNeedsReason("streak", { ...EMPTY, status: "slip", note: "   " })
+    ).toBe(true);
+    expect(
+      slipNeedsReason("streak", { ...EMPTY, status: "slip", note: "argument" })
+    ).toBe(false);
+  });
+
+  it("asks nothing of a clean day, or of an untouched one", () => {
+    expect(slipNeedsReason("streak", { ...EMPTY, status: "clean" })).toBe(false);
+    expect(slipNeedsReason("streak", EMPTY)).toBe(false);
+    expect(slipNeedsReason("streak", undefined)).toBe(false);
+  });
+
+  it("asks nothing of any other kind of tracker", () => {
+    // Nothing else in the app is mandatory, and a zero elsewhere is not a
+    // confession — it is just a quiet day.
+    expect(slipNeedsReason("check", { ...EMPTY, status: "slip" })).toBe(false);
+    expect(slipNeedsReason("count", { ...EMPTY, num: "0" })).toBe(false);
+  });
+
+  it("names the ones a day is waiting on", () => {
+    const trackers = [
+      streak({ id: "a", name: "No smoking" }),
+      streak({ id: "b", name: "No scrolling" }),
+      streak({ id: "c", name: "No sugar" }),
+    ];
+    const draft = {
+      a: { ...EMPTY, status: "slip" as const },
+      b: { ...EMPTY, status: "slip" as const, note: "bored" },
+      c: { ...EMPTY, status: "clean" as const },
+    };
+    expect(slipsMissingReason(trackers, draft).map((t) => t.name)).toEqual([
+      "No smoking",
+    ]);
   });
 });
