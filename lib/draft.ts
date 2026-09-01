@@ -2,6 +2,16 @@ import { MAX_TRACKER_NOTE } from "./notes";
 import { minutesBetween, orderPrayers, type Tracker, type TrackerType } from "./trackers";
 
 /**
+ * A nap: how long it lasted, and the clock time it began when that is
+ * actually known — the timer knows, a nap typed in afterwards doesn't, and
+ * inventing one would be a worse record than admitting the gap.
+ */
+export type Nap = { mins: number; at: string | null };
+
+/** No day gets more than this many naps on it. */
+export const MAX_NAPS = 12;
+
+/**
  * What a day looks like while you're typing it.
  *
  * The daily log keeps everything as strings — a half-typed "1" in an hours box
@@ -17,6 +27,8 @@ export type Draft = {
   start: string;
   end: string;
   quality: number | null;
+  /** Sleep: daytime naps, added into the night's total. */
+  naps: Nap[];
   checked: boolean;
   /** Namaz: which of the five prayers are ticked. */
   parts: string[];
@@ -30,6 +42,7 @@ export type EntryMeta = {
   start?: string | null;
   end?: string | null;
   quality?: number | null;
+  naps?: Nap[] | null;
   parts?: string[] | null;
   status?: "clean" | "slip" | null;
 } | null;
@@ -50,6 +63,7 @@ export const EMPTY: Draft = {
   start: "",
   end: "",
   quality: null,
+  naps: [],
   checked: false,
   parts: [],
   status: null,
@@ -74,6 +88,7 @@ export function toDraft(type: TrackerType, entry: Entry | undefined): Draft {
       start: entry.meta?.start ?? "",
       end: entry.meta?.end ?? "",
       quality: entry.meta?.quality ?? null,
+      naps: entry.meta?.naps ?? [],
     };
   }
   if (type === "check") return { ...base, checked: entry.value > 0 };
@@ -139,6 +154,11 @@ export function slipsMissingReason(
   );
 }
 
+/** How much of the day was napped away. */
+export function napMinutes(naps: Nap[] | null | undefined): number {
+  return (naps ?? []).reduce((s, n) => s + (Number(n?.mins) || 0), 0);
+}
+
 /** Turn what's typed into the value + meta the API stores. */
 export function draftToEntry(type: TrackerType, dr: Draft) {
   if (type === "duration") {
@@ -146,10 +166,21 @@ export function draftToEntry(type: TrackerType, dr: Draft) {
     return { value, meta: null };
   }
   if (type === "sleep") {
-    const value = dr.start && dr.end ? minutesBetween(dr.start, dr.end) : 0;
+    const night = dr.start && dr.end ? minutesBetween(dr.start, dr.end) : 0;
+    const naps = dr.naps ?? [];
+    // Sleep is sleep: an afternoon hour on the sofa is an hour you slept,
+    // so it lands in the same total the goal, the score and the day's 24
+    // hours are all judged against. The times keep describing the *night*
+    // — the clock chart draws bedtimes, and a nap is not one.
+    const value = night + napMinutes(naps);
     const meta =
-      dr.start || dr.end || dr.quality
-        ? { start: dr.start || null, end: dr.end || null, quality: dr.quality }
+      dr.start || dr.end || dr.quality || naps.length > 0
+        ? {
+            start: dr.start || null,
+            end: dr.end || null,
+            quality: dr.quality,
+            naps: naps.length > 0 ? naps : null,
+          }
         : null;
     return { value, meta };
   }

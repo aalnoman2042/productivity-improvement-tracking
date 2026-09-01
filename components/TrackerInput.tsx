@@ -1,8 +1,16 @@
 "use client";
 
 import { useRef } from "react";
+import NapPanel from "@/components/NapPanel";
 import Timer from "@/components/Timer";
-import { EMPTY, digits, isLogged, slipNeedsReason, type Draft } from "@/lib/draft";
+import {
+  EMPTY,
+  digits,
+  isLogged,
+  napMinutes,
+  slipNeedsReason,
+  type Draft,
+} from "@/lib/draft";
 import { MAX_TRACKER_NOTE } from "@/lib/notes";
 import type { Prefill } from "@/lib/prefill";
 import {
@@ -118,9 +126,14 @@ export default function TrackerInput({
   }
 
   if (type === "sleep") {
-    const mins = dr.start && dr.end ? minutesBetween(dr.start, dr.end) : 0;
+    const night = dr.start && dr.end ? minutesBetween(dr.start, dr.end) : 0;
+    const naps = napMinutes(dr.naps);
+    const total = night + naps;
     return (
-      <div className={wrap}>
+      // The row takes the full width so the nap panel — which is a full-width
+      // child of this same wrapping flex — drops onto a line of its own
+      // underneath instead of squeezing in beside the clocks.
+      <div className={`${wrap} w-full`}>
         {offerChip}
         <label className="flex items-center gap-1 text-sm text-muted">
           Slept
@@ -140,9 +153,21 @@ export default function TrackerInput({
             className={`${field} text-center`}
           />
         </label>
-        {mins > 0 && (
-          <span className="rounded-md bg-surface-2 px-2 py-1 text-sm font-medium tabular-nums">
-            {formatValue(mins, "sleep", "min")}
+        {total > 0 && (
+          <span
+            className="rounded-md bg-surface-2 px-2 py-1 text-sm font-medium tabular-nums"
+            title={
+              naps > 0
+                ? `${formatValue(night, "sleep", "min")} at night + ${formatValue(naps, "sleep", "min")} of naps`
+                : undefined
+            }
+          >
+            {formatValue(total, "sleep", "min")}
+            {naps > 0 && (
+              <span className="ml-1 text-xs font-normal text-muted">
+                incl. {formatValue(naps, "sleep", "min")} nap
+              </span>
+            )}
           </span>
         )}
         <div className="flex items-center gap-1">
@@ -162,6 +187,13 @@ export default function TrackerInput({
             </button>
           ))}
         </div>
+        <NapPanel
+          trackerId={t.id}
+          date={date}
+          naps={dr.naps}
+          onChange={(next) => set(t.id, { naps: next })}
+          big={big}
+        />
       </div>
     );
   }

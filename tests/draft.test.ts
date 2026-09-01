@@ -56,16 +56,67 @@ describe("draftToEntry", () => {
   it("computes sleep across midnight", () => {
     const e = draftToEntry("sleep", { ...EMPTY, start: "23:30", end: "07:00" });
     expect(e.value).toBe(450);
-    expect(e.meta).toEqual({ start: "23:30", end: "07:00", quality: null });
+    expect(e.meta).toEqual({
+      start: "23:30",
+      end: "07:00",
+      quality: null,
+      naps: null,
+    });
   });
 
   it("keeps a half-filled night as meta with no value", () => {
     const e = draftToEntry("sleep", { ...EMPTY, start: "23:30" });
     expect(e.value).toBe(0);
-    expect(e.meta).toEqual({ start: "23:30", end: null, quality: null });
+    expect(e.meta).toEqual({
+      start: "23:30",
+      end: null,
+      quality: null,
+      naps: null,
+    });
   });
 
-  it("counts prayers and keeps which ones", () => {
+  it("adds naps into the night's total and keeps them on the entry", () => {
+    const e = draftToEntry("sleep", {
+      ...EMPTY,
+      start: "23:30",
+      end: "07:00",
+      naps: [
+        { mins: 30, at: "14:20" },
+        { mins: 15, at: null },
+      ],
+    });
+    expect(e.value).toBe(450 + 45);
+    expect(e.meta).toEqual({
+      start: "23:30",
+      end: "07:00",
+      quality: null,
+      naps: [
+        { mins: 30, at: "14:20" },
+        { mins: 15, at: null },
+      ],
+    });
+  });
+
+  it("a nap on its own is a logged day — no night needed", () => {
+    const dr = { ...EMPTY, naps: [{ mins: 40, at: null }] };
+    const e = draftToEntry("sleep", dr);
+    expect(e.value).toBe(40);
+    expect(e.meta).toEqual({ start: null, end: null, quality: null, naps: dr.naps });
+    expect(isLogged("sleep", dr)).toBe(true);
+  });
+
+  it("carries naps back out of a stored entry", () => {
+    const naps = [{ mins: 25, at: "15:00" }];
+    expect(
+      toDraft("sleep", {
+        trackerId: "t",
+        value: 505,
+        meta: { start: "23:00", end: "07:00", naps },
+      }).naps
+    ).toEqual(naps);
+  });
+
+  it("counts prayers and keeps which ones", () =>{
     const e = draftToEntry("prayer", { ...EMPTY, parts: ["isha", "fajr"] });
     expect(e.value).toBe(2);
     // Stored in prayer order, not tap order.

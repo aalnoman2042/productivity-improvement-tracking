@@ -231,6 +231,21 @@ const VALIDATORS: Record<string, object> = {
           start: { bsonType: ["string", "null"], pattern: "^\\d{2}:\\d{2}$" },
           end: { bsonType: ["string", "null"], pattern: "^\\d{2}:\\d{2}$" },
           quality: { bsonType: ["number", "null"], minimum: 1, maximum: 5 },
+          // Sleep: the day's naps, each with the minutes slept and the clock
+          // time it started when a timer recorded one. The minutes are also
+          // counted in `value` — the times above describe the night only.
+          naps: {
+            bsonType: ["array", "null"],
+            maxItems: 12,
+            items: {
+              bsonType: "object",
+              required: ["mins"],
+              properties: {
+                mins: { bsonType: "number", minimum: 1, maximum: 1440 },
+                at: { bsonType: ["string", "null"], pattern: "^\d{2}:\d{2}$" },
+              },
+            },
+          },
           // Namaz: which of the five prayers were prayed.
           parts: {
             bsonType: ["array", "null"],

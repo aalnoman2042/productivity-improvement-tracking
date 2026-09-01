@@ -1,67 +1,21 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { post } from "@/lib/sync";
-
-const KEY = "pit_timer";
-const CHANGE = "pit-timer-change";
-
-type Running = { trackerId: string; date: string; startedAt: number };
-
-/**
- * The running timer as an external store: localStorage is the source of
- * truth (it survives refreshes and is shared across tabs), and the snapshot
- * is memoised against the raw text so an unchanged value keeps its identity
- * — which is what `useSyncExternalStore` needs to not re-render forever.
- */
-let snap: { raw: string | null; value: Running | null } = {
-  raw: null,
-  value: null,
-};
-
-function readRunning(): Running | null {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(KEY);
-  } catch {
-    return null;
-  }
-  if (raw !== snap.raw) {
-    let value: Running | null = null;
-    try {
-      value = raw ? (JSON.parse(raw) as Running) : null;
-    } catch {
-      value = null;
-    }
-    snap = { raw, value };
-  }
-  return snap.value;
-}
-
-const noRunning = () => null;
-
-function subscribeRunning(onChange: () => void): () => void {
-  window.addEventListener("storage", onChange);
-  window.addEventListener(CHANGE, onChange);
-  return () => {
-    window.removeEventListener("storage", onChange);
-    window.removeEventListener(CHANGE, onChange);
-  };
-}
-
-function clock(ms: number): string {
-  const total = Math.floor(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
+import {
+  clearTimer,
+  clock,
+  elapsedMinutes,
+  kindOf,
+  startTimer,
+  useNow,
+  useRunning,
+} from "@/lib/timer";
 
 /**
  * Stopwatch for a "time spent" tracker. The running state lives in
- * localStorage, so closing the tab or refreshing doesn't lose the session.
- * Stopping adds the elapsed minutes to that day's total.
+ * localStorage (see `lib/timer`), so closing the tab or refreshing doesn't
+ * lose the session. Stopping adds the elapsed minutes to that day's total.
  */
 export default function Timer({
   trackerId,
@@ -72,36 +26,18 @@ export default function Timer({
   date: string;
   onSaved: () => void;
 }) {
-  const running = useSyncExternalStore(subscribeRunning, readRunning, noRunning);
-  const [now, setNow] = useState(() => Date.now());
+  const running = useRunning();
   const [busy, setBusy] = useState(false);
 
-  const mine = running?.trackerId === trackerId;
-
-  useEffect(() => {
-    if (!mine) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [mine]);
-
-  function broadcast() {
-    window.dispatchEvent(new Event(CHANGE));
-  }
-
-  function start() {
-    const next: Running = { trackerId, date, startedAt: Date.now() };
-    localStorage.setItem(KEY, JSON.stringify(next));
-    setNow(Date.now());
-    broadcast();
-  }
+  const mine =
+    running?.trackerId === trackerId && kindOf(running) === "duration";
+  const now = useNow(mine);
 
   async function stop() {
     if (!running || busy) return;
     setBusy(true);
-    const elapsedMs = Date.now() - running.startedAt;
-    const minutes = Math.max(1, Math.round(elapsedMs / 60000));
-    localStorage.removeItem(KEY);
-    broadcast();
+    const minutes = elapsedMinutes(running.startedAt);
+    clearTimer();
     try {
       // Queues itself if you're offline — the minutes are never lost.
       await post("/api/entries/increment", {
@@ -135,13 +71,16 @@ export default function Timer({
     );
   }
 
-  // Another tracker's timer is running — don't let two run at once.
+  // Another timer is running — a stopwatch or a nap — and only one counts
+  // an hour at a time.
   const blocked = Boolean(running) && !mine;
 
   return (
     <button
       type="button"
-      onClick={start}
+      onClick={() =>
+        startTimer({ trackerId, date, startedAt: Date.now(), kind: "duration" })
+      }
       disabled={blocked}
       className="shrink-0 rounded-md border border-edge px-2.5 py-1.5 text-sm text-secondary hover:bg-background disabled:opacity-40"
       title={blocked ? "Another timer is running" : "Start timer"}

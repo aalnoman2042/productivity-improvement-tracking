@@ -92,7 +92,9 @@ lib/                pure logic, shared helpers, and the database
                      catchup.ts — which days are blank, and never today;
                      targets.ts — a number with a date on it, and the
                        arrival date your own pace implies;
-                     pixels.ts — a year laid out as calendar weeks)
+                     pixels.ts — a year laid out as calendar weeks;
+                     timer.ts — the one running timer, and why there is
+                       only ever one of them)
 tests/              vitest specs, one per lib module
 scripts/            one-off tools (icons, VAPID keys, demo seed, db check,
                     and the two the Android app needs: make-keystore.mjs
@@ -137,6 +139,13 @@ enforcing and compares it to the code.
 | `pushSubs` | endpoint, keys | endpoint |
 | `rateLimits` | count, resetAt | `_id` = `action:subject` (TTL) |
 | `cronRuns` | job, startedAt, result | — (TTL, 30 days) |
+
+`entries.meta` carries what a kind needs beyond a number: the night's clock
+times, its quality and the day's **naps** for sleep, which prayers were
+prayed, and whether a streak day was clean or a slip. A nap's minutes are
+added into the sleep `value` — sleep is sleep, however you got it — while
+`start`/`end` go on describing the night alone, because that is what the
+sleep clock draws.
 
 `restDays` is the odd one out and the point of it: a row there records
 that a day was **deliberately** empty. It adds to nothing — not days logged,
@@ -420,8 +429,8 @@ quietly would be worse than failing loudly.
 
 ## 13. Invariants — do not regress these
 
-1. **A day's time (duration + sleep) ≤ 1440 minutes,** enforced on the
-   server, in the stopwatch, and on the page.
+1. **A day's time (duration + sleep, naps and all) ≤ 1440 minutes,** enforced
+   on the server, in the stopwatch, and on the page.
 2. **A slip is not a blank.** A broken streak is `value 0` *with* meta, so it
    stays on record instead of reading as a day you never logged.
 3. **Unlogged fails an "at least" goal and passes an "at most" one.**

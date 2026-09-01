@@ -14,6 +14,7 @@ describe("parseMeta", () => {
       start: "23:30",
       end: "07:00",
       quality: null,
+      naps: null,
       parts: null,
       status: null,
     });
@@ -33,6 +34,32 @@ describe("parseMeta", () => {
     expect(
       parseMeta({ parts: ["isha", "fajr", "brunch", 42, "fajr"] })?.parts
     ).toEqual(["fajr", "isha"]);
+  });
+
+  it("keeps naps that are real minutes and drops the rest", () => {
+    expect(
+      parseMeta({
+        naps: [
+          { mins: 30, at: "14:20" },
+          { mins: 20 },
+          { mins: 0 },
+          { mins: 2000 },
+          { mins: 15, at: "half two" },
+          "nap",
+        ],
+      })?.naps
+    ).toEqual([
+      { mins: 30, at: "14:20" },
+      { mins: 20, at: null },
+      { mins: 15, at: null },
+    ]);
+  });
+
+  it("a nap alone is worth storing", () => {
+    expect(parseMeta({ naps: [{ mins: 45 }] })?.naps).toEqual([
+      { mins: 45, at: null },
+    ]);
+    expect(parseMeta({ naps: [] })).toBeNull();
   });
 
   it("accepts only clean or slip as a status", () => {
