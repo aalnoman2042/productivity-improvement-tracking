@@ -48,39 +48,3 @@ export async function currentAdminId(): Promise<ObjectId | null> {
     .findOne({ _id: userId }, { projection: { email: 1 } });
   return user && isAdminEmail(user.email) ? userId : null;
 }
-
-/**
- * Who the cortisol estimate is switched on for.
- *
- * Admins only while it is being tested, and **everyone the moment
- * `CORTISOL_OPEN=1` is set in the environment** — a switch rather than a
- * deploy, for the same reason `ADMIN_EMAILS` is one: the day the test ends
- * should not have to wait on a build. Nothing else about the page changes
- * when it flips; it has always read the signed-in account's own days and
- * only its own, admin or not.
- */
-export function cortisolOpenToAll(): boolean {
-  return process.env.CORTISOL_OPEN === "1";
-}
-
-/** Cosmetic use only — for the doorway on Account. The route re-checks. */
-export function canSeeCortisol(email: unknown): boolean {
-  return cortisolOpenToAll() || isAdminEmail(email);
-}
-
-/**
- * The signed-in user's id, but only when the cortisol page is theirs to see.
- * Gated the way the admin routes are: checked against the database on every
- * request, never trusted from the client.
- */
-export async function currentCortisolUserId(): Promise<ObjectId | null> {
-  const userId = await currentUserId();
-  if (!userId) return null;
-  if (cortisolOpenToAll()) return userId;
-
-  const d = await db();
-  const user = await d
-    .collection("users")
-    .findOne({ _id: userId }, { projection: { email: 1 } });
-  return user && isAdminEmail(user.email) ? userId : null;
-}

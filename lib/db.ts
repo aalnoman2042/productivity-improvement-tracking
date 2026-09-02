@@ -90,6 +90,29 @@ const VALIDATORS: Record<string, object> = {
           updatedAt: { bsonType: ["date", "null"] },
         },
       },
+      // What this account's trackers mean, for the health page.
+      //
+      // Only two things are kept: the AI's last answer (`lib/roleAI`) and any
+      // role the reader set by hand. The keyword rules are recomputed on
+      // every read because they are pure and instant, and a cached copy of a
+      // pure function is only a second place for it to be wrong.
+      //
+      // `signature` is the fingerprint of the tracker list the AI answered
+      // for. When it stops matching, the answer is stale and the page offers
+      // to re-run rather than spending a shared allowance on its own.
+      health: {
+        bsonType: ["object", "null"],
+        properties: {
+          roles: { bsonType: ["array", "null"] },
+          // Free-form by necessity: the keys are tracker ids and the values
+          // are role names defined in `lib/trackerRoles`. Listing them here
+          // would be a second copy of that list to keep in step, and what
+          // reaches this field has already been through `cleanOverrides`.
+          overrides: { bsonType: ["object", "null"] },
+          signature: { bsonType: ["string", "null"] },
+          aiAt: { bsonType: ["date", "null"] },
+        },
+      },
       // Nightly "did you log today?" push. The cron decides *when* it fires;
       // tzOffset only decides *which day* the reminder is about.
       reminder: {

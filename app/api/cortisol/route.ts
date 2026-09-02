@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { db, dbReady } from "@/lib/db";
-import { currentCortisolUserId } from "@/lib/admin";
+import { currentHealthUserId } from "@/lib/access";
 import { addDays, isValidDateStr } from "@/lib/dates";
 import { napMinutes, type Nap } from "@/lib/draft";
 import { clockToMinutes } from "@/lib/clock";
@@ -26,7 +26,9 @@ import {
 /**
  * The cortisol read.
  *
- * Gated while it is being tested (see `currentCortisolUserId`), and reading
+ * Gated to invited members while it is being tested (`currentHealthUserId`
+ * — the health page it feeds detects trackers with the shared AI allowance),
+ * and reading
  * **the signed-in account's own days and only its own** whether it is gated
  * or not — no version of this route can be pointed at somebody else, which
  * is the promise every other data route here makes too.
@@ -56,7 +58,7 @@ function nightOf(value: number, meta: Record<string, unknown> | null, naps: numb
 }
 
 export async function GET(req: Request) {
-  const userId = await currentCortisolUserId();
+  const userId = await currentHealthUserId();
   if (!userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const params = new URL(req.url).searchParams;
@@ -193,7 +195,7 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const userId = await currentCortisolUserId();
+  const userId = await currentHealthUserId();
   if (!userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

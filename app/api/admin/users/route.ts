@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { db, dbReady } from "@/lib/db";
 import { currentAdminId } from "@/lib/admin";
+import { hasAI } from "@/lib/access";
 
 /**
  * The admin overview: every account's name with the counts beside it — how
@@ -45,7 +47,7 @@ export async function GET(req: Request) {
     d.collection("users").countDocuments({}),
     d
       .collection("users")
-      .find({}, { projection: { name: 1, createdAt: 1, reminder: 1 } })
+      .find({}, { projection: { name: 1, createdAt: 1, reminder: 1, invited: 1 } })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit)
@@ -98,6 +100,66 @@ export async function GET(req: Request) {
       loggedDays: daysBy.get(String(u._id)) ?? 0,
       devices: devicesBy.get(String(u._id)) ?? 0,
       remindersOn: Boolean(u.reminder?.enabled),
+      // Whether the paid-for parts — the AI coach, and the health page that
+      // reads trackers with the same shared allowance — are switched on for
+      // this account. Absent reads as invited (`lib/access.ts`), so the
+      // toggle below shows what `hasAI` actually decides rather than what
+      // the field literally holds.
+      invited: hasAI(u),
     })),
   });
+}
+
+/**
+ * Turn the invited flag on or off for one account.
+ *
+ * This is the only write in the admin surface, and it is deliberately the
+ * narrowest one that could do the job: an id and a boolean, nothing else
+ * readable or writable. The rest of `/admin` reports counts and sizes and
+ * cannot reach a single day of anybody's log — that line does not move
+ * because a toggle was added beside it.
+ *
+ * `invited` gates the features with a bill attached: the AI coach, and the
+ * health page's tracker detection. Absent means invited, so switching
+ * somebody off writes `false` explicitly rather than clearing the field —
+ * clearing it would silently switch them back on.
+ *
+ * PATCH `{id, invited}`.
+ */
+export async function PATCH(req: Request) {
+  const adminId = await currentAdminId();
+  if (!adminId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const body = (await req.json().catch(() => null)) as {
+    id?: unknown;
+    invited?: unknown;
+  } | null;
+
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "A user id is required" }, { status: 400 });
+  }
+  if (typeof body?.invited !== "boolean") {
+    return NextResponse.json({ error: "invited must be true or false" }, { status: 400 });
+  }
+
+  const userId = new ObjectId(id);
+  // An admin who switched themselves off would lose the coach and the health
+  // page and keep the button that did it, which is a confusing place to be.
+  if (userId.equals(adminId) && body.invited === false) {
+    return NextResponse.json(
+      { error: "You cannot switch your own premium access off from here" },
+      { status: 400 }
+    );
+  }
+
+  const d = await dbReady();
+  const result = await d
+    .collection("users")
+    .updateOne({ _id: userId }, { $set: { invited: body.invited } });
+
+  if (result.matchedCount === 0) {
+    return NextResponse.json({ error: "No such account" }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true, id, invited: body.invited });
 }

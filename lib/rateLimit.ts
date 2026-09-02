@@ -56,6 +56,11 @@ export const RULES = {
   // The weekly review writes one row per week; a handful a day is plenty of
   // room to catch up on missed weeks without emptying the free quota.
   weekly: { limit: 6, windowMs: 24 * 60 * 60_000 },
+  // Re-reading what somebody's trackers mean (`lib/roleAI`). The answer only
+  // changes when the tracker list does, so anybody doing this ten times in an
+  // hour is a stuck retry loop rather than a person — and the loop would be
+  // spending an allowance everybody shares.
+  roles: { limit: 10, windowMs: 60 * 60_000 },
 } satisfies Record<string, Rule>;
 
 export type Action = keyof typeof RULES;

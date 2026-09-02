@@ -81,3 +81,4 @@ export const TrendChart = lazyChart(() => import("./TrendChart"), 256);
 export const SeriesChart = lazyChart(() => import("./SeriesChart"), 180);
 export const SleepClockChart = lazyChart(() => import("./SleepClockChart"), 180);
 export const CortisolCurve = lazyChart(() => import("./CortisolCurve"), 240);
+export const LevelTrend = lazyChart(() => import("./LevelTrend"), 240);

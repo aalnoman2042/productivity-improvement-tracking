@@ -100,6 +100,17 @@ lib/                pure logic, shared helpers, and the database
                      cortisol.ts — a diurnal curve modelled from behaviour,
                        and what it refuses to claim;
                      cortisolCheck.ts — the monthly check-up, as data;
+                     trackerRoles.ts — what each of YOUR trackers means,
+                       since you named them and nobody names them alike;
+                     roleAI.ts — the model that labels a tracker name, and
+                       the closed list it is allowed to answer from;
+                     roleStore.ts — where that answer lives, and when it
+                       has gone stale against the tracker list;
+                     health.ts — the health page's arithmetic: reference
+                       bands, ten domains, the balance, your own clock;
+                     healthDays.ts — entry rows into days, purely;
+                     healthRisk.ts — the predictions, each showing its
+                       working; healthTips.ts — the tips, as data;
                      outlier.ts — is this number a typo? asked, never enforced;
                      awards.ts — the rank ladder, the awards, the records;
                      fading.ts — the trackers that were a habit and stopped;
@@ -519,7 +530,7 @@ quietly would be worse than failing loudly.
     something that happened, so a bad month cannot withdraw it, and a rank is
     held only when *every* one of its requirements holds — you do not average
     your way to a title (`lib/awards`).
-22. **The cortisol page models; it never measures.** Every figure it prints
+22. **The health page models; it never measures.** Every figure it prints
     is derived from logged behaviour and a questionnaire, and it says so
     above the chart rather than under it. A reported illness or medication
     does not lower the score — it sets a confidence flag saying the model
@@ -527,8 +538,35 @@ quietly would be worse than failing loudly.
     contraception move real cortisol on their own. And the monthly check-up
     is answered whole or not at all: a partly-filled sheet scores perfectly
     well, which is exactly why it cannot be allowed (`lib/cortisol`,
-    `lib/cortisolCheck`).
-23. **A running timer belongs to the person, not to a browser.** It lives in
+    `lib/cortisolCheck`, `lib/health`).
+23. **Every band is printed beside the number it judges.** A score of 62 with
+    no reference next to it is a mood, not a measurement — so `REFERENCES` in
+    `lib/health` holds each band *and where it came from*, one table feeding
+    both the arithmetic and the screen, and every prediction in
+    `lib/healthRisk` can show the formula it used and name the one change
+    that would move it most.
+24. **The AI labels; it never calculates.** Trackers are user-defined, so
+    the health page cannot read a field called "hydration" — `lib/roleAI`
+    asks a model which tracker fills which role, from a closed list, shown
+    names and types and never a value or a note. Everything downstream is
+    arithmetic in `lib/health`. Rules run first and offline, the AI only
+    corrects what the rules were unsure of, and a role you set by hand beats
+    both forever. A role nothing fills is reported missing and dropped from
+    the weighting — never scored as a good day. It re-reads itself when the
+    tracker list changes and weekly otherwise (`lib/roleStore`), on the roles
+    route rather than the read the page waits for, and **every** way that can
+    fail returns the map the account already had.
+25. **A role may only claim coverage if something reads it.** The panel's bar
+    says "feeding the numbers above", so a role that is detected but fed into
+    no metric weighs zero — otherwise adding the tracker the app asked for
+    moves the bar while changing not one figure. Enforced by a test over
+    every role in `lib/trackerRoles`.
+26. **An entry row is a number with no units.** Whether it is minutes or
+    repetitions, pounds or kilograms, a clean day or a slip is a property of
+    the TRACKER, so anything folding rows into days takes the trackers too
+    and converts on the way in (`lib/healthDays`). An abstinence streak in a
+    "bad habit" role counts its **slips**, never the days it held.
+27. **A running timer belongs to the person, not to a browser.** It lives in
     `timers`, one row per account, so every device sees the same one and any
     of them can end it. localStorage is that device's cache — it paints the
     clock instantly and keeps counting with no signal — and when the server

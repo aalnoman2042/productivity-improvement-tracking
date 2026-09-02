@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, dbReady } from "@/lib/db";
-import { currentCortisolUserId } from "@/lib/admin";
+import { currentHealthUserId } from "@/lib/access";
 import { isValidDateStr } from "@/lib/dates";
 import {
   cleanAnswers,
@@ -30,7 +30,7 @@ import {
  */
 
 export async function GET(req: Request) {
-  const userId = await currentCortisolUserId();
+  const userId = await currentHealthUserId();
   if (!userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const today = new URL(req.url).searchParams.get("today");
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const userId = await currentCortisolUserId();
+  const userId = await currentHealthUserId();
   if (!userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

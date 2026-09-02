@@ -28,6 +28,7 @@ export default function robots(): MetadataRoute.Robots {
           "/awards",
           "/admin",
           "/cortisol",
+          "/health",
           "/start",
           "/reset",
           "/forgot",

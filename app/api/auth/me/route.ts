@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { canSeeCortisol, isAdminEmail } from "@/lib/admin";
+import { isAdminEmail } from "@/lib/admin";
+import { canSeeHealth } from "@/lib/access";
 
 export async function GET() {
   const userId = await currentUserId();
@@ -10,7 +11,7 @@ export async function GET() {
   const d = await db();
   const user = await d
     .collection("users")
-    .findOne({ _id: userId }, { projection: { name: 1, email: 1 } });
+    .findOne({ _id: userId }, { projection: { name: 1, email: 1, invited: 1 } });
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   return NextResponse.json({
@@ -20,8 +21,9 @@ export async function GET() {
     // Shows the Admin doorway on the Account page. Cosmetic only — the
     // admin API re-checks the email itself on every request.
     admin: isAdminEmail(user.email),
-    // Shows the Cortisol doorway. Admins-only while it is in testing, and
-    // everyone once CORTISOL_OPEN is set — the route decides either way.
-    cortisol: canSeeCortisol(user.email),
+    // Shows the Health doorway. Invited members while it is in testing —
+    // the page reads your trackers with the shared AI allowance — and
+    // everyone once HEALTH_OPEN is set. The routes decide either way.
+    health: canSeeHealth(user),
   });
 }

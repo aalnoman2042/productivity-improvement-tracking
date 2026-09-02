@@ -201,7 +201,11 @@ export default function Select({
           id={id}
           // Above everything on the page but below the modals, and capped so a
           // long list (a year of months) scrolls instead of running off screen.
-          className="animate-fade-in absolute left-0 right-0 z-30 mt-1 max-h-64 min-w-max overflow-y-auto rounded-xl border border-edge card p-1 shadow-lg"
+          // `min-w-max` lets the panel grow past its button so a long option
+          // stays readable — and, unclamped, lets one long option drag the
+          // whole page sideways. The cap is the guard: a caller that passes a
+          // sentence gets a truncated line, never a broken layout.
+          className="animate-fade-in absolute left-0 right-0 z-30 mt-1 max-h-64 max-w-[min(90vw,26rem)] min-w-max overflow-y-auto rounded-xl border border-edge card p-1 shadow-lg"
         >
           {options.map((o, i) => {
             const isSelected = o.value === value;

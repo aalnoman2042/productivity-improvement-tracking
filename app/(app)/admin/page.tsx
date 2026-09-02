@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AdminHealth from "@/components/AdminHealth";
 import CardBoundary from "@/components/CardBoundary";
 import NudgeButton from "@/components/NudgeButton";
+import PremiumToggle from "@/components/PremiumToggle";
 import StorageReport from "@/components/StorageReport";
 import { DEFAULT_NUDGE, MAX_NUDGE, cleanNudge } from "@/lib/nudge";
 
@@ -16,6 +17,8 @@ type Row = {
   loggedDays: number;
   devices: number;
   remindersOn: boolean;
+  /** Whether the AI coach and the health page are on for this account. */
+  invited: boolean;
 };
 
 type Overview = {
@@ -60,6 +63,18 @@ export default function AdminPage() {
     }
   }
 
+  /** One row's premium flag, changed in place so the table stays put. */
+  function setInvited(id: string, invited: boolean) {
+    setData((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            users: current.users.map((u) => (u.id === id ? { ...u, invited } : u)),
+          }
+    );
+  }
+
   // Everything computed before the first early return — see check:shape.
   const toSend = cleanNudge(message) ?? DEFAULT_NUDGE;
   const reachable = data?.users.filter((u) => u.devices > 0).length ?? 0;
@@ -71,7 +86,9 @@ export default function AdminPage() {
         <p className="mt-1 text-sm text-secondary">
           Every account, counted, and what the database is holding. Names,
           numbers and sizes only — nobody&apos;s actual data is readable from
-          here.
+          here. <strong className="font-medium">Premium</strong> switches the
+          two features with a bill attached — the AI coach and the health
+          page — for one account; everything else is open to everybody.
         </p>
       </div>
 
@@ -158,6 +175,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 text-right font-medium">Trackers</th>
                   <th className="px-4 py-3 text-right font-medium">Logged days</th>
+                  <th className="px-4 py-3 text-right font-medium">Premium</th>
                   <th className="px-4 py-3 text-right font-medium">Notify</th>
                 </tr>
               </thead>
@@ -179,6 +197,14 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{u.trackers}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{u.loggedDays}</td>
+                    <td className="px-4 py-3 text-right">
+                      <PremiumToggle
+                        userId={u.id}
+                        name={u.name}
+                        invited={u.invited}
+                        onChange={(invited) => setInvited(u.id, invited)}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <NudgeButton
                         userId={u.id}
