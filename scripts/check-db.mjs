@@ -59,6 +59,8 @@ const EXPECTED = {
   rateLimits: null,
   cronRuns: null,
   timers: "date",
+  // month is "YYYY-MM", not a date — checked for existence, not shape.
+  cortisolChecks: null,
 };
 
 const DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";

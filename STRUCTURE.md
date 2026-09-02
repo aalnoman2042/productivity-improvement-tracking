@@ -97,6 +97,9 @@ lib/                pure logic, shared helpers, and the database
                      pixels.ts — a year laid out as calendar weeks;
                      timer.ts — the one running timer, why the server holds
                        it, and why there is only ever one of them;
+                     cortisol.ts — a diurnal curve modelled from behaviour,
+                       and what it refuses to claim;
+                     cortisolCheck.ts — the monthly check-up, as data;
                      outlier.ts — is this number a typo? asked, never enforced;
                      awards.ts — the rank ladder, the awards, the records;
                      fading.ts — the trackers that were a habit and stopped;
@@ -124,7 +127,7 @@ there even when only two routes need it. Components render; they don't decide.
 
 ## 5. Data model
 
-Fourteen collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
+Fifteen collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
 so the BSON types stay honest (real `ObjectId` refs, real `Date`s, real
 booleans). Collections self-create on first write — there is never any manual
 Atlas work. `npm run check:db` reads back what the cluster is actually
@@ -143,6 +146,7 @@ enforcing and compares it to the code.
 | `weeklyReviews` | weekStart, weekEnd, text, snapshot, digest | (userId, weekEnd) |
 | `restDays` | date, reason | (userId, date) |
 | `timers` | trackerId, date, startedAt, kind | userId (one running timer) |
+| `cortisolChecks` | month, answers, score | (userId, month) |
 | `pushSubs` | endpoint, keys | endpoint |
 | `rateLimits` | count, resetAt | `_id` = `action:subject` (TTL) |
 | `cronRuns` | job, startedAt, result | — (TTL, 30 days) |
@@ -515,7 +519,16 @@ quietly would be worse than failing loudly.
     something that happened, so a bad month cannot withdraw it, and a rank is
     held only when *every* one of its requirements holds — you do not average
     your way to a title (`lib/awards`).
-22. **A running timer belongs to the person, not to a browser.** It lives in
+22. **The cortisol page models; it never measures.** Every figure it prints
+    is derived from logged behaviour and a questionnaire, and it says so
+    above the chart rather than under it. A reported illness or medication
+    does not lower the score — it sets a confidence flag saying the model
+    cannot speak for that person at all, because steroids and hormonal
+    contraception move real cortisol on their own. And the monthly check-up
+    is answered whole or not at all: a partly-filled sheet scores perfectly
+    well, which is exactly why it cannot be allowed (`lib/cortisol`,
+    `lib/cortisolCheck`).
+23. **A running timer belongs to the person, not to a browser.** It lives in
     `timers`, one row per account, so every device sees the same one and any
     of them can end it. localStorage is that device's cache — it paints the
     clock instantly and keeps counting with no signal — and when the server

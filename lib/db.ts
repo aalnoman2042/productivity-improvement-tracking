@@ -77,6 +77,19 @@ const VALIDATORS: Record<string, object> = {
           currency: { bsonType: "string", maxLength: 4 },
         },
       },
+      // The three things the cortisol page needs that no tracker records:
+      // the awakening response flattens with age, differs a little by sex,
+      // and a persistently low mood tracks a flatter evening slope. All
+      // optional, and absent for everyone who never opened that page.
+      cortisol: {
+        bsonType: ["object", "null"],
+        properties: {
+          age: { bsonType: ["number", "null"], minimum: 10, maximum: 120 },
+          sex: { enum: ["male", "female", "other", null] },
+          mood: { bsonType: ["number", "null"], minimum: 1, maximum: 5 },
+          updatedAt: { bsonType: ["date", "null"] },
+        },
+      },
       // Nightly "did you log today?" push. The cron decides *when* it fires;
       // tzOffset only decides *which day* the reminder is about.
       reminder: {
@@ -459,6 +472,30 @@ const VALIDATORS: Record<string, object> = {
       updatedAt: { bsonType: "date" },
     },
   },
+  // The monthly cortisol check-up — the answers the daily log cannot know:
+  // how long sleep takes to arrive, whether the morning has daylight in it,
+  // when the last coffee was, whether the work is on shifts.
+  //
+  // One row per person per month, and kept rather than overwritten, because
+  // a check-up is a dated fact and not a setting: June's answers describe
+  // June, and next month gets its own row to be compared against.
+  cortisolChecks: {
+    bsonType: "object",
+    required: ["userId", "month", "answers", "createdAt", "updatedAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      month: { bsonType: "string", pattern: "^\\d{4}-\\d{2}$" },
+      // Free-form by necessity — the questions are data in
+      // `lib/cortisolCheck`, and a validator listing them here would be a
+      // second copy of that list to keep in step. What reaches this field
+      // has already been through `cleanAnswers`, which drops anything that
+      // is not a known question answered in a known shape.
+      answers: { bsonType: "object" },
+      score: { bsonType: ["number", "null"], minimum: 0, maximum: 100 },
+      createdAt: { bsonType: "date" },
+      updatedAt: { bsonType: "date" },
+    },
+  },
   // Attempt counters for the routes reachable without a session. `_id` is
   // "action:subject" and rows delete themselves once the window has passed.
   rateLimits: {
@@ -544,6 +581,10 @@ async function ensureSchema(d: Db): Promise<void> {
     // One running timer per person, enforced where no client can talk it
     // out of it. Every read of it is this lookup.
     d.collection("timers").createIndex({ userId: 1 }, { unique: true }),
+    // One check-up per person per month — the write is an upsert on this.
+    d
+      .collection("cortisolChecks")
+      .createIndex({ userId: 1, month: 1 }, { unique: true }),
     // Both of these are self-cleaning: MongoDB drops the row once the date
     // field is in the past (plus the TTL), so neither collection grows.
     d

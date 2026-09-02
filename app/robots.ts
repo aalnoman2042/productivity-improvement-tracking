@@ -27,6 +27,7 @@ export default function robots(): MetadataRoute.Robots {
           "/catchup",
           "/awards",
           "/admin",
+          "/cortisol",
           "/start",
           "/reset",
           "/forgot",

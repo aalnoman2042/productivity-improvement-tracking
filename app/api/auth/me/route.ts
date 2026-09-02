@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { isAdminEmail } from "@/lib/admin";
+import { canSeeCortisol, isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   const userId = await currentUserId();
@@ -20,5 +20,8 @@ export async function GET() {
     // Shows the Admin doorway on the Account page. Cosmetic only — the
     // admin API re-checks the email itself on every request.
     admin: isAdminEmail(user.email),
+    // Shows the Cortisol doorway. Admins-only while it is in testing, and
+    // everyone once CORTISOL_OPEN is set — the route decides either way.
+    cortisol: canSeeCortisol(user.email),
   });
 }
