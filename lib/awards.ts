@@ -200,6 +200,7 @@ export function buildAwards({
   };
 
   const active = trackers.filter((t) => !t.archived);
+  const activeIds = new Set(active.map((t) => t.id));
 
   // One pass for all three of: each tracker's best day, how many trackers
   // each day carried, and how many days each month holds.
@@ -208,6 +209,23 @@ export function buildAwards({
   const perMonth = new Map<string, Set<string>>();
 
   for (const e of entries) {
+    // Coverage — how full a day was, and which months hold days at all —
+    // counts only trackers that still EXIST to be filled in. Archiving does
+    // not delete a tracker's entries, so counting them here measured a
+    // historical row against today's tracker list and could render "6/4".
+    if (activeIds.has(e.trackerId)) {
+      // A logged day, not a non-zero one. A streak slip is `value 0` WITH
+      // meta (invariant 2) and a day it was recorded on is a day that was
+      // answered — filtering on `value > 0` would have called it blank and
+      // disagreed with the report card's own days-logged on the same screen.
+      perDay.set(e.date, (perDay.get(e.date) ?? 0) + 1);
+      const month = e.date.slice(0, 7);
+      const days = perMonth.get(month);
+      if (days) days.add(e.date);
+      else perMonth.set(month, new Set([e.date]));
+    }
+
+    // A personal best, on the other hand, does need a real number.
     if (!(e.value > 0)) continue;
     const seen = best.get(e.trackerId);
     // Strictly greater, so a record keeps the date it was FIRST set on
@@ -215,17 +233,18 @@ export function buildAwards({
     if (!seen || e.value > seen.value) {
       best.set(e.trackerId, { value: e.value, date: e.date });
     }
-    perDay.set(e.date, (perDay.get(e.date) ?? 0) + 1);
-    const month = e.date.slice(0, 7);
-    const days = perMonth.get(month);
-    if (days) days.add(e.date);
-    else perMonth.set(month, new Set([e.date]));
   }
 
   const bests: BestDay[] = [];
   for (const t of trackers) {
     if (t.archived) continue;
     if (!MEASURED.includes(t.type as TrackerType)) continue;
+    // A bad habit has no best day. Its maximum is its WORST day — the biggest
+    // binge, the latest night — and printing that under "your best day at
+    // each of these", on the one page in the app with no judgement on it,
+    // would be the app congratulating somebody for the thing they are trying
+    // to stop. Invariant 4: bad habits invert everything.
+    if (t.habit === "bad") continue;
     const b = best.get(t.id);
     if (!b) continue;
     bests.push({

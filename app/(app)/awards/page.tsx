@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import LoadError from "@/components/LoadError";
-import { useCached } from "@/lib/useCached";
 import { useMounted } from "@/lib/useMounted";
 import { prettyDate, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
@@ -51,10 +51,42 @@ export default function AwardsPage() {
   // so the whole body waits for mount rather than painting the build's idea
   // of "today" onto the CDN. See the gotcha in the brief.
   const mounted = useMounted();
-  const today = toDateStr(new Date());
-  const q = useCached<Awards>(`/api/awards?today=${today}`, "awards");
 
-  const data = q.data;
+  // Read once when the page opens, deliberately NOT through `useCached`.
+  //
+  // This route reads every entry the account has ever written and then runs
+  // the whole report-card grader over them — the heaviest read in the app —
+  // and `useCached` would re-run it every 60 seconds for as long as the page
+  // sits open. An award is earned by something that already happened; the
+  // answer cannot change while you are looking at it. (The cache layer itself
+  // is untouched by this: the page simply does not opt into a poll it has no
+  // use for.)
+  const [data, setData] = useState<Awards | null>(null);
+  const [failed, setFailed] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setFailed("");
+    try {
+      const res = await fetch(`/api/awards?today=${toDateStr(new Date())}`);
+      if (res.status === 401) {
+        window.location.assign("/login");
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      setData((await res.json()) as Awards);
+    } catch {
+      setFailed("Couldn't load — check your connection");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Out of the effect's synchronous phase — the lint rule this repo enforces.
+    void Promise.resolve().then(load);
+  }, [load]);
   const earned = (data?.awards ?? []).filter((a) => a.earned);
   const locked = (data?.awards ?? []).filter((a) => !a.earned);
   // A locked award with the most progress is the interesting one, so the
@@ -71,10 +103,10 @@ export default function AwardsPage() {
         </p>
       </div>
 
-      {!mounted || (!data && (q.loading || q.refreshing)) ? (
+      {!mounted || (!data && loading) ? (
         <div className="skeleton h-48 w-full" aria-hidden="true" />
       ) : !data ? (
-        <LoadError message={q.error} onRetry={() => void q.refresh()} what="your awards" />
+        <LoadError message={failed} onRetry={() => void load()} what="your awards" />
       ) : !data.hasData ? (
         <div className="rounded-xl border border-dashed border-edge p-8 text-center">
           <p className="text-sm font-medium">Nothing to celebrate yet</p>

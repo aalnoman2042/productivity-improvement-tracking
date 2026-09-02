@@ -1,4 +1,5 @@
-import { daysBetween } from "./dates";
+import { addDays, daysBetween } from "./dates";
+import { NO_REST } from "./rest";
 
 /**
  * The trackers that used to be a habit and quietly stopped being one.
@@ -25,6 +26,17 @@ import { daysBetween } from "./dates";
 
 /** Silence before a tracker is worth mentioning at all. */
 export const QUIET_DAYS = 10;
+
+/**
+ * Days off do not count as silence.
+ *
+ * A rest day is the app's word for "this was chosen" — it bridges a run
+ * everywhere else in the codebase (`lib/rest`), and it has to bridge this
+ * too. Without it a deliberate fortnight away comes back to the app offering
+ * to archive every habit the person had, which is the exact opposite of what
+ * a planned break is for, and it would be the second feature to punish
+ * somebody for using a feature honestly.
+ */
 
 /**
  * Days on the record before a tracker counts as having been a habit.
@@ -69,10 +81,25 @@ export type FadingTracker = {
   archived: boolean;
 };
 
+/** How many days in (last, today] were marked off on purpose. */
+function restDaysIn(
+  last: string,
+  today: string,
+  rest: ReadonlySet<string>
+): number {
+  if (rest.size === 0) return 0;
+  let n = 0;
+  for (let d = addDays(last, 1); d <= today; d = addDays(d, 1)) {
+    if (rest.has(d)) n += 1;
+  }
+  return n;
+}
+
 export function fadingTrackers(
   trackers: FadingTracker[],
   lives: TrackerLife[],
-  today: string
+  today: string,
+  rest: ReadonlySet<string> = NO_REST
 ): Quiet[] {
   const byId = new Map(lives.map((l) => [l.trackerId, l]));
   const out: Quiet[] = [];
@@ -85,7 +112,11 @@ export function fadingTrackers(
     if (!life) continue;
     if (life.days < ESTABLISHED_DAYS) continue;
 
-    const silent = daysBetween(life.last, today);
+    const elapsed = daysBetween(life.last, today);
+    // Deliberate days off are not silence — see the note on QUIET_DAYS. The
+    // gap is still reported in full; only the decision to speak discounts
+    // them, so the card never claims a shorter absence than really happened.
+    const silent = elapsed - restDaysIn(life.last, today, rest);
     if (silent < QUIET_DAYS) continue;
 
     out.push({
@@ -93,7 +124,7 @@ export function fadingTrackers(
       name: t.name,
       color: t.color,
       type: t.type,
-      silent,
+      silent: elapsed,
       last: life.last,
       days: life.days,
     });

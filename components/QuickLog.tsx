@@ -171,7 +171,13 @@ export default function QuickLog({
             prefill={prefills?.[t.id]}
           />
           <div className="mt-2">
+            {/* Keyed by tracker. Quick log renders ONE tracker at a time in
+                this slot, so without a key React reuses the same component
+                instance as you step through and the "yes, that's right" you
+                gave for one tracker silently suppresses the question for the
+                next. */}
             <OddValue
+              key={t.id}
               tracker={t}
               draft={draft[t.id]}
               baseline={baselines?.[t.id]}

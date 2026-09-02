@@ -1029,7 +1029,10 @@ function TrackersList() {
       {/* Above the list, and only when it has something to say. A tracker
           that has quietly stopped looks identical to one logged this morning
           — this is the one place the app notices. */}
-      {!showForm && !showPacks && <QuietTrackers onChanged={load} />}
+      {/* Always mounted, hidden while a form is open. Unmounting it would
+          re-run the whole-history aggregation behind it every time the
+          add-tracker panel is opened and closed. */}
+      <QuietTrackers onChanged={load} hidden={showForm || showPacks} />
 
       {searchable && !showForm && (
         <div className="flex items-center gap-2">

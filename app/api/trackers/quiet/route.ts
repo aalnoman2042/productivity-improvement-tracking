@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   }
 
   const d = await db();
-  const [trackerDocs, lifeRows] = await Promise.all([
+  const [trackerDocs, lifeRows, restRows] = await Promise.all([
     d.collection("trackers").find({ userId }).sort({ order: 1 }).toArray(),
     d
       .collection("entries")
@@ -42,6 +42,12 @@ export async function GET(req: Request) {
         },
       ])
       .toArray(),
+    // Days taken off on purpose. A planned fortnight away must not come back
+    // to an app offering to archive everything — see lib/fading.
+    d
+      .collection("restDays")
+      .find({ userId, date: { $lte: today } }, { projection: { date: 1, _id: 0 } })
+      .toArray(),
   ]);
 
   const lives: TrackerLife[] = lifeRows.map((r) => ({
@@ -50,7 +56,9 @@ export async function GET(req: Request) {
     days: Number(r.days),
   }));
 
+  const rest = new Set(restRows.map((r) => String(r.date)));
+
   return NextResponse.json({
-    quiet: fadingTrackers(trackerDocs.map(toTracker), lives, today),
+    quiet: fadingTrackers(trackerDocs.map(toTracker), lives, today, rest),
   });
 }

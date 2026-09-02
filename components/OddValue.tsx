@@ -38,7 +38,14 @@ export default function OddValue({
   if (!odd || accepted === value) return null;
 
   return (
-    <p className="animate-fade-in flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-600/40 bg-amber-600/5 p-2 text-xs text-secondary">
+    <p
+      // Announced, because this appears on its own while somebody is typing
+      // and nothing else on screen changes. "polite" so it waits for a pause
+      // rather than interrupting the digit being entered.
+      role="status"
+      aria-live="polite"
+      className="animate-fade-in flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-600/40 bg-amber-600/5 p-2 text-xs text-secondary"
+    >
       <span>
         <span className="text-amber-700 dark:text-amber-500">
           {odd.direction === "high"
@@ -50,6 +57,10 @@ export default function OddValue({
       <button
         type="button"
         onClick={() => setAccepted(value)}
+        // The visible word is "Yes" because the sentence above it asks
+        // "Right?" — but on its own it answers nothing, so the accessible
+        // name says which number is being confirmed and for what.
+        aria-label={`Yes, ${tracker.name} is correct`}
         className="ml-auto rounded-md border border-edge px-2 py-1 font-medium hover:border-accent hover:text-accent"
       >
         Yes

@@ -102,14 +102,66 @@ describe("buildAwards — the wall", () => {
     expect(a.bestMonth).toEqual({ month: "2026-08", days: 3 });
   });
 
-  it("ignores zeroes — an empty row is not a personal best", () => {
+  it("ignores zeroes for a personal best — but still counts the day", () => {
+    // A streak slip is `value 0` WITH meta (invariant 2), and the projection
+    // this route reads does not carry meta. So a zero row is a day that was
+    // ANSWERED, and treating it as blank would have disagreed with the report
+    // card's own days-logged sitting on the same screen.
     const a = buildAwards({
       trackers,
       entries: [{ trackerId: "t1", date: "2026-08-04", value: 0 }],
       report: report(),
     });
     expect(a.bests).toEqual([]);
-    expect(a.fullestDay).toBeNull();
+    expect(a.fullestDay).toEqual({ date: "2026-08-04", count: 1, of: 2 });
+    expect(a.bestMonth).toEqual({ month: "2026-08", days: 1 });
+  });
+
+  it("never counts an archived tracker's old rows towards a day's fullness", () => {
+    // Archiving does not delete entries. Counting them against today's active
+    // tracker list is how the card came to render an impossible "3/2".
+    const a = buildAwards({
+      trackers: [tracker(), tracker({ id: "gone", archived: true })],
+      entries: [
+        { trackerId: "t1", date: "2026-08-01", value: 60 },
+        { trackerId: "gone", date: "2026-08-01", value: 60 },
+      ],
+      report: report(),
+    });
+    expect(a.fullestDay).toEqual({ date: "2026-08-01", count: 1, of: 1 });
+    // ...and the ratio can never exceed one.
+    expect(a.fullestDay?.count).toBeLessThanOrEqual(a.fullestDay?.of ?? 0);
+  });
+
+  it("does not hand Full house to a day carried by archived trackers", () => {
+    const a = buildAwards({
+      trackers: [
+        tracker(),
+        tracker({ id: "t2" }),
+        tracker({ id: "old1", archived: true }),
+        tracker({ id: "old2", archived: true }),
+      ],
+      entries: [
+        { trackerId: "t1", date: "2026-08-01", value: 60 },
+        { trackerId: "old1", date: "2026-08-01", value: 60 },
+        { trackerId: "old2", date: "2026-08-01", value: 60 },
+      ],
+      report: report(),
+    });
+    // Three rows that day, but only one of the two live trackers was filled.
+    expect(a.awards.find((x) => x.id === "full-house")?.earned).toBe(false);
+  });
+
+  it("gives a bad habit no best day — its maximum is its worst day", () => {
+    const a = buildAwards({
+      trackers: [tracker({ id: "junk", name: "Junk food", type: "count", habit: "bad" })],
+      entries: [
+        { trackerId: "junk", date: "2026-08-01", value: 2 },
+        { trackerId: "junk", date: "2026-08-02", value: 9 },
+      ],
+      report: report(),
+    });
+    expect(a.bests).toEqual([]);
   });
 
   it("has no best day for the kinds that cannot have one", () => {
