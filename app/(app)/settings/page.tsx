@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import { useRouter } from "next/navigation";
 import Footer from "@/components/Footer";
 import ImportBackup from "@/components/ImportBackup";
@@ -130,6 +131,27 @@ export default function SettingsPage() {
         </span>
       </Link>
 
+      {/* The trophy cabinet. Here rather than in the bottom nav on purpose:
+          it is a page you open on a day you want to see it, not a fifth tab
+          competing with the four screens that are for logging. */}
+      <Link
+        href="/awards"
+        className="animate-rise-in flex items-center justify-between gap-3 rounded-xl border border-edge card p-4 shadow-sm hover:bg-surface-2"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <Icon name="medal" size={22} className="mt-0.5 text-accent" />
+          <span className="min-w-0">
+            <span className="block font-semibold">My awards</span>
+            <span className="block text-sm text-secondary">
+              Your rank, what you have earned, and every record you hold.
+            </span>
+          </span>
+        </span>
+        <span className="shrink-0 text-accent" aria-hidden="true">
+          →
+        </span>
+      </Link>
+
       {/* Only the emails in ADMIN_EMAILS ever see this doorway — everyone
           else's Account page is unchanged, and the API behind it re-checks. */}
       {me?.admin && (
@@ -138,9 +160,7 @@ export default function SettingsPage() {
           className="animate-rise-in flex items-center justify-between gap-3 rounded-xl border border-edge card p-4 shadow-sm hover:bg-surface-2"
         >
           <span className="flex min-w-0 items-center gap-3">
-            <span className="text-xl" aria-hidden="true">
-              🛡️
-            </span>
+            <Icon name="shield" size={22} className="mt-0.5 text-accent" />
             <span className="min-w-0">
               <span className="block font-semibold">Admin</span>
               <span className="block text-sm text-secondary">

@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/session";
-import { addDays, isValidMonthStr, monthRange } from "@/lib/dates";
+import {
+  addDays,
+  addMonths,
+  isValidDateStr,
+  isValidMonthStr,
+  monthRange,
+} from "@/lib/dates";
 import { toTracker } from "@/lib/trackerDoc";
 import type { Goal } from "@/lib/trackers";
-import type { MonthDay, MonthSummary } from "@/lib/history";
+import type { MonthDay, MonthSummary, YearAgo } from "@/lib/history";
 
 /**
  * One month of history, a day at a time — what the calendar on `/history`
@@ -24,15 +30,31 @@ export async function GET(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const month = new URL(req.url).searchParams.get("month");
+  const params = new URL(req.url).searchParams;
+  const month = params.get("month");
   if (!isValidMonthStr(month)) {
     return NextResponse.json({ error: "month=YYYY-MM required" }, { status: 400 });
   }
+  // Optional, and only used to decide how much of last year to compare
+  // against — the calendar itself does not need to know what today is.
+  const today = params.get("today");
 
   const { start, end } = monthRange(month);
   const d = await db();
 
-  const [trackerDocs, rows, noteRows, taskRows, restRows] = await Promise.all([
+  // Twelve months back, over the SAME span. A month still being lived is
+  // matched to the same many days of last year's, never to the whole of it:
+  // two days of September against thirty is not a comparison. See
+  // `yearAgoLine` in lib/history and the same rule in lib/periodCompare.
+  const agoMonth = addMonths(month, -12);
+  const agoRange = monthRange(agoMonth);
+  const running = isValidDateStr(today) && today >= start && today <= end;
+  const agoEnd = running
+    ? // Clamp to that month's own length — 31 August has no 31 February.
+      [`${agoMonth}-${today.slice(8, 10)}`, agoRange.end].sort()[0]
+    : agoRange.end;
+
+  const [trackerDocs, rows, noteRows, taskRows, restRows, agoRows] = await Promise.all([
     d.collection("trackers").find({ userId }).toArray(),
     d
       .collection("entries")
@@ -66,6 +88,15 @@ export async function GET(req: Request) {
       .find(
         { userId, date: { $gte: start, $lte: end } },
         { projection: { date: 1, _id: 0 } }
+      )
+      .toArray(),
+    // The same month a year ago, for the one line under the calendar. An
+    // indexed range read of three fields — the cheapest thing on this route.
+    d
+      .collection("entries")
+      .find(
+        { userId, date: { $gte: agoRange.start, $lte: agoEnd } },
+        { projection: { trackerId: 1, date: 1, value: 1, _id: 0 } }
       )
       .toArray(),
   ]);
@@ -153,6 +184,31 @@ export async function GET(req: Request) {
     if (run > bestRun) bestRun = run;
   }
 
+  // Nothing there at all means the account did not exist yet — and "0 days a
+  // year ago" every month for a year is noise, not a comparison.
+  let lastYear: YearAgo | null = null;
+  if (agoRows.length > 0) {
+    const agoDays = new Set<string>();
+    let agoMinutes = 0;
+    for (const r of agoRows) {
+      const tracker = byId.get(String(r.trackerId));
+      // Archived trackers are left out here for the same reason they are left
+      // out of the month above: you cannot fill in what is not on screen.
+      if (!tracker) continue;
+      agoDays.add(String(r.date));
+      if (tracker.type === "duration") agoMinutes += Number(r.value);
+    }
+    if (agoDays.size > 0) {
+      lastYear = {
+        month: agoMonth,
+        daysLogged: agoDays.size,
+        minutes: agoMinutes,
+        through: agoEnd,
+        partial: agoEnd < agoRange.end,
+      };
+    }
+  }
+
   const summary: MonthSummary = {
     month,
     start,
@@ -161,6 +217,7 @@ export async function GET(req: Request) {
     days,
     daysLogged: days.filter((d) => d.logged > 0).length,
     bestRun,
+    lastYear,
   };
   return NextResponse.json(summary);
 }

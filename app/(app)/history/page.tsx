@@ -23,6 +23,7 @@ import {
   dayLabel,
   dayLook,
   fillOpacity,
+  yearAgoLine,
   type MonthDay,
   type MonthSummary,
 } from "@/lib/history";
@@ -177,8 +178,11 @@ export default function HistoryPage() {
   const today = toDateStr(new Date());
   const [month, setMonth] = useState(() => monthOf(today));
 
+  // `today` only decides how much of last year to weigh this month against
+  // (a running month is matched to the same many days). The key stays the
+  // month, because the calendar is still answering one question per month.
   const q = useCached<MonthSummary>(
-    `/api/entries/month?month=${month}`,
+    `/api/entries/month?month=${month}&today=${today}`,
     `month:${month}`
   );
   const data = q.data;
@@ -200,6 +204,14 @@ export default function HistoryPage() {
   );
   // Gaps are the point of this page, so they get counted out loud.
   const missed = inPast.filter((d) => d.logged === 0).length;
+
+  const lastYearLine = yearAgoLine(
+    { daysLogged: data?.daysLogged ?? 0, minutes },
+    data?.lastYear,
+    // Just the month's name — the years are the point of the sentence and
+    // "September 2026 last year" would say two of them.
+    monthTitle(month).split(" ")[0]
+  );
 
   return (
     <div className="card-stack">
@@ -312,6 +324,15 @@ export default function HistoryPage() {
               label="goals met"
             />
           </div>
+
+          {/* The payoff for a year of logging, and the only comparison in the
+              app that needs one. A line rather than a card, deliberately —
+              every other month has to scroll past it. */}
+          {lastYearLine && (
+            <p className="animate-fade-in px-1 text-sm text-secondary">
+              <span aria-hidden="true">📆</span> {lastYearLine}
+            </p>
+          )}
 
           {/* The month against the one before it. Follows the picker above,
               so browsing back compares each month to its predecessor. */}

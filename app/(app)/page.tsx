@@ -14,6 +14,7 @@ import MotivationLine from "@/components/MotivationLine";
 import QuickLog from "@/components/QuickLog";
 import ReadingToday from "@/components/ReadingToday";
 import TapGrid from "@/components/TapGrid";
+import OddValue from "@/components/OddValue";
 import TrackerInput from "@/components/TrackerInput";
 import { cacheSet, getCached, post, type PostResult } from "@/lib/sync";
 import { useCached, useStored } from "@/lib/useCached";
@@ -21,6 +22,7 @@ import { useMinutesElapsed } from "@/lib/useElapsed";
 import { addDays, formatMinutes, isValidDateStr, toDateStr } from "@/lib/dates";
 import { seriesColor } from "@/lib/palette";
 import { buildPrefills, type RecentEntry } from "@/lib/prefill";
+import { buildBaselines } from "@/lib/outlier";
 import {
   DAY_MINUTES,
   EMPTY,
@@ -157,6 +159,15 @@ function TodayLog() {
 
   const prefills = useMemo(
     () => buildPrefills(trackers, recentQ.data ?? []),
+    [trackers, recentQ.data]
+  );
+
+  // The same week of rows the prefills come out of, read a second way: what
+  // an ordinary day looks like for each tracker, so a number an order of
+  // magnitude past it can be questioned before it is believed forever. No
+  // request of its own — see `lib/outlier.ts`.
+  const baselines = useMemo(
+    () => buildBaselines(trackers, recentQ.data ?? []),
     [trackers, recentQ.data]
   );
 
@@ -802,6 +813,13 @@ function TodayLog() {
                                 prefill={prefills[t.id]}
                               />
                             </div>
+                            {/* Under the inputs, never in front of them:
+                                the day is already saving while this asks. */}
+                            <OddValue
+                              tracker={t}
+                              draft={draft[t.id]}
+                              baseline={baselines[t.id]}
+                            />
                           </li>
                         ))}
                       </ul>
@@ -903,6 +921,7 @@ function TodayLog() {
               set={set}
               date={date}
               prefills={prefills}
+              baselines={baselines}
               onClose={() => {
                 setQuick(false);
                 void saveNow();

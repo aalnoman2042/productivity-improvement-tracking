@@ -75,6 +75,8 @@ app/
     settings/       account, reminders, data
     admin/          owner-only counts, health, and the 🔔 nudge
     catchup/        the blank days, in one list, answerable in taps
+    awards/         rank, awards earned, and records — the one screen with
+                    no judgement on it. Reached from Account, not the nav
   start/            first-run tour (signed in, outside the app shell)
   welcome/          the signed-out pitch, served at / by a proxy rewrite
   login|signup|forgot|reset/
@@ -94,7 +96,11 @@ lib/                pure logic, shared helpers, and the database
                        arrival date your own pace implies;
                      pixels.ts — a year laid out as calendar weeks;
                      timer.ts — the one running timer, and why there is
-                       only ever one of them)
+                       only ever one of them;
+                     outlier.ts — is this number a typo? asked, never enforced;
+                     awards.ts — the rank ladder, the awards, the records;
+                     fading.ts — the trackers that were a habit and stopped;
+                     icons.ts — the app's own icons, as geometry)
 tests/              vitest specs, one per lib module
 scripts/            one-off tools (icons, VAPID keys, demo seed, db check,
                     and the two the Android app needs: make-keystore.mjs
@@ -175,6 +181,7 @@ trackers/           CRUD + [id]/history       challenges/   "this, every day, fo
 books/              the shelf
 stats/              period stats              stats/compare week-vs-week, month-vs-month
 report/             all-time grades           insights/correlations  the pattern engine
+awards/             rank, awards, records     trackers/quiet  what has gone quiet
 coach/              the daily AI read         coach/ask     a question box
                                               coach/weekly  the week in review, kept
 reminders/          settings, subscribe, test, digest, flush
@@ -258,6 +265,28 @@ All of it pure, all of it in `lib/`, all of it tested.
 - `prayerTimes.ts` — the five waqts from solar position. No API, no key, no
   network. Returns `null` where the sun never reaches the angle, rather than
   inventing a time.
+
+---
+
+### Two things the app now notices on its own
+
+**A number that isn't your usual day** (`lib/outlier.ts`). A mistyped value is
+the only mistake here that can never be found later: 14h of study instead of
+1h 40m is a legal value on a legal day, and from the moment it saves it is
+inside every average, grade and correlation. So it is questioned at the one
+moment somebody still knows the answer — under the row, in amber, while the
+day is *already saving*. Four times the usual day **and** two and a half times
+the best day in the window, both, because the mistake being hunted is an order
+of magnitude and a bar set at three would fire on every good day until nobody
+read it. It refuses nothing (invariant 3).
+
+**A habit that stopped without saying so** (`lib/fading.ts`). A tracker logged
+daily for three months and untouched for a fortnight looks exactly like one
+logged this morning, and a list that fills with those is how the whole app
+quietly stops being used. After ten days of silence — and only for a tracker
+that was established, fourteen days on the record, because a thing tried twice
+and dropped is a decision already made — it offers two answers and treats them
+as equals: log it, or archive it.
 
 ---
 
@@ -476,6 +505,15 @@ quietly would be worse than failing loudly.
 19. **The catch-up screen offers taps only.** Reconstructing a yes/no from
     memory is honest; typing last Tuesday's sleep is invention, and this app
     would rather keep a gap than gain a made-up number.
+20. **The app may ask about a number. It may never refuse one.** The odd-value
+    warning (`lib/outlier`) appears *while the day is already saving*, blocks
+    no field and clears no value, and one tap dismisses it for good. The same
+    rule the mandatory-slip-reason experiment taught the hard way: a guard
+    that can decline a save is a guard that will eventually eat a month.
+21. **Nothing on the awards screen can go down.** An award is earned by
+    something that happened, so a bad month cannot withdraw it, and a rank is
+    held only when *every* one of its requirements holds — you do not average
+    your way to a title (`lib/awards`).
 
 ---
 
@@ -488,6 +526,12 @@ reinstall.
 
 Before pushing: `npm test`, `npm run lint`, `npx tsc --noEmit`,
 `npm run build:local`. All four must be clean.
+
+One more thing only `build:local` catches: **a `route.ts` may export request
+handlers and known config keys and nothing else.** Next generates a type per
+route asserting exactly that, so a stray `export const` there fails the build
+while `tsc --noEmit`, ESLint and the tests all call it clean. A constant two
+files share belongs in `lib/`.
 
 `npm run lint` also runs `check:shape`, which enforces the one React Compiler
 rule nothing else catches: **in a component, compute everything before the

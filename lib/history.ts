@@ -1,3 +1,5 @@
+import { formatMinutes } from "./dates";
+
 /** The shape `/api/entries/month` returns, shared by the route and the page. */
 
 export type MonthDay = {
@@ -32,6 +34,24 @@ export type MonthDay = {
   rest: boolean;
 };
 
+/**
+ * The same calendar month, twelve months back.
+ *
+ * Absent when there is nothing there to compare against — an account in its
+ * first year would otherwise be told "0 days" every month, which is noise
+ * rather than a comparison.
+ */
+export type YearAgo = {
+  /** "2025-09". */
+  month: string;
+  daysLogged: number;
+  minutes: number;
+  /** The last day counted. */
+  through: string;
+  /** True when only part of it was counted, to match a month still running. */
+  partial: boolean;
+};
+
 export type MonthSummary = {
   month: string;
   start: string;
@@ -42,6 +62,11 @@ export type MonthSummary = {
   daysLogged: number;
   /** The longest run of consecutive logged days inside this month. */
   bestRun: number;
+  /**
+   * Optional: a cached copy written before this existed simply has no year
+   * to compare against, and the line is not drawn. See `yearAgoLine`.
+   */
+  lastYear?: YearAgo | null;
 };
 
 /**
@@ -91,4 +116,35 @@ export function dayLabel(day: MonthDay | undefined, trackers: number): string {
   const filled = `${day.logged} of ${trackers} filled in`;
   if (day.goalsTotal === 0) return filled;
   return `${filled} · ${day.goalsMet}/${day.goalsTotal} goals met`;
+}
+
+/**
+ * "September so far last year: 12 days and 41h. This year: 18 and 63h."
+ *
+ * Deliberately one sentence and no card. The payoff for a year of logging is
+ * emotional, not analytical — it belongs beside the month you are already
+ * looking at, not in a panel of its own that every other month has to scroll
+ * past. Adjacent months already have `PeriodCompare`; this is the one
+ * comparison that needs a year to become possible and a line to be said.
+ *
+ * The fairness rule is the same one every other comparison here obeys: a
+ * month still being lived is matched against **the same many days** of last
+ * year's, never against the whole of it (`partial`). Two days of September
+ * weighed against thirty would not be a comparison, it would be a scolding.
+ */
+export function yearAgoLine(
+  now: { daysLogged: number; minutes: number },
+  ago: YearAgo | null | undefined,
+  monthName: string
+): string | null {
+  if (!ago) return null;
+  const then = `${ago.daysLogged} day${ago.daysLogged === 1 ? "" : "s"}`;
+  const here = `${now.daysLogged} day${now.daysLogged === 1 ? "" : "s"}`;
+  const opening = ago.partial
+    ? `${monthName} so far last year`
+    : `${monthName} last year`;
+  return (
+    `${opening}: ${then} and ${formatMinutes(ago.minutes)}. ` +
+    `This year: ${here} and ${formatMinutes(now.minutes)}.`
+  );
 }

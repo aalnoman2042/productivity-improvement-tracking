@@ -59,34 +59,53 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #0d0d0d;
+  /* Charcoal, not black. The old ramp put #0d0d0d under a #1a1a19 card:
+     true black is the cheapest dark theme to make and the harshest to read
+     on, because every edge in the app becomes maximum contrast and the
+     shadows that separate one card from the next have nothing to fall on.
+     The card is #333333 — the step you actually read on — and the page sits
+     one below it so a card still lifts off the background. Every ink was
+     re-measured against #333333 rather than carried over: the muted grey
+     that cleared 4.5:1 on near-black only managed 3.0:1 here, which is the
+     whole reason this is a new set of steps and not the old ones lightened. */
+  --background: #232323;
   --foreground: #ffffff;
-  --surface: #1a1a19;
-  --surface-2: #201f1e;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
-  --chart-grid: #2c2c2a;
-  --chart-axis: #383835;
-  --edge: #2f2f2d;
+  --surface: #333333;
+  --surface-2: #3c3c3c;
+  --ink-secondary: #c9c8c0;
+  --ink-muted: #acaaa3;
+  --chart-grid: #414141;
+  --chart-axis: #4e4e4e;
+  --edge: #454545;
 
+  /* Unchanged, and deliberately: `--accent` is a text colour in 71 places
+     AND a button background under white text in 44 (`bg-accent text-white`),
+     so it is pinned between two contrast floors that move in opposite
+     directions. Lightening it for the lighter card would have cost the
+     white-on-blue chips more than the links gained. */
   --accent: #3987e5;
   --accent-hover: #5598e7;
-  --accent-soft: #16273d;
+  --accent-soft: #1b2c42;
 
   --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
-  --grad-card: linear-gradient(180deg, #1c1c1b 0%, #171716 100%);
+  --grad-card: linear-gradient(180deg, #363636 0%, #303030 100%);
 
-  --wash-1: rgba(57, 135, 229, 0.2);
-  --wash-2: rgba(144, 133, 233, 0.16);
-  --wash-3: rgba(25, 158, 112, 0.12);
-  --wash-base: #0d0d0d;
+  /* Pulled back a step: the same tint reads stronger over charcoal than it
+     did over black, where most of it was being swallowed. */
+  --wash-1: rgba(57, 135, 229, 0.17);
+  --wash-2: rgba(144, 133, 233, 0.14);
+  --wash-3: rgba(25, 158, 112, 0.1);
+  --wash-base: #232323;
 
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
   --series-5: #d55181;
-  --series-6: #008300;
+  /* The one series that had to move. #008300 cleared 3:1 on the old
+     near-black card and manages 2.55:1 on this one — a chart line nobody
+     can follow. */
+  --series-6: #2fa32f;
   --series-7: #9085e9;
   --series-8: #e66767;
 }
@@ -457,7 +476,7 @@ select:disabled {
    sit a step above the card — and the arrow needs the lighter ink. */
 :root[data-theme="dark"] select {
   background-color: var(--surface-2);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6 8 10.5 12.5 6' fill='none' stroke='%23c3c2b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6 8 10.5 12.5 6' fill='none' stroke='%23c9c8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 :root[data-theme="dark"] select:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--surface-2) 82%, var(--foreground) 10%);

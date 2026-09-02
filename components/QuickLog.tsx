@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import OddValue from "@/components/OddValue";
 import TrackerInput from "@/components/TrackerInput";
 import { EMPTY, isLogged, type Draft } from "@/lib/draft";
+import type { Baseline } from "@/lib/outlier";
 import type { Prefill } from "@/lib/prefill";
 import { categoryMeta, type Tracker, type TrackerType } from "@/lib/trackers";
 import { seriesColor } from "@/lib/palette";
@@ -29,6 +31,7 @@ export default function QuickLog({
   onClose,
   onTimerSaved,
   prefills,
+  baselines,
 }: {
   trackers: Tracker[];
   draft: Record<string, Draft>;
@@ -38,6 +41,8 @@ export default function QuickLog({
   onTimerSaved?: () => void | Promise<void>;
   /** "Same as usual" offers, so most questions are one tap here too. */
   prefills?: Record<string, Prefill>;
+  /** What an ordinary day looks like, for the odd-number question. */
+  baselines?: Record<string, Baseline>;
 }) {
   // Start on the first thing not yet filled in — coming back to finish a
   // half-done day shouldn't mean tapping past what's already there.
@@ -165,6 +170,13 @@ export default function QuickLog({
             onTimerSaved={onTimerSaved}
             prefill={prefills?.[t.id]}
           />
+          <div className="mt-2">
+            <OddValue
+              tracker={t}
+              draft={draft[t.id]}
+              baseline={baselines?.[t.id]}
+            />
+          </div>
         </div>
 
         <p className="text-xs text-muted">

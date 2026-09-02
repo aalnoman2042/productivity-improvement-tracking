@@ -26,8 +26,18 @@ import { COOKIE_NAME, cookieOptions, verifyPassword } from "@/lib/auth";
  * one, and the confirmation says so.
  */
 
-/** The words that have to be typed, exactly. */
-export const DELETE_PHRASE = "delete my account";
+/**
+ * The words that have to be typed, exactly.
+ *
+ * NOT exported, and it cannot be: Next 16 allows a route file to export
+ * request handlers and its own known config keys, nothing else, and the
+ * generated route types fail the build over anything extra
+ * (`Property 'DELETE_PHRASE' is incompatible with index signature`). Nothing
+ * imports it — the client's copy of the phrase lives in
+ * `components/DeleteAccount.tsx` — so if a second reader ever needs it, the
+ * constant moves to `lib/`, it does not become an export here.
+ */
+const DELETE_PHRASE = "delete my account";
 
 /** Everything keyed to a user. Missing one here would orphan rows for ever. */
 const OWNED = [

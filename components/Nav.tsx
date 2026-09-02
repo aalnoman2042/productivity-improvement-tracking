@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import InstallButton from "@/components/InstallButton";
 import Logo from "@/components/Logo";
+import Icon from "@/components/Icon";
+import type { IconName } from "@/lib/icons";
 import SyncStatus from "@/components/SyncStatus";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -15,11 +17,11 @@ import ThemeToggle from "@/components/ThemeToggle";
 // and a tap must never disagree about what "next" means.
 // The icons are for the phone's bottom bar, where four words in a row all
 // look alike at a glance and a shape doesn't.
-export const LINKS = [
-  { href: "/", label: "Today", icon: "📝" },
-  { href: "/dashboard", label: "Stats", icon: "📈" },
-  { href: "/status", label: "Status", icon: "🧭" },
-  { href: "/trackers", label: "Trackers", icon: "📋" },
+export const LINKS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/", label: "Today", icon: "calendar" },
+  { href: "/dashboard", label: "Stats", icon: "trend" },
+  { href: "/status", label: "Status", icon: "compass" },
+  { href: "/trackers", label: "Trackers", icon: "list" },
 ];
 
 // Reachable from the header on every screen, but kept out of the phone's
@@ -117,7 +119,7 @@ export default function Nav() {
                   active ? "bg-accent/15" : ""
                 }`}
               >
-                {l.icon}
+                <Icon name={l.icon} size={20} />
               </span>
               <span
                 className={`text-[11px] font-medium ${

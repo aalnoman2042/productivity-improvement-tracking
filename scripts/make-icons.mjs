@@ -151,7 +151,13 @@ const targets = [
   { file: "public/icon-192.png", size: 192, opts: {} },
   { file: "public/icon-512.png", size: 512, opts: {} },
   { file: "public/icon-maskable-512.png", size: 512, opts: { inset: 0.14 } },
-  { file: "app/icon.png", size: 512, opts: {} },
+  // The browser tab favicon, and 96 rather than 512 on purpose. At 512 this
+  // was a 70 KB PNG — the single heaviest resource on the welcome page,
+  // downloaded on every first visit to draw something 16 px wide, and
+  // competing for bandwidth with the LCP image on a phone. 96 covers a 3x
+  // display and costs a couple of KB. The manifest's install icons are the
+  // full-size ones in public/ and are untouched by this.
+  { file: "app/icon.png", size: 96, opts: {} },
   { file: "app/apple-icon.png", size: 180, opts: { inset: 0.06 } },
 ];
 

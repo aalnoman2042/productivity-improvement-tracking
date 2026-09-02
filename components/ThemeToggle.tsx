@@ -23,7 +23,7 @@ export function applyTheme(theme: Theme) {
 
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#0d0d0d" : "#1c5cab");
+    ?.setAttribute("content", theme === "dark" ? "#232323" : "#1c5cab");
 }
 
 function subscribe(onChange: () => void): () => void {

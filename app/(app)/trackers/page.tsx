@@ -4,6 +4,7 @@ import Select from "@/components/Select";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { SERIES_PALETTE, seriesColor } from "@/lib/palette";
+import QuietTrackers from "@/components/QuietTrackers";
 import { useCached } from "@/lib/useCached";
 import type { Target } from "@/lib/targets";
 import { useSearchParams } from "next/navigation";
@@ -1024,6 +1025,11 @@ function TrackersList() {
           </div>
         </form>
       )}
+
+      {/* Above the list, and only when it has something to say. A tracker
+          that has quietly stopped looks identical to one logged this morning
+          — this is the one place the app notices. */}
+      {!showForm && !showPacks && <QuietTrackers onChanged={load} />}
 
       {searchable && !showForm && (
         <div className="flex items-center gap-2">

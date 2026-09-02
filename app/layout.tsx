@@ -46,7 +46,7 @@ export const viewport: Viewport = {
  */
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('pit_theme');
 if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');
-var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#0d0d0d');}
+var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#232323');}
 }catch(e){}
 try{if(navigator.userAgent.indexOf('PITApp')>=0){
 document.documentElement.setAttribute('data-shell','native');}
