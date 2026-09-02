@@ -84,6 +84,12 @@ tabs, with a light slide so the page follows the finger.
     per time tracker — sleep included — and the gap left in it is the part
     of the day nobody wrote down. It turns red past 24 hours, which is also
     the point at which the day refuses to save.
+  - **A number that isn't your usual day gets one question.** Type four times
+    your usual and more than twice your best, and a quiet amber line asks
+    whether you meant it. It appears while the day is *already saving*,
+    blocks nothing, and one tap dismisses it for good — because 14h of study
+    instead of 1h 40m is a legal value on a legal day, and once it is saved
+    nothing downstream can tell it from a real afternoon.
   - **It reads as a grid, not a scroll.** One-tap trackers sit two to a row
     on a phone and up to four on a wide screen; the typed kinds go two to a
     row from tablet width up. Each category section folds from its heading,
@@ -128,6 +134,9 @@ tabs, with a light slide so the page follows the finger.
   against your goals. Two channels rather than one, because a blank day and a
   bad day are different things and collapsing them hides exactly the gaps
   you're looking for. Tap any day to open it ready to fill in.
+  - **The same month a year ago**, in one line under the month's figures —
+    and a month still being lived is weighed against the *same many days* of
+    last year's, never against the whole of it.
   - **Search everything you have written** sits above the calendar: one box
     over both kinds of note — the day's own and the ones pinned to a tracker
     — newest first, with the match marked and the date one tap from the day
@@ -144,7 +153,10 @@ tabs, with a light slide so the page follows the finger.
     as a share of days. Nothing invents a percentage off a zero baseline —
     those say "new this month" or "stopped this month" instead.
 - **Trackers** (`/trackers`) — create, edit, set goals, archive, delete, and add
-  ready-made packs. A pack is a kind of person rather than a category, so two
+  ready-made packs. **A habit that has quietly stopped is named here**: after
+  ten days of silence — rest days excluded — a tracker you kept for a fortnight
+  or more is offered back to you, with archiving presented as an equally good
+  answer to picking it up again. A pack is a kind of person rather than a category, so two
   or three taps cover most of a life: **Essentials**, **Faith & discipline**
   (namaz, Quran, a clean streak), **Gym man** (workout, cardio, steps,
   protein, water, weight), **Productive man** (deep work, the day's plan, up
@@ -196,6 +208,12 @@ tabs, with a light slide so the page follows the finger.
   readable from the page.
 - **Account** (`/settings`) — profile, password, the daily reminder (and
   the hour it arrives), and your data: CSV/JSON download and backup import.
+  A door to Awards sits at the top of it.
+- **Awards** (`/awards`) — the counterweight to all the grading: your rank
+  (Newcomer through Alpha, each rung earned by meeting *every* one of its
+  requirements rather than averaging them), the awards you have collected,
+  and your records — longest run, best month, fullest day, and the best day
+  each tracker has ever had. Nothing on this page can go down.
 
 `/today` still redirects to `/`, query string intact, so notifications sitting
 unread in a tray from before the move still land on the right day.

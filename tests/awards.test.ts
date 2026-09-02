@@ -113,7 +113,9 @@ describe("buildAwards — the wall", () => {
       report: report(),
     });
     expect(a.bests).toEqual([]);
-    expect(a.fullestDay).toEqual({ date: "2026-08-04", count: 1, of: 2 });
+    // `of` is 1, not 2: t2 has never been logged, so it was not something
+    // being tracked on that day. See `expectedOn`.
+    expect(a.fullestDay).toEqual({ date: "2026-08-04", count: 1, of: 1 });
     expect(a.bestMonth).toEqual({ month: "2026-08", days: 1 });
   });
 
@@ -142,14 +144,54 @@ describe("buildAwards — the wall", () => {
         tracker({ id: "old2", archived: true }),
       ],
       entries: [
+        // Both live trackers were in use from the 1st...
         { trackerId: "t1", date: "2026-08-01", value: 60 },
-        { trackerId: "old1", date: "2026-08-01", value: 60 },
-        { trackerId: "old2", date: "2026-08-01", value: 60 },
+        { trackerId: "t2", date: "2026-08-01", value: 60 },
+        // ...and on the 2nd only one of them was answered, while two
+        // archived trackers were. Three rows, but the day is not complete.
+        { trackerId: "t1", date: "2026-08-02", value: 60 },
+        { trackerId: "old1", date: "2026-08-02", value: 60 },
+        { trackerId: "old2", date: "2026-08-02", value: 60 },
       ],
       report: report(),
     });
-    // Three rows that day, but only one of the two live trackers was filled.
-    expect(a.awards.find((x) => x.id === "full-house")?.earned).toBe(false);
+    // The 1st is the full day, not the 2nd — archived rows count for nothing.
+    expect(a.fullestDay).toEqual({ date: "2026-08-01", count: 2, of: 2 });
+  });
+
+  it("never lets a tracker added later un-complete a day already finished", () => {
+    // The promise this page makes in its own header: an award is earned by
+    // something that happened, and nothing later can take it back.
+    const entries: ReportEntry[] = [
+      { trackerId: "t1", date: "2026-08-01", value: 60 },
+      { trackerId: "t2", date: "2026-08-01", value: 60 },
+    ];
+    const before = buildAwards({
+      trackers: [tracker(), tracker({ id: "t2" })],
+      entries,
+      report: report(),
+    });
+    expect(before.awards.find((x) => x.id === "full-house")?.earned).toBe(true);
+
+    // Now add a third tracker today and log nothing on it.
+    const after = buildAwards({
+      trackers: [tracker(), tracker({ id: "t2" }), tracker({ id: "t3" })],
+      entries,
+      report: report(),
+    });
+    expect(after.awards.find((x) => x.id === "full-house")?.earned).toBe(true);
+  });
+
+  it("a ratio on the card can never exceed one", () => {
+    const a = buildAwards({
+      trackers: [tracker(), tracker({ id: "gone", archived: true })],
+      entries: [
+        { trackerId: "t1", date: "2026-08-01", value: 60 },
+        { trackerId: "gone", date: "2026-08-01", value: 60 },
+      ],
+      report: report(),
+    });
+    expect(a.fullestDay!.count).toBeLessThanOrEqual(a.fullestDay!.of);
   });
 
   it("gives a bad habit no best day — its maximum is its worst day", () => {

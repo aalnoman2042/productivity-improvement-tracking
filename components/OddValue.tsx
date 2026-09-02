@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EMPTY, draftToEntry, type Draft } from "@/lib/draft";
 import { oddValue, type Baseline } from "@/lib/outlier";
 import type { Tracker, TrackerType } from "@/lib/trackers";
@@ -33,7 +33,25 @@ export default function OddValue({
   const [accepted, setAccepted] = useState<number | null>(null);
 
   const { value } = draftToEntry(tracker.type as TrackerType, draft ?? EMPTY);
-  const odd = oddValue(tracker, value, baseline);
+
+  // Judge the number somebody has FINISHED typing, not each digit on the way.
+  //
+  // A weight of 75 passes through 7 on its way to being typed, and 7 is a
+  // fifteenth of the usual 75 — so the low-side check fired on the first
+  // keystroke of an ordinary Tuesday, every time, and the live region
+  // announced it. The warning is worth nothing if it appears before the
+  // number does. Settling on a pause is the same shape as the day's own
+  // 900ms autosave, a little shorter so the question still arrives before
+  // the save it is asking about.
+  const [settled, setSettled] = useState<number | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(value), 700);
+    return () => clearTimeout(id);
+  }, [value]);
+
+  // `settled` starts null and stays null until the first pause, which is
+  // also what keeps this quiet while a day's stored draft is loading in.
+  const odd = settled === value ? oddValue(tracker, value, baseline) : null;
 
   if (!odd || accepted === value) return null;
 
@@ -48,9 +66,11 @@ export default function OddValue({
     >
       <span>
         <span className="text-amber-700 dark:text-amber-500">
+          {/* A fraction, not a hand-built ordinal: "a 21th of your usual"
+              is what appending "th" to a rounded integer produces. */}
           {odd.direction === "high"
             ? `${odd.times}× your usual`
-            : `a ${odd.times}th of your usual`}
+            : `1/${odd.times} of your usual`}
         </span>{" "}
         ({odd.usual}). Right?
       </span>

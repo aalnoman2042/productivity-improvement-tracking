@@ -207,6 +207,9 @@ export function buildAwards({
   const best = new Map<string, { value: number; date: string }>();
   const perDay = new Map<string, number>();
   const perMonth = new Map<string, Set<string>>();
+  // The first day each tracker was ever answered — which is the closest this
+  // payload gets to "when did you start keeping this one".
+  const firstSeen = new Map<string, string>();
 
   for (const e of entries) {
     // Coverage — how full a day was, and which months hold days at all —
@@ -219,6 +222,8 @@ export function buildAwards({
       // answered — filtering on `value > 0` would have called it blank and
       // disagreed with the report card's own days-logged on the same screen.
       perDay.set(e.date, (perDay.get(e.date) ?? 0) + 1);
+      const seenOn = firstSeen.get(e.trackerId);
+      if (!seenOn || e.date < seenOn) firstSeen.set(e.trackerId, e.date);
       const month = e.date.slice(0, 7);
       const days = perMonth.get(month);
       if (days) days.add(e.date);
@@ -259,10 +264,40 @@ export function buildAwards({
     });
   }
 
+  /**
+   * How many trackers a given day could have held.
+   *
+   * NOT `active.length`. Measuring a day in March against the tracker list as
+   * it stands today means adding a tracker in June retroactively un-completes
+   * March — and this module promises the opposite in its own header: an award
+   * is earned by something that happened, and nothing that happens later can
+   * take it back. A tracker with no entry before a date was not being kept on
+   * that date, so it is not counted against it.
+   */
+  const expectedOn = (date: string): number => {
+    let n = 0;
+    for (const t of active) {
+      const from = firstSeen.get(t.id);
+      if (from && from <= date) n += 1;
+    }
+    return n;
+  };
+
   let fullestDay: Awards["fullestDay"] = null;
   for (const [date, count] of perDay) {
     if (!fullestDay || count > fullestDay.count) {
-      fullestDay = { date, count, of: active.length };
+      fullestDay = { date, count, of: expectedOn(date) };
+    }
+  }
+
+  // Every tracker you were keeping, all answered, on one day — ever. Checked
+  // day by day against that day's own list, so it cannot be revoked later.
+  let fullHouse = false;
+  for (const [date, count] of perDay) {
+    const expected = expectedOn(date);
+    if (expected > 0 && count >= expected) {
+      fullHouse = true;
+      break;
     }
   }
 
@@ -277,6 +312,7 @@ export function buildAwards({
   const done = standing.challengesDone;
   const overall = report.overall ?? 0;
   const fullest = fullestDay?.count ?? 0;
+  const fullestOf = fullestDay?.of ?? 0;
 
   const awards: Award[] = [
     {
@@ -363,10 +399,19 @@ export function buildAwards({
       id: "full-house",
       icon: "🌕",
       name: "Full house",
-      detail: "A day with every tracker filled in",
+      // "everything you were tracking", not "every tracker". The distinction
+      // is the whole of `expectedOn`: a day is judged against the trackers
+      // that were in use BY THEN, because judging it against today's list
+      // would let a tracker added in June un-complete a day in March — and
+      // this page promises that nothing on it can go down. The cost of that
+      // promise is a tracker you have never once logged: it is not counted
+      // against any day, so the wording does not claim it was.
+      detail: "A day with everything you were tracking filled in",
       // An account with no trackers has not earned this by vacuum.
-      earned: active.length > 0 && fullest >= active.length,
-      progress: active.length > 0 ? toward(fullest, active.length) : 0,
+      earned: fullHouse,
+      // Progress is against the best day's own list, for the same reason the
+      // award is: a new tracker must not knock the bar back.
+      progress: fullHouse ? 1 : fullestOf > 0 ? toward(fullest, fullestOf) : 0,
     },
   ];
 

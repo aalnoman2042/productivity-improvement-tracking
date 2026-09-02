@@ -25,6 +25,7 @@ export default function robots(): MetadataRoute.Robots {
           "/tracker/",
           "/settings",
           "/catchup",
+          "/awards",
           "/admin",
           "/start",
           "/reset",
