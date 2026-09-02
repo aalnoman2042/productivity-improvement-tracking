@@ -210,6 +210,9 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const wiped = await d
     .collection("entries")
     .deleteMany({ userId, trackerId });
+  // A timer still counting into it would outlive the tracker and block
+  // every other one, with no row left on screen to stop it from.
+  await d.collection("timers").deleteMany({ userId, trackerId });
   const res = await d.collection("trackers").deleteOne({ _id: trackerId, userId });
   if (res.deletedCount === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -20,7 +20,12 @@ export type Row = Record<string, unknown>;
 function matches(row: Row, query: Row): boolean {
   for (const [key, cond] of Object.entries(query)) {
     const value = row[key];
-    if (cond && typeof cond === "object" && !(cond instanceof ObjectId)) {
+    if (
+      cond &&
+      typeof cond === "object" &&
+      !(cond instanceof ObjectId) &&
+      !(cond instanceof Date)
+    ) {
       const c = cond as Record<string, unknown>;
       if ("$gte" in c && !(String(value) >= String(c.$gte))) return false;
       if ("$lte" in c && !(String(value) <= String(c.$lte))) return false;
@@ -40,6 +45,10 @@ function matches(row: Row, query: Row): boolean {
 
 function same(a: unknown, b: unknown): boolean {
   if (a instanceof ObjectId || b instanceof ObjectId) return String(a) === String(b);
+  // Two Dates for the same instant are equal to Mongo and `!==` to JS — and
+  // a route that identifies a row by a timestamp (which timer is this stop
+  // for?) is only tested at all if the fake agrees with Mongo here.
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
   return a === b;
 }
 

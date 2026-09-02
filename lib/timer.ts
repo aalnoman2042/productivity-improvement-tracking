@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { flush, getQueue, post } from "./sync";
 
 const KEY = "pit_timer";
 const CHANGE = "pit-timer-change";
+const PATH = "/api/timer";
+
+/** How often an open, visible screen re-asks whose timer is running. */
+const PULL_MS = 20_000;
+
+/** Focus and visibilitychange fire together on a wake; that is one ask. */
+const DEDUPE_MS = 3_000;
 
 /**
  * What a running timer is counting. "duration" is the stopwatch on a time
@@ -23,13 +31,31 @@ export type Running = {
 };
 
 /**
- * The running timer as an external store: localStorage is the source of
- * truth (it survives refreshes and is shared across tabs), and the snapshot
- * is memoised against the raw text so an unchanged value keeps its identity
- * — which is what `useSyncExternalStore` needs to not re-render forever.
+ * The one running timer.
  *
- * There is deliberately only one: two stopwatches counting the same hour is
- * how a day ends up with twenty-six of them in it.
+ * **The server holds it** (`/api/timer`); localStorage is this device's copy.
+ * That is the whole point of the split. A timer that lived only in the
+ * browser it was started in was a timer you could not stop from anywhere
+ * else: shut the laptop and it kept counting, out of reach of the phone in
+ * your pocket, until the machine came back hours later still ticking.
+ *
+ * Now the phone asks the server what is running and is handed the laptop's
+ * timer. Stopping it there stops it everywhere.
+ *
+ * localStorage stays for the two jobs it is still the right tool for:
+ * painting the clock immediately on load rather than after a round trip, and
+ * keeping a timer running through a tunnel with no signal. It is the cache,
+ * not the truth — when the server is reachable the server wins, **including
+ * when it says nothing is running**. That last part is what takes a stopped
+ * timer off the laptop's screen.
+ *
+ * Reading it is a `useSyncExternalStore` over a snapshot memoised against the
+ * raw text, so an unchanged value keeps its identity — which is what that
+ * hook needs to not re-render forever.
+ *
+ * There is deliberately only one, here and in the unique index on the
+ * collection: two stopwatches counting the same hour is how a day ends up
+ * with twenty-six of them in it.
  */
 let snap: { raw: string | null; value: Running | null } = {
   raw: null,
@@ -70,24 +96,171 @@ function broadcast() {
   window.dispatchEvent(new Event(CHANGE));
 }
 
-/** The timer running right now, on any tracker — null when none is. */
-export function useRunning(): Running | null {
-  return useSyncExternalStore(subscribeRunning, readRunning, noRunning);
-}
-
 /** Older stored timers carry no kind; they were all stopwatches. */
 export function kindOf(running: Running | null | undefined): TimerKind | null {
   return running ? running.kind ?? "duration" : null;
 }
 
-export function startTimer(next: Running): void {
-  localStorage.setItem(KEY, JSON.stringify(next));
+/** One field order, so an unchanged timer is recognisably unchanged. */
+function normalise(r: Running): Running {
+  return {
+    trackerId: r.trackerId,
+    date: r.date,
+    startedAt: r.startedAt,
+    kind: kindOf(r) ?? "duration",
+  };
+}
+
+/** Write this device's copy, and tell the screen only if something moved. */
+function writeLocal(next: Running | null): void {
+  const raw = next === null ? null : JSON.stringify(next);
+  try {
+    if (localStorage.getItem(KEY) === raw) return;
+    if (raw === null) localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, raw);
+  } catch {
+    return;
+  }
   broadcast();
 }
 
+/* --------------------------- the server's copy ------------------------- */
+
+/**
+ * Bumped by every start and stop pressed here, and again once the server has
+ * been told. An answer that crossed one of those was written by a server
+ * that had not heard yet, so it is dropped rather than allowed to undo the
+ * press that overtook it.
+ */
+let acts = 0;
+let lastPullAt = 0;
+
+/** A start or a stop typed with no signal is still on its way. */
+function queued(): boolean {
+  return getQueue().some((j) => j.path === PATH);
+}
+
+function fromServer(value: unknown): Running | null {
+  if (!value || typeof value !== "object") return null;
+  const r = value as Partial<Running>;
+  if (typeof r.trackerId !== "string" || typeof r.date !== "string") return null;
+  if (typeof r.startedAt !== "number" || !Number.isFinite(r.startedAt)) return null;
+  return normalise(r as Running);
+}
+
+async function pull(): Promise<void> {
+  lastPullAt = Date.now();
+  // Anything queued is newer than what the server can currently say.
+  if (queued()) return;
+  const seen = acts;
+  try {
+    const res = await fetch(PATH, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = (await res.json()) as { running?: unknown };
+    // Start or stop was pressed on this device while we were asking.
+    if (acts !== seen || queued()) return;
+    writeLocal(fromServer(data.running));
+  } catch {
+    /* offline — this device's copy stands, and keeps counting */
+  }
+}
+
+/** Ask again, unless we asked a moment ago. */
+function revalidate(): void {
+  if (Date.now() - lastPullAt < DEDUPE_MS) return;
+  void pull();
+}
+
+async function push(body: unknown): Promise<void> {
+  let refused = false;
+  try {
+    // Queues itself when there is no signal, and is replayed in order — so a
+    // start and the stop that follows it arrive the right way round.
+    await post(PATH, body);
+  } catch {
+    refused = true;
+  }
+  // The server has been told now; a reply still in flight has not.
+  acts++;
+  if (refused) {
+    // A 4xx — the tracker was deleted on another device, say. The server
+    // will never hold this timer, and a clock ticking here that no other
+    // device can see is the exact thing this file exists to end.
+    await pull();
+  }
+}
+
+/* ------------------------- one poller, not two ------------------------- */
+
+let watchers = 0;
+let release: (() => void) | null = null;
+
+/**
+ * The daily page mounts a stopwatch per time tracker and a nap panel per
+ * sleep row, and every one of them reads this store — so the listeners and
+ * the interval are counted, not per component. Otherwise a page of trackers
+ * is a page of pollers all asking the same question.
+ */
+function attach(): () => void {
+  watchers += 1;
+  if (watchers === 1) {
+    const visible = () =>
+      typeof document === "undefined" || document.visibilityState === "visible";
+    const onWake = () => {
+      if (visible()) revalidate();
+    };
+    const onOnline = () => {
+      // Deliver what was typed offline first, so the answer that follows is
+      // read from a server that already knows about it.
+      void flush().then(() => pull());
+    };
+
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("online", onOnline);
+    const id = setInterval(onWake, PULL_MS);
+
+    release = () => {
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("online", onOnline);
+      clearInterval(id);
+    };
+    void pull();
+  }
+  return () => {
+    watchers -= 1;
+    if (watchers === 0) {
+      release?.();
+      release = null;
+    }
+  };
+}
+
+/* -------------------------------- hooks -------------------------------- */
+
+/** The timer running right now, on any tracker — null when none is. */
+export function useRunning(): Running | null {
+  const running = useSyncExternalStore(subscribeRunning, readRunning, noRunning);
+  useEffect(attach, []);
+  return running;
+}
+
+export function startTimer(next: Running): void {
+  const running = normalise(next);
+  writeLocal(running);
+  acts++;
+  void push(running);
+}
+
 export function clearTimer(): void {
-  localStorage.removeItem(KEY);
-  broadcast();
+  // Read it before dropping it: a stop names the timer it was pressed on, so
+  // one that has to wait for signal can only ever remove that same timer and
+  // never a fresh one begun in the meantime.
+  const was = readRunning();
+  writeLocal(null);
+  acts++;
+  void push({ stop: true, startedAt: was?.startedAt ?? null });
 }
 
 /**

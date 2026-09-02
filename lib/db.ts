@@ -242,7 +242,7 @@ const VALIDATORS: Record<string, object> = {
               required: ["mins"],
               properties: {
                 mins: { bsonType: "number", minimum: 1, maximum: 1440 },
-                at: { bsonType: ["string", "null"], pattern: "^\d{2}:\d{2}$" },
+                at: { bsonType: ["string", "null"], pattern: "^\\d{2}:\\d{2}$" },
               },
             },
           },
@@ -435,6 +435,30 @@ const VALIDATORS: Record<string, object> = {
       createdAt: { bsonType: "date" },
     },
   },
+  // The one timer that is running right now — the stopwatch on a time
+  // tracker, or the nap on a sleep row. One row per person at most, which is
+  // what the unique index says out loud.
+  //
+  // It lives here rather than in the browser it was started from because a
+  // timer you cannot reach is a timer you cannot stop: the laptop gets shut,
+  // the hour keeps counting, and the phone in your pocket — the one device
+  // you actually have — has no idea any of it is happening.
+  timers: {
+    bsonType: "object",
+    required: ["userId", "trackerId", "date", "startedAt", "kind", "updatedAt"],
+    properties: {
+      userId: { bsonType: "objectId" },
+      trackerId: { bsonType: "objectId" },
+      // The day the minutes belong to, which is the day it was *started* on
+      // and not necessarily the day it is stopped on.
+      date: { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      startedAt: { bsonType: "date" },
+      // Which of the two it is — see `lib/timer.ts`. A stopwatch's minutes
+      // go straight to the day's total; a nap's are handed to the draft.
+      kind: { enum: ["duration", "nap"] },
+      updatedAt: { bsonType: "date" },
+    },
+  },
   // Attempt counters for the routes reachable without a session. `_id` is
   // "action:subject" and rows delete themselves once the window has passed.
   rateLimits: {
@@ -517,6 +541,9 @@ async function ensureSchema(d: Db): Promise<void> {
     // The same browser re-subscribing must update its row, not add another.
     d.collection("pushSubs").createIndex({ endpoint: 1 }, { unique: true }),
     d.collection("pushSubs").createIndex({ userId: 1 }),
+    // One running timer per person, enforced where no client can talk it
+    // out of it. Every read of it is this lookup.
+    d.collection("timers").createIndex({ userId: 1 }, { unique: true }),
     // Both of these are self-cleaning: MongoDB drops the row once the date
     // field is in the past (plus the TTL), so neither collection grows.
     d

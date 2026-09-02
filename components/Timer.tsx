@@ -13,9 +13,12 @@ import {
 } from "@/lib/timer";
 
 /**
- * Stopwatch for a "time spent" tracker. The running state lives in
- * localStorage (see `lib/timer`), so closing the tab or refreshing doesn't
- * lose the session. Stopping adds the elapsed minutes to that day's total.
+ * Stopwatch for a "time spent" tracker. The running state lives on the
+ * server (see `lib/timer`), so it survives a refresh, a closed tab and a
+ * shut-down machine — and, the reason it is there rather than in this
+ * browser, it can be stopped from the phone in your pocket instead of only
+ * from whatever you happened to start it on. Stopping adds the elapsed
+ * minutes to that day's total.
  */
 export default function Timer({
   trackerId,

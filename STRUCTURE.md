@@ -95,8 +95,8 @@ lib/                pure logic, shared helpers, and the database
                      targets.ts — a number with a date on it, and the
                        arrival date your own pace implies;
                      pixels.ts — a year laid out as calendar weeks;
-                     timer.ts — the one running timer, and why there is
-                       only ever one of them;
+                     timer.ts — the one running timer, why the server holds
+                       it, and why there is only ever one of them;
                      outlier.ts — is this number a typo? asked, never enforced;
                      awards.ts — the rank ladder, the awards, the records;
                      fading.ts — the trackers that were a habit and stopped;
@@ -124,7 +124,7 @@ there even when only two routes need it. Components render; they don't decide.
 
 ## 5. Data model
 
-Thirteen collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
+Fourteen collections, every one with a `$jsonSchema` validator in `lib/db.ts`,
 so the BSON types stay honest (real `ObjectId` refs, real `Date`s, real
 booleans). Collections self-create on first write — there is never any manual
 Atlas work. `npm run check:db` reads back what the cluster is actually
@@ -142,6 +142,7 @@ enforcing and compares it to the code.
 | `aiReviews` | text, snapshot, today, model | — (latest wins) |
 | `weeklyReviews` | weekStart, weekEnd, text, snapshot, digest | (userId, weekEnd) |
 | `restDays` | date, reason | (userId, date) |
+| `timers` | trackerId, date, startedAt, kind | userId (one running timer) |
 | `pushSubs` | endpoint, keys | endpoint |
 | `rateLimits` | count, resetAt | `_id` = `action:subject` (TTL) |
 | `cronRuns` | job, startedAt, result | — (TTL, 30 days) |
@@ -514,6 +515,13 @@ quietly would be worse than failing loudly.
     something that happened, so a bad month cannot withdraw it, and a rank is
     held only when *every* one of its requirements holds — you do not average
     your way to a title (`lib/awards`).
+22. **A running timer belongs to the person, not to a browser.** It lives in
+    `timers`, one row per account, so every device sees the same one and any
+    of them can end it. localStorage is that device's cache — it paints the
+    clock instantly and keeps counting with no signal — and when the server
+    is reachable the server wins, *including when it says nothing is
+    running*. A timer only one machine can stop is a timer that runs all
+    night once that machine is off (`lib/timer`).
 
 ---
 

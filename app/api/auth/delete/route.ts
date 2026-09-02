@@ -51,6 +51,7 @@ const OWNED = [
   "aiReviews",
   "weeklyReviews",
   "pushSubs",
+  "timers",
 ] as const;
 
 export async function POST(req: Request) {
