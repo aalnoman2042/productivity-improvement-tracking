@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  carryMinutes,
   DAY_MINUTES,
   EMPTY,
   dayTimeTotal,
@@ -306,5 +307,43 @@ describe("slipNeedsReason", () => {
     expect(slipsMissingReason(trackers, draft).map((t) => t.name)).toEqual([
       "No smoking",
     ]);
+  });
+});
+
+describe("carryMinutes — 1h 90m is 2h 30m", () => {
+  it("carries a full hour out of the minutes box", () => {
+    expect(carryMinutes("1", "90")).toEqual({ h: "2", m: "30" });
+  });
+
+  it("works from an empty hours box", () => {
+    expect(carryMinutes("", "90")).toEqual({ h: "1", m: "30" });
+  });
+
+  it("takes exactly sixty as a whole hour", () => {
+    expect(carryMinutes("0", "60")).toEqual({ h: "1", m: "0" });
+  });
+
+  it("says there is nothing to do below sixty", () => {
+    // Null rather than an unchanged object, so a blur on a clean draft does
+    // not write to it and mark it dirty for nothing.
+    expect(carryMinutes("2", "59")).toBeNull();
+    expect(carryMinutes("2", "0")).toBeNull();
+    expect(carryMinutes("", "")).toBeNull();
+  });
+
+  it("never changes the total, which is the whole point", () => {
+    for (const [h, m] of [["1", "90"], ["", "75"], ["3", "60"], ["0", "99"]]) {
+      const before = (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
+      const after = carryMinutes(h, m);
+      expect(after).not.toBeNull();
+      const total = (parseInt(after!.h, 10) || 0) * 60 + (parseInt(after!.m, 10) || 0);
+      expect(total).toBe(before);
+    }
+  });
+
+  it("leaves both boxes inside two digits, which is what they now accept", () => {
+    const carried = carryMinutes("9", "99")!;
+    expect(carried.h.length).toBeLessThanOrEqual(2);
+    expect(carried.m.length).toBeLessThanOrEqual(2);
   });
 });

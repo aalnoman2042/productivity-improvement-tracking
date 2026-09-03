@@ -5,6 +5,7 @@ import NapPanel from "@/components/NapPanel";
 import Timer from "@/components/Timer";
 import {
   EMPTY,
+  carryMinutes,
   digits,
   isLogged,
   napMinutes,
@@ -116,7 +117,14 @@ export default function TrackerInput({
           inputMode="numeric"
           placeholder={offer?.patch.m || "0"}
           value={dr.m}
-          onChange={(e) => set(t.id, { m: digits(e.target.value, 3) })}
+          // Two digits, like the hours box beside it. Sixty and over is not
+          // refused — it is carried into the hours on blur, so typing 90
+          // where you mean an hour and a half works and then says so.
+          onChange={(e) => set(t.id, { m: digits(e.target.value, 2) })}
+          onBlur={() => {
+            const carried = carryMinutes(dr.h, dr.m);
+            if (carried) set(t.id, carried);
+          }}
           className={`${field} ${big ? "w-16" : "w-12"}`}
           aria-label={`${t.name} minutes`}
         />

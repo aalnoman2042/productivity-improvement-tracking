@@ -226,6 +226,29 @@ export function digits(raw: string, max: number): string {
   return raw.replace(/[^0-9]/g, "").slice(0, max);
 }
 
+/**
+ * 1h 90m is 2h 30m — said in the boxes rather than only in the total.
+ *
+ * The arithmetic never needed this: `draftToEntry` already computes
+ * `h * 60 + m`, so ninety minutes has always been worth ninety minutes
+ * whichever box it was typed in. What needed it is the *display*, now that
+ * both boxes take two digits: somebody who means an hour and a half types 90
+ * into the minutes box, and the boxes should agree with the total instead of
+ * sitting there reading "0h 90m".
+ *
+ * Returns null when there is nothing to carry, so the caller can skip the
+ * write — a `set()` on every blur would mark a clean draft dirty for nothing.
+ */
+export function carryMinutes(
+  h: string,
+  m: string
+): { h: string; m: string } | null {
+  const mins = parseInt(m, 10);
+  if (!Number.isFinite(mins) || mins < 60) return null;
+  const total = (parseInt(h, 10) || 0) * 60 + mins;
+  return { h: String(Math.floor(total / 60)), m: String(total % 60) };
+}
+
 /** Minutes in a day — the hard ceiling on a day's time log. */
 export const DAY_MINUTES = 24 * 60;
 
