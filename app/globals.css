@@ -84,29 +84,24 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* Charcoal, not black, and settled one step down from the first attempt.
-     The old ramp put #0d0d0d under a #1a1a19 card: true black is the cheapest
-     dark theme to make and the harshest to read on, because every edge in the
-     app becomes maximum contrast and the shadows that separate one card from
-     the next have nothing to fall on. But #333333 as the card read too washed
-     out, so that value moved up to be the *raised* step (inputs, chips,
-     skeletons) and the card sits at #2a2a2a with the page below it at
-     #1c1c1c.
+  /* Shiny black. The page is near-black and the cards are a step above it
+     with a glossy finish (see the dark `.card` rule): a soft sheen across the
+     top and a bright hairline along the top edge. That sheen and hairline
+     separate one card from the next, because a dark shadow does nothing on a
+     black page. That problem is why an earlier version of this theme avoided
+     true black.
 
-     Every ink is measured against the card rather than carried over from the
-     old ramp — the muted grey that cleared 4.5:1 on near-black manages 3.0:1
-     on #333333, which is why this is a re-measured set and not the old one
-     lightened. On #2a2a2a the whole ramp has room to spare: secondary 8.6:1,
-     muted 6.2:1. */
-  --background: #1c1c1c;
+     Every ink colour gains contrast on the darker card, so none had to move:
+     secondary and muted text both stay well above 4.5:1. */
+  --background: #0a0a0b;
   --foreground: #ffffff;
-  --surface: #2a2a2a;
-  --surface-2: #333333;
+  --surface: #141416;
+  --surface-2: #1f1f22;
   --ink-secondary: #c9c8c0;
   --ink-muted: #acaaa3;
-  --chart-grid: #383838;
-  --chart-axis: #474747;
-  --edge: #3d3d3d;
+  --chart-grid: #232326;
+  --chart-axis: #36363b;
+  --edge: #2a2a2e;
 
   /* `--accent` is pinned between two contrast floors that move in opposite
      directions: it is a text colour in 71 places AND a button background
@@ -120,14 +115,14 @@
   --accent-soft: #1b2c42;
 
   --grad-brand: linear-gradient(135deg, #3987e5 0%, #2a6ec4 55%, #6a5ce0 100%);
-  --grad-card: linear-gradient(180deg, #2d2d2d 0%, #272727 100%);
+  --grad-card: linear-gradient(180deg, #1c1c1f 0%, #121214 60%, #0f0f11 100%);
 
-  /* Pulled back a step: the same tint reads stronger over charcoal than it
-     did over black, where most of it was being swallowed. */
+  /* Faint colour under the black, so the page reads as deep rather than
+     flat. Black swallows most of the tint, so these show as a glow. */
   --wash-1: rgba(57, 135, 229, 0.17);
   --wash-2: rgba(144, 133, 233, 0.14);
   --wash-3: rgba(25, 158, 112, 0.1);
-  --wash-base: #1c1c1c;
+  --wash-base: #0a0a0b;
 
   --series-1: #3987e5;
   --series-2: #d95926;
@@ -430,27 +425,39 @@ body::before {
     0 24px 48px -20px rgba(60, 50, 38, 0.3);
 }
 
-/* Dark mode needs a third layer the light one doesn't: a black card on a
-   black page casts a shadow nobody can see, so a hairline of light along
-   its top edge does the separating instead. (In light mode that highlight
-   would be white on white — which is why it isn't up there.) */
+/* Dark mode needs more than shadow: a black card on a black page casts a
+   shadow nobody can see. So the dark card is glossy. A diagonal sheen sits
+   over the card gradient, and a bright hairline runs along the top edge, the
+   way light catches lacquer. (In light mode that highlight would be white on
+   white, which is why it isn't up there.) */
 :root[data-theme="dark"] .card {
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.02) 38%,
+      transparent 60%
+    ),
+    var(--grad-card);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    0 6px 16px -8px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    0 8px 20px -8px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 :root[data-theme="dark"] .card.shadow-md {
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.55),
-    0 12px 28px -12px rgba(0, 0, 0, 0.7),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    0 2px 6px rgba(0, 0, 0, 0.75),
+    0 14px 30px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 :root[data-theme="dark"] .card.shadow-lg {
   box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.6),
-    0 24px 48px -20px rgba(0, 0, 0, 0.8),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    0 4px 10px rgba(0, 0, 0, 0.8),
+    0 24px 48px -20px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 /* Headings pull in slightly as they grow, the way type is set on paper: at
